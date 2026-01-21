@@ -1,0 +1,5 @@
+                        <a href="#" class="text-blue-600 hover:text-blue-900 mr-3">查看</a><a href="#" class="text-primary hover:text-primary-dark mr-3">编辑</a>
+                        operator: '张三',
+                        remark: '客户订单#20240721-001',
+                        operator: '李四',
+                        remark: '采购入库',
