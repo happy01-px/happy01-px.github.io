@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿// 当前登录用户
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// 当前登录用户
 const currentUser = {
     id: 'U001',
     name: '张三',
@@ -353,7 +353,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const addOutboundBtn = document.getElementById('add-outbound-btn');
     if (addOutboundBtn) {
         addOutboundBtn.addEventListener('click', function() {
-            showAddOutboundModal();
+            showSection('sales-order');
+            // 初始化销售单
+            initSalesOrder();
         });
     }
     
@@ -712,7 +714,8 @@ function showModal(title, content, confirmCallback) {
     // Remove old event listener by cloning node or just setting onclick (simpler for now)
     confirmBtn.onclick = function() {
         if (typeof confirmCallback === 'function') {
-            confirmCallback();
+            const result = confirmCallback();
+            if (result === false) return; // 如果回调返回false，则阻止关闭
         }
         document.getElementById('modal').classList.add('hidden');
     };
@@ -935,23 +938,49 @@ function updateInventoryTable() {
 
 // 显示新增进货模态框
 function showAddInboundModal() {
-    // 商品选项
-    let productOptions = '<option value="">请选择商品</option>';
-    mockData.products.forEach(p => {
-        productOptions += `<option value="${p.id}">${p.name} (当前库存: ${p.stockQuantity})</option>`;
-    });
-
+    // 使用自定义下拉框替代原生select，以支持模糊搜索和滚动加载
     const content = `
         <form id="add-inbound-form" class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">商品 <span class="text-danger">*</span></label>
-                <select name="productId" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                    ${productOptions}
-                </select>
+                <div class="relative group">
+                    <input type="hidden" name="productId" id="inbound-product-id" required>
+                    <input type="text" id="inbound-product-search" placeholder="请选择或搜索商品..." autocomplete="off"
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer">
+                    <!-- 下拉图标 -->
+                    <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                    <!-- 下拉列表容器 -->
+                    <div id="inbound-product-dropdown" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto hidden">
+                        <div id="inbound-product-list" class="divide-y divide-gray-100">
+                            <!-- 动态加载选项 -->
+                        </div>
+                        <div id="inbound-product-loading" class="text-center py-2 text-gray-500 text-sm hidden">加载中...</div>
+                    </div>
+                </div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">数量 <span class="text-danger">*</span></label>
                 <input type="number" name="quantity" min="1" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">供应商 <span class="text-danger">*</span></label>
+                <div class="relative group">
+                    <input type="hidden" name="supplierId" id="inbound-supplier-id" required>
+                    <input type="text" id="inbound-supplier-search" placeholder="请选择或搜索供应商..." autocomplete="off"
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer">
+                    <!-- 下拉图标 -->
+                    <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                    <!-- 下拉列表容器 -->
+                    <div id="inbound-supplier-dropdown" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto hidden">
+                        <div id="inbound-supplier-list" class="divide-y divide-gray-100">
+                            <!-- 动态加载选项 -->
+                        </div>
+                    </div>
+                </div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
@@ -963,14 +992,39 @@ function showAddInboundModal() {
     showModal('新增进货', content, function() {
         const form = document.getElementById('add-inbound-form');
         const formData = new FormData(form);
-        const productId = formData.get('productId');
+        const productId = formData.get('productId'); // 获取隐藏域的值
+        const quantityStr = formData.get('quantity');
+        const supplierId = formData.get('supplierId');
+        
+        // 必填校验
+        if (!productId) {
+            alert('请选择商品（必填）');
+            return false;
+        }
+        if (!quantityStr) {
+            alert('请输入数量（必填）');
+            return false;
+        }
+        if (!supplierId) {
+            alert('请选择供应商（必填）');
+            return false;
+        }
+
         const product = mockData.products.find(p => p.id === productId);
         
         if (product) {
-            const quantity = parseInt(formData.get('quantity'));
+            const quantity = parseInt(quantityStr);
+            if (isNaN(quantity) || quantity <= 0) {
+                alert('请输入有效的数量');
+                return false;
+            }
+
             // 更新库存
             product.stockQuantity += quantity;
             product.updatedAt = new Date().toISOString().split('T')[0];
+            const remarkValue = (formData.get('remark') || '').trim();
+            const selectedSupplierId = formData.get('supplierId');
+            const supplier = mockData.suppliers.find(s => s.id === selectedSupplierId);
             
             // 添加进货记录
             const record = {
@@ -980,8 +1034,10 @@ function showAddInboundModal() {
                 productName: product.name,
                 quantity: quantity,
                 unit: product.unit,
+                supplierId: selectedSupplierId,
+                supplierName: supplier ? supplier.name : '-',
                 operator: currentUser.name,
-                remark: formData.get('remark') || '进货入库',
+                remark: remarkValue || '-', // 默认备注为 -
                 createdAt: new Date(),
                 updatedAt: new Date()
             };
@@ -999,25 +1055,234 @@ function showAddInboundModal() {
             updateInventoryTable();
             
             alert('进货记录添加成功');
+            return false;
         }
     });
+
+    // --- 商品下拉逻辑 ---
+    const searchInput = document.getElementById('inbound-product-search');
+    const hiddenInput = document.getElementById('inbound-product-id');
+    const dropdown = document.getElementById('inbound-product-dropdown');
+    const listEl = document.getElementById('inbound-product-list');
+    const loadingEl = document.getElementById('inbound-product-loading');
+    
+    // --- 供应商下拉逻辑 ---
+    const supplierSearchInput = document.getElementById('inbound-supplier-search');
+    const supplierHiddenInput = document.getElementById('inbound-supplier-id');
+    const supplierDropdown = document.getElementById('inbound-supplier-dropdown');
+    const supplierListEl = document.getElementById('inbound-supplier-list');
+
+    let filteredProducts = [...mockData.products];
+    const pageSize = 10;
+    let page = 1;
+
+    // 渲染商品列表
+    const renderList = (append = false) => {
+        if (!listEl) return;
+        if (!append) listEl.innerHTML = '';
+        
+        const start = (page - 1) * pageSize;
+        const end = page * pageSize;
+        const items = filteredProducts.slice(start, end);
+
+        if (items.length === 0 && !append) {
+            listEl.innerHTML = '<div class="px-3 py-2 text-gray-500 text-sm">无匹配商品</div>';
+            return;
+        }
+
+        const html = items.map(p => `
+            <div class="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm border-b border-gray-50 last:border-b-0" 
+                 data-id="${p.id}" 
+                 data-name="${p.name}" 
+                 data-supplier="${p.supplierId || ''}">
+                <div class="font-medium text-gray-900">${p.name}</div>
+                <div class="text-xs text-gray-500 flex justify-between">
+                    <span>库存: ${p.stockQuantity}</span>
+                    <span>编码: ${p.id}</span>
+                </div>
+            </div>
+        `).join('');
+
+        if (append) {
+            listEl.insertAdjacentHTML('beforeend', html);
+        } else {
+            listEl.innerHTML = html;
+        }
+    };
+
+    // 渲染供应商列表
+    const renderSupplierList = (filter = '') => {
+        if (!supplierListEl) return;
+        
+        const keyword = filter.toLowerCase();
+        const items = mockData.suppliers.filter(s => 
+            s.name.toLowerCase().includes(keyword) || 
+            s.id.toLowerCase().includes(keyword)
+        );
+
+        if (items.length === 0) {
+            supplierListEl.innerHTML = '<div class="px-3 py-2 text-gray-500 text-sm">无匹配供应商</div>';
+            return;
+        }
+
+        const html = items.map(s => `
+            <div class="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm border-b border-gray-50 last:border-b-0" 
+                 data-id="${s.id}" 
+                 data-name="${s.name}">
+                <div class="font-medium text-gray-900">${s.name}</div>
+            </div>
+        `).join('');
+
+        supplierListEl.innerHTML = html;
+    };
+
+    // 初始化渲染
+    renderList();
+    renderSupplierList();
+
+    // --- 商品事件监听 ---
+    if (searchInput && dropdown) {
+        searchInput.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown.classList.remove('hidden');
+            supplierDropdown.classList.add('hidden'); // 关闭另一个
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            const keyword = e.target.value.trim().toLowerCase();
+            if (keyword === '') {
+                filteredProducts = [...mockData.products];
+            } else {
+                filteredProducts = mockData.products.filter(p => 
+                    p.name.toLowerCase().includes(keyword) || 
+                    p.id.toLowerCase().includes(keyword)
+                );
+            }
+            page = 1;
+            renderList(false);
+            dropdown.classList.remove('hidden');
+            hiddenInput.value = '';
+        });
+    }
+
+    if (listEl) {
+        listEl.addEventListener('click', (e) => {
+            const item = e.target.closest('[data-id]');
+            if (!item) return;
+
+            const id = item.dataset.id;
+            const name = item.dataset.name;
+            const supplierId = item.dataset.supplier;
+
+            searchInput.value = name;
+            hiddenInput.value = id;
+            dropdown.classList.add('hidden');
+
+            // 自动选择供应商
+            if (supplierHiddenInput && supplierSearchInput) {
+                supplierHiddenInput.value = supplierId;
+                const supplier = mockData.suppliers.find(s => s.id === supplierId);
+                if (supplier) {
+                    supplierSearchInput.value = supplier.name;
+                } else {
+                    supplierSearchInput.value = '';
+                }
+            }
+        });
+    }
+
+    if (dropdown) {
+        dropdown.addEventListener('scroll', () => {
+            if (dropdown.scrollTop + dropdown.clientHeight >= dropdown.scrollHeight - 20) {
+                if (page * pageSize < filteredProducts.length) {
+                    loadingEl.classList.remove('hidden');
+                    if (dropdown.dataset.loading === 'true') return;
+                    dropdown.dataset.loading = 'true';
+                    
+                    setTimeout(() => {
+                        page++;
+                        renderList(true);
+                        loadingEl.classList.add('hidden');
+                        dropdown.dataset.loading = 'false';
+                    }, 200);
+                }
+            }
+        });
+    }
+
+    // --- 供应商事件监听 ---
+    if (supplierSearchInput && supplierDropdown) {
+        supplierSearchInput.addEventListener('click', (e) => {
+            e.stopPropagation();
+            supplierDropdown.classList.remove('hidden');
+            dropdown.classList.add('hidden'); // 关闭另一个
+        });
+
+        supplierSearchInput.addEventListener('input', (e) => {
+            const keyword = e.target.value.trim();
+            renderSupplierList(keyword);
+            supplierDropdown.classList.remove('hidden');
+            supplierHiddenInput.value = '';
+        });
+    }
+
+    if (supplierListEl) {
+        supplierListEl.addEventListener('click', (e) => {
+            const item = e.target.closest('[data-id]');
+            if (!item) return;
+
+            const id = item.dataset.id;
+            const name = item.dataset.name;
+
+            supplierSearchInput.value = name;
+            supplierHiddenInput.value = id;
+            supplierDropdown.classList.add('hidden');
+        });
+    }
+
+    // 点击外部关闭所有下拉
+    const closeDropdowns = (e) => {
+        const isClickInsideProduct = searchInput && searchInput.contains(e.target) || dropdown && dropdown.contains(e.target);
+        const isClickInsideSupplier = supplierSearchInput && supplierSearchInput.contains(e.target) || supplierDropdown && supplierDropdown.contains(e.target);
+
+        if (!isClickInsideProduct && dropdown) {
+            dropdown.classList.add('hidden');
+        }
+        if (!isClickInsideSupplier && supplierDropdown) {
+            supplierDropdown.classList.add('hidden');
+        }
+    };
+    
+    if (window.inboundDropdownCloser) {
+        document.removeEventListener('click', window.inboundDropdownCloser);
+    }
+    window.inboundDropdownCloser = closeDropdowns;
+    document.addEventListener('click', window.inboundDropdownCloser);
 }
 
 // 显示新增出货模态框
 function showAddOutboundModal() {
-    // 商品选项
-    let productOptions = '<option value="">请选择商品</option>';
-    mockData.products.forEach(p => {
-        productOptions += `<option value="${p.id}">${p.name} (当前库存: ${p.stockQuantity})</option>`;
-    });
-
+    // 使用自定义下拉框替代原生select，以支持模糊搜索和滚动加载
     const content = `
         <form id="add-outbound-form" class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">商品 <span class="text-danger">*</span></label>
-                <select name="productId" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                    ${productOptions}
-                </select>
+                <div class="relative group">
+                    <input type="hidden" name="productId" id="outbound-product-id" required>
+                    <input type="text" id="outbound-product-search" placeholder="请选择或搜索商品..." autocomplete="off"
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer">
+                    <!-- 下拉图标 -->
+                    <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                    <!-- 下拉列表容器 -->
+                    <div id="outbound-product-dropdown" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto hidden">
+                        <div id="outbound-product-list" class="divide-y divide-gray-100">
+                            <!-- 动态加载选项 -->
+                        </div>
+                        <div id="outbound-product-loading" class="text-center py-2 text-gray-500 text-sm hidden">加载中...</div>
+                    </div>
+                </div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">数量 <span class="text-danger">*</span></label>
@@ -1034,14 +1299,30 @@ function showAddOutboundModal() {
         const form = document.getElementById('add-outbound-form');
         const formData = new FormData(form);
         const productId = formData.get('productId');
+        const quantityStr = formData.get('quantity');
+
+        // 必填校验
+        if (!productId) {
+            alert('请选择商品（必填）');
+            return false;
+        }
+        if (!quantityStr) {
+            alert('请输入数量（必填）');
+            return false;
+        }
+
         const product = mockData.products.find(p => p.id === productId);
         
         if (product) {
-            const quantity = parseInt(formData.get('quantity'));
+            const quantity = parseInt(quantityStr);
+            if (isNaN(quantity) || quantity <= 0) {
+                alert('请输入有效的数量');
+                return false;
+            }
             
             if (product.stockQuantity < quantity) {
                 alert(`库存不足！当前库存：${product.stockQuantity}`);
-                return; // 不关闭模态框
+                return false; // 不关闭模态框
             }
             
             // 更新库存
@@ -1075,8 +1356,126 @@ function showAddOutboundModal() {
             updateInventoryTable();
             
             alert('出货记录添加成功');
+            return false;
         }
     });
+
+    // --- 商品下拉逻辑 ---
+    const searchInput = document.getElementById('outbound-product-search');
+    const hiddenInput = document.getElementById('outbound-product-id');
+    const dropdown = document.getElementById('outbound-product-dropdown');
+    const listEl = document.getElementById('outbound-product-list');
+    const loadingEl = document.getElementById('outbound-product-loading');
+    
+    let filteredProducts = [...mockData.products];
+    const pageSize = 10;
+    let page = 1;
+
+    // 渲染商品列表
+    const renderList = (append = false) => {
+        if (!listEl) return;
+        if (!append) listEl.innerHTML = '';
+        
+        const start = (page - 1) * pageSize;
+        const end = page * pageSize;
+        const items = filteredProducts.slice(start, end);
+
+        if (items.length === 0 && !append) {
+            listEl.innerHTML = '<div class="px-3 py-2 text-gray-500 text-sm">无匹配商品</div>';
+            return;
+        }
+
+        const html = items.map(p => `
+            <div class="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm border-b border-gray-50 last:border-b-0" 
+                 data-id="${p.id}" 
+                 data-name="${p.name}">
+                <div class="font-medium text-gray-900">${p.name}</div>
+                <div class="text-xs text-gray-500 flex justify-between">
+                    <span>库存: ${p.stockQuantity}</span>
+                    <span>编码: ${p.id}</span>
+                </div>
+            </div>
+        `).join('');
+
+        if (append) {
+            listEl.insertAdjacentHTML('beforeend', html);
+        } else {
+            listEl.innerHTML = html;
+        }
+    };
+
+    // 初始化渲染
+    renderList();
+
+    // --- 商品事件监听 ---
+    if (searchInput && dropdown) {
+        searchInput.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown.classList.remove('hidden');
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            const keyword = e.target.value.trim().toLowerCase();
+            if (keyword === '') {
+                filteredProducts = [...mockData.products];
+            } else {
+                filteredProducts = mockData.products.filter(p => 
+                    p.name.toLowerCase().includes(keyword) || 
+                    p.id.toLowerCase().includes(keyword)
+                );
+            }
+            page = 1;
+            renderList(false);
+            dropdown.classList.remove('hidden');
+            hiddenInput.value = '';
+        });
+    }
+
+    if (listEl) {
+        listEl.addEventListener('click', (e) => {
+            const item = e.target.closest('[data-id]');
+            if (!item) return;
+
+            const id = item.dataset.id;
+            const name = item.dataset.name;
+
+            searchInput.value = name;
+            hiddenInput.value = id;
+            dropdown.classList.add('hidden');
+        });
+    }
+
+    if (dropdown) {
+        dropdown.addEventListener('scroll', () => {
+            if (dropdown.scrollTop + dropdown.clientHeight >= dropdown.scrollHeight - 20) {
+                if (page * pageSize < filteredProducts.length) {
+                    loadingEl.classList.remove('hidden');
+                    if (dropdown.dataset.loading === 'true') return;
+                    dropdown.dataset.loading = 'true';
+                    
+                    setTimeout(() => {
+                        page++;
+                        renderList(true);
+                        loadingEl.classList.add('hidden');
+                        dropdown.dataset.loading = 'false';
+                    }, 200);
+                }
+            }
+        });
+    }
+
+    // 点击外部关闭
+    const closeDropdown = (e) => {
+        if (searchInput && dropdown && !searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.add('hidden');
+        }
+    };
+    
+    if (window.outboundDropdownCloser) {
+        document.removeEventListener('click', window.outboundDropdownCloser);
+    }
+    window.outboundDropdownCloser = closeDropdown;
+    document.addEventListener('click', window.outboundDropdownCloser);
 }
 
 // 根据商品分类获取图标
@@ -1265,6 +1664,7 @@ function getInitial(name) {
 function renderStockMovementTable(filter = 'all') {
     const tableBody = document.getElementById('stock-movement-table-body');
     if (!tableBody) return;
+    const tableHead = document.getElementById('stock-movement-table-head');
     
     tableBody.innerHTML = '';
     
@@ -1275,11 +1675,33 @@ function renderStockMovementTable(filter = 'all') {
     } else if (filter === 'outbound') {
         filteredData = stockMovementData.filter(record => record.type === 'outbound');
     }
+
+    if (tableHead) {
+        if (filter === 'inbound') {
+            tableHead.innerHTML = `
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">商品名称</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">数量变动</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">供应商</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">备注</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建与更新</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+            `;
+        } else {
+            tableHead.innerHTML = `
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">商品名称</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作类型</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">数量变动</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">备注</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建与更新</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+            `;
+        }
+    }
     
     if (filteredData.length === 0) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">暂无记录</td>
+                <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">暂无记录</td>
             </tr>
         `;
         return;
@@ -1288,11 +1710,16 @@ function renderStockMovementTable(filter = 'all') {
     // 按时间倒序排列
     filteredData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     
+    const supplierMap = new Map(mockData.suppliers.map(supplier => [supplier.id, supplier.name]));
+    const productMap = new Map(mockData.products.map(product => [product.id, product]));
+    
     filteredData.forEach(record => {
         const typeText = record.type === 'inbound' ? '入库' : '出库';
         const typeClass = record.type === 'inbound' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
         const quantityClass = record.type === 'inbound' ? 'text-green-600' : 'text-blue-600';
         const quantitySign = record.type === 'inbound' ? '+' : '-';
+        const product = productMap.get(record.productId);
+        const supplierName = record.supplierName || (product ? supplierMap.get(product.supplierId) : '') || '-';
         
         const createdAt = new Date(record.createdAt);
         const updatedAt = new Date(record.updatedAt);
@@ -1316,43 +1743,81 @@ function renderStockMovementTable(filter = 'all') {
         });
         
         const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.productName}</td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${typeClass}">${typeText}</span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${quantityClass}">${quantitySign}${record.quantity} ${record.unit}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${record.remark || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">
-                <div class="space-y-1">
-                    <div class="flex items-center">
-                        <span class="text-xs text-gray-500 mr-2">创建时间:</span>
-                        <span class="flex items-center">
-                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(record.operator)}</span>
-                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedCreatedAt}</span>
-                        </span>
+        if (filter === 'inbound') {
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.productName}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${quantityClass}">${quantitySign}${record.quantity} ${record.unit}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${supplierName}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">${record.remark || '-'}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">
+                    <div class="space-y-1">
+                        <div class="flex items-center">
+                            <span class="text-xs text-gray-500 mr-2">创建时间:</span>
+                            <span class="flex items-center">
+                                <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(record.operator)}</span>
+                                <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedCreatedAt}</span>
+                            </span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="text-xs text-gray-500 mr-2">更新时间:</span>
+                            <span class="flex items-center">
+                                <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(record.operator)}</span>
+                                <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedUpdatedAt}</span>
+                            </span>
+                        </div>
                     </div>
-                    <div class="flex items-center">
-                        <span class="text-xs text-gray-500 mr-2">更新时间:</span>
-                        <span class="flex items-center">
-                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(record.operator)}</span>
-                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedUpdatedAt}</span>
-                        </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button class="text-primary hover:text-primary-dark mr-3">
+                        查看
+                    </button>
+                    <button class="text-yellow-600 hover:text-yellow-800 mr-3">
+                        编辑
+                    </button>
+                    <button class="text-red-600 hover:text-red-800">
+                        删除
+                    </button>
+                </td>
+            `;
+        } else {
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.productName}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${typeClass}">${typeText}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${quantityClass}">${quantitySign}${record.quantity} ${record.unit}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">${record.remark || '-'}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">
+                    <div class="space-y-1">
+                        <div class="flex items-center">
+                            <span class="text-xs text-gray-500 mr-2">创建时间:</span>
+                            <span class="flex items-center">
+                                <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(record.operator)}</span>
+                                <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedCreatedAt}</span>
+                            </span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="text-xs text-gray-500 mr-2">更新时间:</span>
+                            <span class="flex items-center">
+                                <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(record.operator)}</span>
+                                <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedUpdatedAt}</span>
+                            </span>
+                        </div>
                     </div>
-                </div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <button class="text-primary hover:text-primary-dark mr-3">
-                    查看
-                </button>
-                <button class="text-yellow-600 hover:text-yellow-800 mr-3">
-                    编辑
-                </button>
-                <button class="text-red-600 hover:text-red-800">
-                    删除
-                </button>
-            </td>
-        `;
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button class="text-primary hover:text-primary-dark mr-3">
+                        查看
+                    </button>
+                    <button class="text-yellow-600 hover:text-yellow-800 mr-3">
+                        编辑
+                    </button>
+                    <button class="text-red-600 hover:text-red-800">
+                        删除
+                    </button>
+                </td>
+            `;
+        }
         
         tableBody.appendChild(row);
     });
@@ -1365,6 +1830,7 @@ function addInboundRecord(recordData) {
         alert('商品不存在！');
         return;
     }
+    const supplier = mockData.suppliers.find(s => s.id === product.supplierId);
     
     // 创建进货记录
     const now = new Date();
@@ -1375,8 +1841,10 @@ function addInboundRecord(recordData) {
         productName: product.name,
         quantity: recordData.quantity,
         unit: product.unit,
+        supplierId: product.supplierId,
+        supplierName: supplier ? supplier.name : '-',
         operator: currentUser.name,
-        remark: recordData.remark,
+        remark: (recordData.remark || '').trim(),
         createdAt: now,
         updatedAt: now
     };
