@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// 当前登录用户
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// 当前登录用户
 const currentUser = {
     id: 'U001',
     name: '张三',
@@ -311,9 +311,42 @@ let stockMovementData = [];
 // 日志数据
 let logsData = [];
 
+// 初始化库存筛选器
+function initInventoryFilters() {
+    const companyFilter = document.getElementById('filter-company');
+    const statusFilter = document.getElementById('filter-status');
+    const supplierFilter = document.getElementById('filter-supplier');
+    const searchFilter = document.getElementById('filter-search');
+
+    // 动态生成供应商选项
+    if (supplierFilter) {
+        let supplierOptions = '<option value="">全部供应商</option>';
+        mockData.suppliers.forEach(supplier => {
+            supplierOptions += `<option value="${supplier.id}">${supplier.name}</option>`;
+        });
+        supplierFilter.innerHTML = supplierOptions;
+    }
+
+    // 绑定事件监听
+    const filters = [companyFilter, statusFilter, supplierFilter, searchFilter];
+    filters.forEach(filter => {
+        if (filter) {
+            filter.addEventListener('input', updateInventoryTable);
+            filter.addEventListener('change', updateInventoryTable);
+        }
+    });
+}
+
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM Content Loaded');
+    
+    // 初始化库存筛选器
+    try {
+        initInventoryFilters();
+    } catch (e) {
+        console.error('Error initializing filters:', e);
+    }
     
     // 清除旧的本地存储数据，强制重新加载示例数据
     // localStorage.removeItem('stockMovementData');
@@ -844,17 +877,62 @@ function updateInventoryTable() {
     const tbody = document.querySelector('#inventory tbody');
     if (!tbody) return;
     
+    // 获取筛选条件
+    const companyFilter = document.getElementById('filter-company')?.value;
+    const statusFilter = document.getElementById('filter-status')?.value;
+    const supplierFilter = document.getElementById('filter-supplier')?.value;
+    const searchFilter = document.getElementById('filter-search')?.value.toLowerCase();
+
     // 清空表格内容
     tbody.innerHTML = '';
     
-    // 根据 mockData.products 重新渲染表格
-    mockData.products.forEach(product => {
+    // 过滤数据
+    let filteredProducts = mockData.products;
+
+    if (companyFilter) {
+        // 假设商品数据中有 company 字段，或者根据某种规则判断公司
+        // 这里暂时假设没有 company 字段，实际应用中需要确认数据结构
+        // 如果没有，可以暂不处理或添加模拟字段
+        // 为了演示，假设 products 中没有 company 字段，这里先注释掉或根据实际情况调整
+        // filteredProducts = filteredProducts.filter(p => p.company === companyFilter);
+        // 如果要完全实现，需要在 mockData.products 中添加 company 属性
+    }
+
+    if (statusFilter) {
+        filteredProducts = filteredProducts.filter(product => {
+            if (statusFilter === 'normal') return product.stockQuantity >= product.minStock && product.stockQuantity <= product.maxStock && product.stockQuantity > 0;
+            if (statusFilter === 'low') return product.stockQuantity < product.minStock && product.stockQuantity > 0;
+            if (statusFilter === 'overstock') return product.stockQuantity > product.maxStock;
+            if (statusFilter === 'out') return product.stockQuantity === 0;
+            return true;
+        });
+    }
+
+    if (supplierFilter) {
+        filteredProducts = filteredProducts.filter(p => p.supplierId === supplierFilter);
+    }
+
+    if (searchFilter) {
+        filteredProducts = filteredProducts.filter(p => 
+            p.name.toLowerCase().includes(searchFilter) || 
+            p.id.toLowerCase().includes(searchFilter)
+        );
+    }
+
+    if (filteredProducts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="px-6 py-4 text-center text-gray-500">没有找到匹配的商品</td></tr>';
+        return;
+    }
+
+    // 根据 filteredProducts 重新渲染表格
+    filteredProducts.forEach(product => {
         // 获取供应商名称
         const supplier = mockData.suppliers.find(s => s.id === product.supplierId);
         const supplierName = supplier ? supplier.name : '未知供应商';
         
         // 计算库存价值
-        const stockValue = product.stockQuantity * product.costPrice;
+        const costPriceDisplay = (product.costPrice !== null && product.costPrice !== undefined) ? `¥${product.costPrice.toLocaleString()}` : '-';
+        const stockValue = (product.costPrice || 0) * product.stockQuantity;
         
         // 确定库存状态
         let statusClass = 'bg-green-100 text-green-800';
@@ -888,39 +966,39 @@ function updateInventoryTable() {
         // 创建表格行
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap">
+            <td class="px-6 py-4 whitespace-nowrap overflow-hidden">
                 <div class="flex items-center">
                     <div class="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-md flex items-center justify-center">
                         <i class="fa fa-${getProductIcon(product.category)} text-gray-500 text-xl"></i>
                     </div>
-                    <div class="ml-4">
-                        <div class="text-sm font-medium text-gray-900">${product.name}</div>
-                        <div class="text-sm text-gray-500">SKU: ${product.id}</div>
+                    <div class="ml-4 overflow-hidden">
+                        <div class="text-sm font-medium text-gray-900 truncate" title="${product.name}">${product.name}</div>
+                        <div class="text-sm text-gray-500 truncate">SKU: ${product.id}</div>
                     </div>
                 </div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${product.category}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate" title="${product.category}">${product.category}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${product.stockQuantity}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥${product.costPrice.toLocaleString()}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${costPriceDisplay}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">¥${stockValue.toLocaleString()}</td>
             <td class="px-6 py-4 whitespace-nowrap">
                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${statusText}</span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${supplierName}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate" title="${supplierName}">${supplierName}</td>
             <td class="px-6 py-4 text-sm text-gray-500">
                 <div class="space-y-1">
                     <div class="flex items-center">
-                        <span class="text-xs text-gray-500 mr-2">创建时间:</span>
-                        <span class="flex items-center">
-                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
-                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedCreatedAt}</span>
+                        <span class="text-xs text-gray-500 mr-2 w-16 text-right flex-shrink-0">创建时间:</span>
+                        <span class="flex items-center overflow-hidden">
+                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2 flex-shrink-0">${getInitial(currentUser.name)}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full truncate">${formattedCreatedAt}</span>
                         </span>
                     </div>
                     <div class="flex items-center">
-                        <span class="text-xs text-gray-500 mr-2">更新时间:</span>
-                        <span class="flex items-center">
-                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
-                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedUpdatedAt}</span>
+                        <span class="text-xs text-gray-500 mr-2 w-16 text-right flex-shrink-0">更新时间:</span>
+                        <span class="flex items-center overflow-hidden">
+                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2 flex-shrink-0">${getInitial(currentUser.name)}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full truncate">${formattedUpdatedAt}</span>
                         </span>
                     </div>
                 </div>
@@ -965,6 +1043,10 @@ function showAddInboundModal() {
                 <input type="number" name="quantity" min="1" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
             </div>
             <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">进价</label>
+                <input type="number" name="costPrice" min="0" step="0.01" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="未填写则使用默认进价">
+            </div>
+            <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">供应商 <span class="text-danger">*</span></label>
                 <div class="relative group">
                     <input type="hidden" name="supplierId" id="inbound-supplier-id" required>
@@ -995,68 +1077,182 @@ function showAddInboundModal() {
         const productId = formData.get('productId'); // 获取隐藏域的值
         const quantityStr = formData.get('quantity');
         const supplierId = formData.get('supplierId');
+        const supplierNameInput = document.getElementById('inbound-supplier-search').value.trim();
+        const productNameInput = document.getElementById('inbound-product-search').value.trim();
+        const costPriceStr = formData.get('costPrice');
         
         // 必填校验
-        if (!productId) {
-            alert('请选择商品（必填）');
+        if (!productId && !productNameInput) {
+            alert('请选择或输入商品（必填）');
             return false;
         }
         if (!quantityStr) {
             alert('请输入数量（必填）');
             return false;
         }
-        if (!supplierId) {
-            alert('请选择供应商（必填）');
+        // 供应商校验：必须有 ID 或者有输入名称
+        if (!supplierId && !supplierNameInput) {
+            alert('请选择或输入供应商（必填）');
             return false;
         }
 
-        const product = mockData.products.find(p => p.id === productId);
+        const quantity = parseInt(quantityStr);
+        if (isNaN(quantity) || quantity <= 0) {
+            alert('请输入有效的数量');
+            return false;
+        }
         
-        if (product) {
-            const quantity = parseInt(quantityStr);
-            if (isNaN(quantity) || quantity <= 0) {
-                alert('请输入有效的数量');
-                return false;
-            }
-
-            // 更新库存
-            product.stockQuantity += quantity;
-            product.updatedAt = new Date().toISOString().split('T')[0];
-            const remarkValue = (formData.get('remark') || '').trim();
-            const selectedSupplierId = formData.get('supplierId');
-            const supplier = mockData.suppliers.find(s => s.id === selectedSupplierId);
-            
-            // 添加进货记录
-            const record = {
-                id: 'SM' + Date.now(),
-                type: 'inbound',
-                productId: product.id,
-                productName: product.name,
-                quantity: quantity,
-                unit: product.unit,
-                supplierId: selectedSupplierId,
-                supplierName: supplier ? supplier.name : '-',
-                operator: currentUser.name,
-                remark: remarkValue || '-', // 默认备注为 -
-                createdAt: new Date(),
-                updatedAt: new Date()
-            };
-            stockMovementData.unshift(record);
-            localStorage.setItem('stockMovementData', JSON.stringify(stockMovementData));
-            
-            // 添加日志
-            addLog('add', 'stock_movement', product.name, `进货 ${quantity} ${product.unit}`);
-            
-            // 刷新表格
-            const activeTab = document.querySelector('#stock-tabs .active');
-            if (activeTab) {
-                renderStockMovementTable(activeTab.getAttribute('data-tab'));
-            }
-            updateInventoryTable();
-            
-            alert('进货记录添加成功');
+        const costPriceInput = costPriceStr ? parseFloat(costPriceStr) : null;
+        if (costPriceStr && (isNaN(costPriceInput) || costPriceInput < 0)) {
+            alert('请输入有效的进价');
             return false;
         }
+
+        // --- 1. 处理供应商逻辑 ---
+        let finalSupplierId = supplierId;
+        let finalSupplierName = '';
+
+        // 如果有 ID，说明是选择的现有供应商
+        if (finalSupplierId) {
+            const supplier = mockData.suppliers.find(s => s.id === finalSupplierId);
+            finalSupplierName = supplier ? supplier.name : '未知供应商';
+        } 
+        // 如果没有 ID 但有输入名称，说明是新供应商
+        else if (supplierNameInput) {
+            // 先检查是否正好同名
+            const existingSupplier = mockData.suppliers.find(s => s.name === supplierNameInput);
+            if (existingSupplier) {
+                finalSupplierId = existingSupplier.id;
+                finalSupplierName = existingSupplier.name;
+            } else {
+                // 创建新供应商
+                const newSupplierId = 'S' + String(mockData.suppliers.length + 1).padStart(3, '0');
+                const newSupplier = {
+                    id: newSupplierId,
+                    name: supplierNameInput,
+                    contactPerson: '-',
+                    contactPhone: '-',
+                    email: '-',
+                    address: '-',
+                    paymentTerms: 'Net 30',
+                    creditLimit: 0,
+                    status: 'active',
+                    createdAt: new Date().toISOString().split('T')[0],
+                    updatedAt: new Date().toISOString().split('T')[0]
+                };
+                mockData.suppliers.push(newSupplier);
+                finalSupplierId = newSupplierId;
+                finalSupplierName = supplierNameInput;
+                
+                addLog('add', 'supplier', finalSupplierName, '自动创建新供应商');
+                
+                // 刷新供应商筛选器（如果存在）
+                const filterSupplier = document.getElementById('filter-supplier');
+                if (filterSupplier) {
+                    const option = document.createElement('option');
+                    option.value = finalSupplierId;
+                    option.textContent = finalSupplierName;
+                    filterSupplier.appendChild(option);
+                }
+            }
+        }
+
+        // --- 2. 处理商品逻辑 ---
+        let finalProduct = null;
+        if (productId) {
+            finalProduct = mockData.products.find(p => p.id === productId);
+        }
+        
+        // 如果没有找到商品（或没传ID），但有输入名称
+        if (!finalProduct && productNameInput) {
+             // 先检查同名
+             finalProduct = mockData.products.find(p => p.name === productNameInput);
+             
+             if (!finalProduct) {
+                 // 创建新商品
+                 const newProductId = 'P' + String(mockData.products.length + 1).padStart(3, '0');
+                 finalProduct = {
+                    id: newProductId,
+                    name: productNameInput,
+                    category: '未分类',
+                    unit: '个',
+                    costPrice: costPriceInput !== null ? costPriceInput : null,
+                    retailPrice: costPriceInput !== null ? costPriceInput * 1.2 : 0,
+                    stockQuantity: 0,
+                    minStock: 10,
+                    maxStock: 100,
+                    supplierId: finalSupplierId, // 关联到确定的供应商
+                    createdAt: new Date().toISOString().split('T')[0],
+                    updatedAt: new Date().toISOString().split('T')[0]
+                 };
+                 mockData.products.push(finalProduct);
+                 addLog('add', 'product', finalProduct.name, '自动创建新商品');
+             }
+        }
+
+        if (!finalProduct) {
+             alert('无法处理商品信息，请重试');
+             return false;
+        }
+
+        // --- 3. 更新库存与记录 ---
+        finalProduct.stockQuantity += quantity;
+        finalProduct.updatedAt = new Date().toISOString().split('T')[0];
+        
+        // 确定本次进货记录的进价信息
+        let recordPrice = null;
+        let recordPriceType = 'none';
+
+        if (costPriceInput !== null) {
+            recordPrice = costPriceInput;
+            recordPriceType = 'custom';
+            // 如果是现有商品，这里暂时不更新商品的主成本价，除非有明确需求
+            // 如果是新商品，上面创建时已经设置了
+        } else {
+            // 没有输入进价
+            if (finalProduct.costPrice !== null && finalProduct.costPrice !== undefined) {
+                recordPrice = finalProduct.costPrice;
+                recordPriceType = 'default';
+            } else {
+                // 新商品且未输入进价，或者原商品本身就没设置成本价
+                recordPrice = null;
+                recordPriceType = 'none';
+            }
+        }
+
+        const remarkValue = (formData.get('remark') || '').trim();
+        
+        // 添加进货记录
+        const record = {
+            id: 'SM' + Date.now(),
+            type: 'inbound',
+            productId: finalProduct.id,
+            productName: finalProduct.name,
+            quantity: quantity,
+            unit: finalProduct.unit,
+            supplierId: finalSupplierId,
+            supplierName: finalSupplierName,
+            price: recordPrice,
+            priceType: recordPriceType,
+            operator: currentUser.name,
+            remark: remarkValue || '-', 
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+        stockMovementData.unshift(record);
+        localStorage.setItem('stockMovementData', JSON.stringify(stockMovementData));
+        
+        // 添加日志
+        addLog('add', 'stock_movement', finalProduct.name, `进货 ${quantity} ${finalProduct.unit}`);
+        
+        // 刷新表格
+        const activeTab = document.querySelector('#stock-tabs .active');
+        if (activeTab) {
+            renderStockMovementTable(activeTab.getAttribute('data-tab'));
+        }
+        updateInventoryTable();
+
+        alert(`进货记录添加成功`);
     });
 
     // --- 商品下拉逻辑 ---
@@ -1681,6 +1877,7 @@ function renderStockMovementTable(filter = 'all') {
             tableHead.innerHTML = `
                 <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">商品名称</th>
                 <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">数量变动</th>
+                <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">进价</th>
                 <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">供应商</th>
                 <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">备注</th>
                 <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建与更新</th>
@@ -1744,9 +1941,17 @@ function renderStockMovementTable(filter = 'all') {
         
         const row = document.createElement('tr');
         if (filter === 'inbound') {
+            // 处理进价显示
+            let priceHtml = '<span class="text-gray-400">-</span>';
+            if (record.price !== null && record.price !== undefined) {
+                const priceClass = record.priceType === 'custom' ? 'text-gray-900' : 'text-gray-500';
+                priceHtml = `<span class="${priceClass}">¥${parseFloat(record.price).toLocaleString()}</span>`;
+            }
+
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.productName}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${quantityClass}">${quantitySign}${record.quantity} ${record.unit}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">${priceHtml}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${supplierName}</td>
                 <td class="px-6 py-4 text-sm text-gray-500">${record.remark || '-'}</td>
                 <td class="px-6 py-4 text-sm text-gray-500">
