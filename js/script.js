@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// 当前登录用户
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// 当前登录用户
 const currentUser = {
     id: 'U001',
     name: '张三',
@@ -162,6 +162,30 @@ const mockData = {
             status: 'active',
             createdAt: '2023-03-05',
             updatedAt: '2023-06-05'
+        }
+    ],
+    companies: [
+        {
+            id: 'CO001',
+            name: '化工',
+            contactPerson: '张经理',
+            contactPhone: '13800138001',
+            address: '上海市浦东新区张江高科技园区',
+            email: 'zhang@chem.com',
+            status: 'active',
+            createdAt: '2023-07-15',
+            updatedAt: '2023-07-15'
+        },
+        {
+            id: 'CO002',
+            name: '劳保',
+            contactPerson: '李经理',
+            contactPhone: '13900139001',
+            address: '北京市朝阳区建国路88号',
+            email: 'li@laobao.com',
+            status: 'active',
+            createdAt: '2023-07-15',
+            updatedAt: '2023-07-15'
         }
     ],
     bills: [
@@ -356,6 +380,7 @@ document.addEventListener('DOMContentLoaded', function() {
         loadStockMovementData();
         loadLogsData();
         updateInventoryTable();
+        updateCompanyTable();
     } catch (e) {
         console.error('Error loading data:', e);
     }
@@ -372,6 +397,22 @@ document.addEventListener('DOMContentLoaded', function() {
     if (addProductBtn) {
         addProductBtn.addEventListener('click', function() {
             showAddProductModal();
+        });
+    }
+    
+    // 绑定新增客户按钮事件
+    const addCustomerBtn = document.getElementById('add-customer-btn');
+    if (addCustomerBtn) {
+        addCustomerBtn.addEventListener('click', function() {
+            showAddCustomerModal();
+        });
+    }
+
+    // 绑定新增公司按钮事件
+    const addCompanyBtn = document.getElementById('add-company-btn');
+    if (addCompanyBtn) {
+        addCompanyBtn.addEventListener('click', function() {
+            showAddCompanyModal();
         });
     }
     
@@ -1010,6 +1051,121 @@ function updateInventoryTable() {
         `;
         
         // 添加到表格
+        tbody.appendChild(row);
+    });
+}
+
+// 显示新增公司模态框
+function showAddCompanyModal() {
+    const content = `
+        <form id="add-company-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">公司名称 <span class="text-danger">*</span></label>
+                <input type="text" name="name" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">联系人 <span class="text-danger">*</span></label>
+                <input type="text" name="contactPerson" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">联系电话 <span class="text-danger">*</span></label>
+                <input type="tel" name="contactPhone" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入国内手机号或座机号">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">公司地址 <span class="text-danger">*</span></label>
+                <input type="text" name="address" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">电子邮箱</label>
+                <input type="email" name="email" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+        </form>
+    `;
+
+    showModal('新增公司', content, function() {
+        const form = document.getElementById('add-company-form');
+        const formData = new FormData(form);
+        const name = formData.get('name').trim();
+        const contactPerson = formData.get('contactPerson').trim();
+        const contactPhone = formData.get('contactPhone').trim();
+        const address = formData.get('address').trim();
+        const email = formData.get('email').trim();
+        
+        // Required field validation
+        if (!name) { alert('请输入公司名称'); return false; }
+        if (!contactPerson) { alert('请输入联系人'); return false; }
+        if (!contactPhone) { alert('请输入联系电话'); return false; }
+        if (!address) { alert('请输入公司地址'); return false; }
+        
+        // Domestic phone validation
+        const phoneRegex = /^1[3-9]\d{9}$|^0\d{2,3}-?\d{7,8}$/;
+        if (!phoneRegex.test(contactPhone)) {
+            alert('请输入有效的国内联系电话（手机号或座机号）');
+            return false;
+        }
+        
+        // Create new company object
+        const newCompany = {
+            id: 'CO' + String(mockData.companies.length + 1).padStart(3, '0'),
+            name: name,
+            contactPerson: contactPerson,
+            contactPhone: contactPhone,
+            address: address,
+            email: email || '-',
+            status: 'active',
+            createdAt: new Date().toISOString().split('T')[0],
+            updatedAt: new Date().toISOString().split('T')[0]
+        };
+        
+        // Update mock data and table
+        mockData.companies.push(newCompany);
+        addLog('add', 'company', name, `新增公司，联系人：${contactPerson}`);
+        updateCompanyTable();
+        alert('公司添加成功');
+        return true;
+    });
+}
+
+// 更新公司列表表格
+function updateCompanyTable() {
+    const tbody = document.querySelector('#companies tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    mockData.companies.forEach(company => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900">${company.name}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${company.contactPerson}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${company.contactPhone}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${company.address}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">${company.status}</span>
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-500">
+                <div class="space-y-1">
+                    <div class="flex items-center">
+                        <span class="text-xs text-gray-500 mr-2">创建:</span>
+                        <span class="flex items-center">
+                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${company.createdAt}</span>
+                        </span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="text-xs text-gray-500 mr-2">更新:</span>
+                        <span class="flex items-center">
+                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${company.updatedAt}</span>
+                        </span>
+                    </div>
+                </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <a href="#" class="text-primary hover:text-primary-dark mr-3">编辑</a>
+                <a href="#" class="text-danger hover:text-danger-dark">删除</a>
+            </td>
+        `;
         tbody.appendChild(row);
     });
 }
@@ -1672,6 +1828,160 @@ function showAddOutboundModal() {
     }
     window.outboundDropdownCloser = closeDropdown;
     document.addEventListener('click', window.outboundDropdownCloser);
+}
+
+// 显示新增客户模态框
+function showAddCustomerModal() {
+    const content = `
+        <form id="add-customer-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">客户名称 <span class="text-danger">*</span></label>
+                <input type="text" name="name" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">联系人 <span class="text-danger">*</span></label>
+                <input type="text" name="contactPerson" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">联系电话 <span class="text-danger">*</span></label>
+                <input type="tel" name="contactPhone" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入国内手机号或座机号">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">客户地址 <span class="text-danger">*</span></label>
+                <input type="text" name="address" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">电子邮箱</label>
+                <input type="email" name="email" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">付款条件 <span class="text-danger">*</span></label>
+                <select name="paymentTerms" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <option value="Net 30">Net 30</option>
+                    <option value="Net 45">Net 45</option>
+                    <option value="Net 60">Net 60</option>
+                    <option value="COD">货到付款</option>
+                </select>
+            </div>
+        </form>
+    `;
+
+    showModal('新增客户', content, function() {
+        const form = document.getElementById('add-customer-form');
+        const formData = new FormData(form);
+        
+        const name = formData.get('name').trim();
+        const contactPerson = formData.get('contactPerson').trim();
+        const contactPhone = formData.get('contactPhone').trim();
+        const address = formData.get('address').trim();
+        const email = formData.get('email').trim();
+        const paymentTerms = formData.get('paymentTerms');
+
+        // 非空校验
+        if (!name) {
+            alert('请输入客户名称');
+            return false;
+        }
+        if (!contactPerson) {
+            alert('请输入联系人');
+            return false;
+        }
+        if (!contactPhone) {
+            alert('请输入联系电话');
+            return false;
+        }
+        if (!address) {
+            alert('请输入客户地址');
+            return false;
+        }
+
+        // 国内电话号码校验 (手机号或带区号的座机)
+        // 手机号: 1开头，11位数字
+        // 座机: 区号3-4位 - 电话7-8位 (例如: 010-12345678, 021-12345678, 0755-12345678)
+        const phoneRegex = /^1[3-9]\d{9}$|^0\d{2,3}-?\d{7,8}$/;
+        if (!phoneRegex.test(contactPhone)) {
+            alert('请输入有效的国内联系电话（手机号或座机号）');
+            return false;
+        }
+
+        // 创建新客户对象
+        const newCustomer = {
+            id: 'C' + String(mockData.customers.length + 1).padStart(3, '0'),
+            name: name,
+            contactPerson: contactPerson,
+            contactPhone: contactPhone,
+            address: address, // 新增地址字段
+            email: email || '-',
+            paymentTerms: paymentTerms,
+            creditLimit: 0, // 默认信用额度
+            status: 'active',
+            createdAt: new Date().toISOString().split('T')[0],
+            updatedAt: new Date().toISOString().split('T')[0]
+        };
+
+        // 添加到模拟数据
+        mockData.customers.push(newCustomer);
+        
+        // 记录日志
+        addLog('add', 'customer', name, `新增客户，联系人：${contactPerson}`);
+        
+        // 刷新客户表格 (如果有的话，这里需要实现updateCustomerTable函数，或者简单地刷新页面)
+        // 这里为了简单，我们假设需要刷新客户管理部分的表格。
+        // 由于原代码中客户表格是静态HTML，我们需要实现一个渲染函数或者直接刷新页面。
+        // 为了演示效果，我们可以手动将新行添加到表格中。
+        updateCustomerTable(); 
+
+        alert('客户添加成功');
+        return true;
+    });
+}
+
+// 更新客户列表表格
+function updateCustomerTable() {
+    const tbody = document.querySelector('#customers tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = ''; // 清空现有内容
+
+    mockData.customers.forEach(customer => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900">${customer.name}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${customer.contactPerson}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${customer.contactPhone}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${customer.address || '-'}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${customer.email}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${customer.paymentTerms}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">活跃</span>
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-500">
+                <div class="space-y-1">
+                    <div class="flex items-center">
+                        <span class="text-xs text-gray-500 mr-2">创建:</span>
+                        <span class="flex items-center">
+                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${customer.createdAt}</span>
+                        </span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="text-xs text-gray-500 mr-2">更新:</span>
+                        <span class="flex items-center">
+                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${customer.updatedAt}</span>
+                        </span>
+                    </div>
+                </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <a href="#" class="text-primary hover:text-primary-dark mr-3">编辑</a>
+                <a href="#" class="text-danger hover:text-danger-dark">删除</a>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
 }
 
 // 根据商品分类获取图标
