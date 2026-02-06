@@ -1,0 +1,22 @@
+{
+  "name": "inventory-system",
+  "version": "1.0.0",
+  "description": "Local Inventory Management System",
+  "main": "preview_server.js",
+  "bin": "preview_server.js",
+  "scripts": {
+    "start": "node preview_server.js",
+    "build": "pkg ."
+  },
+  "pkg": {
+    "assets": [
+      "index.html",
+      "css/**/*",
+      "js/**/*",
+      "data/**/*"
+    ],
+    "targets": [
+      "node16-win-x64"
+    ]
+  }
+}

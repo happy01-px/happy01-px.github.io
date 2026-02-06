@@ -1,339 +1,305 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// 当前登录用户
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// 当前登录用户
 const currentUser = {
     id: 'U001',
     name: '张三',
     role: 'admin'
 };
 
+// --- Ant Design 集成 ---
+// 延迟初始化以确保资源加载
+const initAntdComponents = () => {
+    // 检查依赖是否加载
+    if (!window.React || !window.ReactDOM || !window.dayjs || !window.antd) {
+        return false;
+    }
+
+    const { message, DatePicker, Space } = window.antd;
+    const { RangePicker } = DatePicker;
+    const React = window.React;
+    const ReactDOM = window.ReactDOM;
+    const dayjs = window.dayjs;
+
+    // 配置全局 message
+    message.config({
+        top: 50,
+        duration: 3,
+        maxCount: 3,
+    });
+
+    // 覆盖原生 alert (仅一次)
+    if (!window.alertOverridden) {
+        window.originalAlert = window.alert;
+        window.alert = function(msg) {
+            if (!msg) return;
+            const strMsg = String(msg);
+            if (strMsg.includes('成功') || strMsg.includes('完成')) {
+                message.success(strMsg);
+            } else if (strMsg.includes('失败') || strMsg.includes('错误') || strMsg.includes('请') || strMsg.includes('无效')) {
+                message.error(strMsg);
+            } else if (strMsg.includes('警告')) {
+                message.warning(strMsg);
+            } else {
+                message.info(strMsg);
+            }
+        };
+        window.alertOverridden = true;
+    }
+    
+    console.log('Ant Design components loaded and integrated.');
+
+    // 初始化 DatePicker 通用函数
+    const renderDatePicker = (containerId, startInputId, endInputId, renderCallback) => {
+        const container = document.getElementById(containerId);
+        if (container) {
+            // 检查是否已经渲染过（防止重复渲染）
+            if (container.hasAttribute('data-rendered')) {
+                return true;
+            }
+
+            const rangePresets = [
+                { label: 'Last 7 Days', value: [dayjs().add(-7, 'd'), dayjs()] },
+                { label: 'Last 14 Days', value: [dayjs().add(-14, 'd'), dayjs()] },
+                { label: 'Last 30 Days', value: [dayjs().add(-30, 'd'), dayjs()] },
+                { label: 'Last 90 Days', value: [dayjs().add(-90, 'd'), dayjs()] },
+            ];
+
+            const DatePickerApp = () => {
+                const onRangeChange = (dates, dateStrings) => {
+                    // User provided logging logic
+                    if (dates) {
+                        console.log('From: ', dates[0], ', to: ', dates[1]);
+                        console.log('From: ', dateStrings[0], ', to: ', dateStrings[1]);
+                    } else {
+                        console.log('Clear');
+                    }
+
+                    // Integration logic
+                    const startInput = document.getElementById(startInputId);
+                    const endInput = document.getElementById(endInputId);
+                    
+                    if (startInput && endInput) {
+                        startInput.value = dateStrings[0] || '';
+                        endInput.value = dateStrings[1] || '';
+                        
+                        if (typeof renderCallback === 'function') {
+                            if (window.paginationState) {
+                                // 尝试推断 stateKey (logs, bills 等)
+                                // 这里简化处理，假设 callback 是 renderLogsTable 这种命名
+                                const callbackName = renderCallback.name;
+                                let stateKey = '';
+                                if (callbackName.includes('Logs')) stateKey = 'logs';
+                                else if (callbackName.includes('Bills')) stateKey = 'bills'; // 假设有 bills 分页
+                                
+                                if (stateKey && window.paginationState[stateKey]) {
+                                    window.paginationState[stateKey].page = 1;
+                                }
+                            }
+                            renderCallback();
+                        }
+                    }
+                };
+
+                // Using the 3rd RangePicker from the user's provided code
+                return React.createElement(RangePicker, {
+                    presets: [
+                        {
+                            label: React.createElement('span', { 'aria-label': 'Current Time to End of Day' }, 'Now ~ EOD'),
+                            value: () => [dayjs(), dayjs().endOf('day')],
+                        },
+                        ...rangePresets,
+                    ],
+                    showTime: true,
+                    format: "YYYY/MM/DD HH:mm:ss",
+                    onChange: onRangeChange,
+                    style: { width: '100%' }
+                });
+            };
+
+            const root = ReactDOM.createRoot(container);
+            root.render(React.createElement(DatePickerApp));
+            container.setAttribute('data-rendered', 'true');
+            return true;
+        }
+        return false;
+    };
+
+    // 初始化各个模块的 DatePicker
+    const logInit = renderDatePicker('log-date-range-picker-container', 'log-filter-date-start', 'log-filter-date-end', window.renderLogsTable);
+    const billsInit = renderDatePicker('bills-date-range-picker-container', 'bills-filter-date-start', 'bills-filter-date-end', window.renderBillsTable); // 假设有 renderBillsTable
+
+    // 只要有一个成功初始化，就认为成功（或者可以更严格）
+    return logInit || billsInit;
+};
+
+// 启动初始化流程
+const startAntdInit = () => {
+    let attempts = 0;
+    const maxAttempts = 100; // 10 seconds
+    
+    const tryInit = () => {
+        // 尝试初始化
+        const initSuccess = initAntdComponents();
+        
+        // 如果 initAntdComponents 返回 true，说明所有组件都已成功渲染，直接退出
+        if (initSuccess) {
+            return;
+        }
+
+        attempts++;
+        if (attempts < maxAttempts) {
+            setTimeout(tryInit, 100);
+        } else {
+            console.error('Failed to load Ant Design components or container after 10 seconds.');
+            
+            // 详细的错误诊断
+            const missing = [];
+            if (!window.React) missing.push('React');
+            if (!window.ReactDOM) missing.push('ReactDOM');
+            if (!window.dayjs) missing.push('dayjs');
+            if (!window.antd) missing.push('antd');
+            
+            const errorMsg = missing.length > 0 
+                ? `组件加载失败，缺失依赖：${missing.join(', ')}。请检查网络或刷新重试。` 
+                : '组件加载失败（未知原因），请刷新页面重试。';
+
+            console.error(errorMsg);
+            
+            const fallback = (id) => {
+                const c = document.getElementById(id);
+                // 只有当容器存在且没有被渲染过（data-rendered）且没有子节点时，才显示错误
+                if (c && !c.hasAttribute('data-rendered') && !c.hasChildNodes()) {
+                    c.innerHTML = `
+                        <div class="flex items-center space-x-2 text-sm text-red-500 bg-red-50 p-2 rounded border border-red-200">
+                            <i class="fa fa-exclamation-circle"></i>
+                            <span>${errorMsg}</span>
+                        </div>
+                    `;
+                }
+            };
+            
+            fallback('log-date-range-picker-container');
+            fallback('bills-date-range-picker-container');
+        }
+    };
+    
+    tryInit();
+};
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startAntdInit);
+} else {
+    startAntdInit();
+}
+// ----------------------
+
 // 获取客户端IP地址（模拟）
 const clientIP = '192.168.1.100';
 
+    // 获取本地日期的ISO字符串格式 (YYYY-MM-DD)
+function getLocalISOString() {
+    const now = new Date();
+    // 使用本地时间而不是UTC时间
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
 // 模拟数据
-const mockData = {
-    products: [
-        {
-            id: 'P001',
-            name: 'iPhone 13 Pro',
-            category: '电子产品',
-            unit: '个',
-            costPrice: 6999,
-            retailPrice: 7999,
-            stockQuantity: 125,
-            minStock: 50,
-            maxStock: 200,
-            supplierId: 'S001',
-            createdAt: '2023-01-15',
-            updatedAt: '2023-07-15'
-        },
-        {
-            id: 'P002',
-            name: 'MacBook Air M2',
-            category: '电子产品',
-            unit: '个',
-            costPrice: 8499,
-            retailPrice: 9499,
-            stockQuantity: 35,
-            minStock: 40,
-            maxStock: 100,
-            supplierId: 'S001',
-            createdAt: '2023-02-10',
-            updatedAt: '2023-07-10'
-        },
-        {
-            id: 'P003',
-            name: 'iPad Pro',
-            category: '电子产品',
-            unit: '个',
-            costPrice: 6799,
-            retailPrice: 7799,
-            stockQuantity: 0,
-            minStock: 30,
-            maxStock: 100,
-            supplierId: 'S001',
-            createdAt: '2023-03-05',
-            updatedAt: '2023-07-05'
-        },
-        {
-            id: 'P004',
-            name: 'AirPods Pro',
-            category: '电子产品',
-            unit: '个',
-            costPrice: 1799,
-            retailPrice: 1999,
-            stockQuantity: 210,
-            minStock: 50,
-            maxStock: 200,
-            supplierId: 'S001',
-            createdAt: '2023-04-20',
-            updatedAt: '2023-07-20'
-        },
-        {
-            id: 'P005',
-            name: 'Apple Watch',
-            category: '电子产品',
-            unit: '个',
-            costPrice: 3199,
-            retailPrice: 3499,
-            stockQuantity: 75,
-            minStock: 30,
-            maxStock: 100,
-            supplierId: 'S001',
-            createdAt: '2023-05-15',
-            updatedAt: '2023-07-15'
-        }
-    ],
-    suppliers: [
-        {
-            id: 'S001',
-            name: '苹果公司',
-            contactPerson: '张经理',
-            contactPhone: '13800138000',
-            email: 'zhang@apple.com',
-            address: '上海市浦东新区张江高科技园区',
-            paymentTerms: 'Net 30',
-            creditLimit: 1000000,
-            status: 'active',
-            createdAt: '2023-01-01',
-            updatedAt: '2023-06-01'
-        },
-        {
-            id: 'S002',
-            name: '三星电子',
-            contactPerson: '李经理',
-            contactPhone: '13900139000',
-            email: 'li@samsung.com',
-            address: '北京市朝阳区三星大厦',
-            paymentTerms: 'Net 45',
-            creditLimit: 800000,
-            status: 'active',
-            createdAt: '2023-02-01',
-            updatedAt: '2023-06-01'
-        },
-        {
-            id: 'S003',
-            name: '华为技术',
-            contactPerson: '王经理',
-            contactPhone: '13700137000',
-            email: 'wang@huawei.com',
-            address: '深圳市南山区华为总部',
-            paymentTerms: 'Net 60',
-            creditLimit: 900000,
-            status: 'active',
-            createdAt: '2023-03-01',
-            updatedAt: '2023-06-01'
-        }
-    ],
-    customers: [
-        {
-            id: 'C001',
-            name: '京东商城',
-            contactPerson: '赵经理',
-            contactPhone: '13600136000',
-            email: 'zhao@jd.com',
-            address: '北京市朝阳区京东总部',
-            paymentTerms: 'Net 30',
-            creditLimit: 1500000,
-            status: 'active',
-            createdAt: '2023-01-05',
-            updatedAt: '2023-06-05'
-        },
-        {
-            id: 'C002',
-            name: '天猫商城',
-            contactPerson: '钱经理',
-            contactPhone: '13500135000',
-            email: 'qian@tmall.com',
-            address: '杭州市余杭区阿里巴巴西溪园区',
-            paymentTerms: 'Net 45',
-            creditLimit: 1200000,
-            status: 'active',
-            createdAt: '2023-02-05',
-            updatedAt: '2023-06-05'
-        },
-        {
-            id: 'C003',
-            name: '苏宁易购',
-            contactPerson: '孙经理',
-            contactPhone: '13400134000',
-            email: 'sun@suning.com',
-            address: '南京市玄武区苏宁总部',
-            paymentTerms: 'Net 60',
-            creditLimit: 1000000,
-            status: 'active',
-            createdAt: '2023-03-05',
-            updatedAt: '2023-06-05'
-        }
-    ],
-    companies: [
-        {
-            id: 'CO001',
-            name: '化工',
-            contactPerson: '张经理',
-            contactPhone: '13800138001',
-            address: '上海市浦东新区张江高科技园区',
-            email: 'zhang@chem.com',
-            status: 'active',
-            createdAt: '2023-07-15',
-            updatedAt: '2023-07-15'
-        },
-        {
-            id: 'CO002',
-            name: '劳保',
-            contactPerson: '李经理',
-            contactPhone: '13900139001',
-            address: '北京市朝阳区建国路88号',
-            email: 'li@laobao.com',
-            status: 'active',
-            createdAt: '2023-07-15',
-            updatedAt: '2023-07-15'
-        }
-    ],
-    bills: [
-        {
-            id: 'B001',
-            type: 'supplier',
-            relatedId: 'S001',
-            periodStart: '2023-06-01',
-            periodEnd: '2023-06-30',
-            billAmount: 250000,
-            paymentStatus: 'paid',
-            paymentDate: '2023-07-10',
-            paymentMethod: '银行转账',
-            notes: '六月货款',
-            status: 'paid',
-            createdAt: '2023-07-05',
-            updatedAt: '2023-07-10'
-        },
-        {
-            id: 'B002',
-            type: 'supplier',
-            relatedId: 'S002',
-            periodStart: '2023-06-01',
-            periodEnd: '2023-06-30',
-            billAmount: 180000,
-            paymentStatus: 'pending',
-            paymentDate: null,
-            paymentMethod: null,
-            notes: '六月货款',
-            status: 'verified',
-            createdAt: '2023-07-08',
-            updatedAt: '2023-07-08'
-        },
-        {
-            id: 'B003',
-            type: 'supplier',
-            relatedId: 'S003',
-            periodStart: '2023-06-01',
-            periodEnd: '2023-06-30',
-            billAmount: 210000,
-            paymentStatus: 'pending',
-            paymentDate: null,
-            paymentMethod: null,
-            notes: '六月货款',
-            status: 'pending',
-            createdAt: '2023-07-10',
-            updatedAt: '2023-07-10'
-        },
-        {
-            id: 'B004',
-            type: 'supplier',
-            relatedId: 'S001',
-            periodStart: '2023-07-01',
-            periodEnd: '2023-07-15',
-            billAmount: 150000,
-            paymentStatus: 'pending',
-            paymentDate: null,
-            paymentMethod: null,
-            notes: '七月上半月货款',
-            status: 'pending',
-            createdAt: '2023-07-18',
-            updatedAt: '2023-07-18'
-        }
-    ],
-    deliveryNotes: [
-        {
-            id: 'D001',
-            supplierId: 'S001',
-            orderId: 'O001',
-            deliveryDate: '2023-07-15',
-            expectedDate: '2023-07-15',
-            status: 'received',
-            totalAmount: 150000,
-            notes: 'iPhone 13 Pro 50台',
-            createdAt: '2023-07-14',
-            updatedAt: '2023-07-15',
-            details: [
-                {
-                    id: 'DD001',
-                    deliveryId: 'D001',
-                    productId: 'P001',
-                    quantity: 50,
-                    unitPrice: 6999,
-                    totalAmount: 349950,
-                    receivedQuantity: 50,
-                    notes: '',
-                    status: 'received'
-                }
-            ]
-        },
-        {
-            id: 'D002',
-            supplierId: 'S002',
-            orderId: 'O002',
-            deliveryDate: '2023-07-18',
-            expectedDate: '2023-07-18',
-            status: 'partial',
-            totalAmount: 120000,
-            notes: 'Samsung Galaxy S23 20台',
-            createdAt: '2023-07-17',
-            updatedAt: '2023-07-18',
-            details: [
-                {
-                    id: 'DD002',
-                    deliveryId: 'D002',
-                    productId: 'P006',
-                    quantity: 20,
-                    unitPrice: 5999,
-                    totalAmount: 119980,
-                    receivedQuantity: 15,
-                    notes: '5台有瑕疵，待退货',
-                    status: 'partial'
-                }
-            ]
-        },
-        {
-            id: 'D003',
-            supplierId: 'S003',
-            orderId: 'O003',
-            deliveryDate: '2023-07-20',
-            expectedDate: '2023-07-20',
-            status: 'pending',
-            totalAmount: 180000,
-            notes: 'Huawei Mate 50 Pro 30台',
-            createdAt: '2023-07-19',
-            updatedAt: '2023-07-19',
-            details: [
-                {
-                    id: 'DD003',
-                    deliveryId: 'D003',
-                    productId: 'P007',
-                    quantity: 30,
-                    unitPrice: 5999,
-                    totalAmount: 179970,
-                    receivedQuantity: 0,
-                    notes: '',
-                    status: 'pending'
-                }
-            ]
-        }
-    ]
-};
+let defaultMockData = {}; // 将从 data.json 加载
+
+// 实际使用的数据（支持持久化）
+let mockData = JSON.parse(JSON.stringify(defaultMockData));
 
 // 进出货记录数据
 let stockMovementData = [];
 
 // 日志数据
 let logsData = [];
+
+// Deprecated variables removed
+
+// 全局分页状态管理
+const paginationState = {
+    inventory: { page: 1, pageSize: 10, total: 0 },
+    stock: { page: 1, pageSize: 10, total: 0 },
+    logs: { page: 1, pageSize: 10, total: 0 },
+    suppliers: { page: 1, pageSize: 10, total: 0 },
+    companies: { page: 1, pageSize: 10, total: 0 },
+    customers: { page: 1, pageSize: 10, total: 0 },
+    bills: { page: 1, pageSize: 10, total: 0 }
+};
+
+// 存储 React Roots 以支持多次渲染
+window.paginationRoots = {};
+
+// 分页控件渲染函数 (Ant Design 版)
+function renderPaginationControl(containerId, stateKey, onPageChange) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    // 检查 Ant Design 依赖
+    if (!window.antd || !window.React || !window.ReactDOM) {
+        console.warn('Ant Design dependencies not loaded, skipping pagination render.');
+        return;
+    }
+
+    const { Pagination, ConfigProvider, theme } = window.antd;
+    const React = window.React;
+    const ReactDOM = window.ReactDOM;
+    const state = paginationState[stateKey];
+    
+    // 如果没有 root，创建一个
+    if (!window.paginationRoots[containerId]) {
+        window.paginationRoots[containerId] = ReactDOM.createRoot(container);
+    }
+    const root = window.paginationRoots[containerId];
+
+    const onChange = (page, pageSize) => {
+        // 更新状态
+        paginationState[stateKey].page = page;
+        paginationState[stateKey].pageSize = pageSize;
+        
+        // 触发回调
+        if (typeof onPageChange === 'function') {
+            onPageChange();
+        }
+    };
+
+    // 使用 ConfigProvider 配置中文文案（简易版，不依赖外部 locale 文件）
+    // 注意：完整的中文支持通常需要引入 antd/locale/zh_CN，这里通过自定义 showTotal 等属性实现部分汉化
+    const App = React.createElement(ConfigProvider, {
+            theme: {
+                algorithm: theme.defaultAlgorithm,
+                token: {
+                    colorPrimary: '#1a56db', 
+                },
+            },
+        }, 
+        React.createElement('div', { className: "flex justify-end py-4" },
+            React.createElement(Pagination, {
+                current: state.page,
+                pageSize: state.pageSize,
+                total: state.total,
+                showSizeChanger: true,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                onChange: onChange,
+                showTotal: (total, range) => `显示 ${range[0]}-${range[1]} 条，共 ${total} 条`,
+                // 强制英文部分尽可能通过 prop 覆盖，或者接受默认
+            })
+        )
+    );
+
+    root.render(App);
+}
+
+// 旧的分页辅助函数 (已废弃，保留占位防止报错)
+function generatePageNumbers() { return ''; }
+window.changePageSize = function() {};
+window.changePage = function() {};
 
 // 初始化库存筛选器
 function initInventoryFilters() {
@@ -355,105 +321,202 @@ function initInventoryFilters() {
     const filters = [companyFilter, statusFilter, supplierFilter, searchFilter];
     filters.forEach(filter => {
         if (filter) {
-            filter.addEventListener('input', updateInventoryTable);
-            filter.addEventListener('change', updateInventoryTable);
+            const handler = () => {
+                paginationState.inventory.page = 1; // 重置到第一页
+                updateInventoryTable();
+            };
+            filter.addEventListener('input', handler);
+            filter.addEventListener('change', handler);
         }
     });
 }
 
-// 页面加载完成后执行
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM Content Loaded');
+// 初始化日志筛选器
+function initLogFilters() {
+    const typeFilter = document.getElementById('log-filter-type');
+    const userFilter = document.getElementById('log-filter-user');
+    const dateStartFilter = document.getElementById('log-filter-date-start');
+    const dateEndFilter = document.getElementById('log-filter-date-end');
+    const searchFilter = document.getElementById('log-filter-search');
+
+    const filters = [typeFilter, userFilter, searchFilter]; // Removed date filters from listener because they are handled by React component
+    filters.forEach(filter => {
+        if (filter) {
+            const handler = () => {
+                paginationState.logs.page = 1; // 重置到第一页
+                renderLogsTable();
+            };
+            filter.addEventListener('input', handler);
+            filter.addEventListener('change', handler);
+        }
+    });
+}
+
+// 更新对账单列表
+function updateBillsTable() {
+    const tbody = document.getElementById('bills-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    // 确保 mockData.bills 存在
+    if (!mockData.bills) mockData.bills = [];
     
-    // 初始化库存筛选器
-    try {
-        initInventoryFilters();
-    } catch (e) {
-        console.error('Error initializing filters:', e);
+    // 如果没有数据，添加一些模拟数据 (仅用于演示，实际应从 loadMockData 获取)
+    if (mockData.bills.length === 0) {
+        mockData.bills = [
+            { id: 'BILL-2023-0001', supplierName: '苹果公司', period: '2023-06-01 至 2023-06-30', amount: '¥250,000', status: 'paid', createdAt: '2023-07-05' },
+            { id: 'BILL-2023-0002', supplierName: '三星电子', period: '2023-06-01 至 2023-06-30', amount: '¥180,000', status: 'verified', createdAt: '2023-07-08' },
+            { id: 'BILL-2023-0003', supplierName: '华为技术', period: '2023-06-01 至 2023-06-30', amount: '¥210,000', status: 'pending', createdAt: '2023-07-10' },
+            { id: 'BILL-2023-0004', supplierName: '苹果公司', period: '2023-07-01 至 2023-07-15', amount: '¥150,000', status: 'pending', createdAt: '2023-07-18' }
+        ];
     }
+
+    let filteredBills = [...mockData.bills];
     
-    // 清除旧的本地存储数据，强制重新加载示例数据
-    // localStorage.removeItem('stockMovementData');
+    // 按创建时间倒序
+    filteredBills.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    paginationState.bills.total = filteredBills.length;
+
+    let { page, pageSize } = paginationState.bills;
+
+    // 如果当前页超出了总页数，且总页数大于0，则重置为最后一页
+    const totalPages = Math.ceil(filteredBills.length / pageSize);
+    if (page > totalPages && totalPages > 0) {
+        paginationState.bills.page = totalPages;
+        page = totalPages;
+    }
+
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedBills = filteredBills.slice(startIndex, endIndex);
+
+    if (paginatedBills.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">暂无对账单记录</td></tr>';
+        renderPaginationControl('bills-pagination-container', 'bills', updateBillsTable);
+        return;
+    }
+
+    paginatedBills.forEach(bill => {
+        const formattedCreatedAt = new Date(bill.createdAt || new Date()).toLocaleString('zh-CN', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour12: false
+        });
+        
+        let statusClass = '';
+        let statusText = '';
+        switch(bill.status) {
+            case 'paid': 
+                statusClass = 'bg-green-100 text-green-800'; 
+                statusText = '已付款';
+                break;
+            case 'verified': 
+                statusClass = 'bg-blue-100 text-blue-800'; 
+                statusText = '已核对';
+                break;
+            case 'pending': 
+                statusClass = 'bg-yellow-100 text-yellow-800'; 
+                statusText = '待核对';
+                break;
+            default:
+                statusClass = 'bg-gray-100 text-gray-800';
+                statusText = bill.status;
+        }
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${bill.id}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${bill.supplierName}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${bill.period}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${bill.amount}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${statusText}</span>
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-500">
+                <div class="space-y-1">
+                    <div class="flex items-center">
+                        <span class="text-xs text-gray-500 mr-2">创建:</span>
+                        <span class="flex items-center">
+                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedCreatedAt}</span>
+                        </span>
+                    </div>
+                </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <a href="#" class="text-primary hover:text-primary-dark mr-3">查看</a>
+                <a href="#" class="text-danger hover:text-danger-dark">删除</a>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    renderPaginationControl('bills-pagination-container', 'bills', updateBillsTable);
+}
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', async function() {
+
+    console.log('DOM Content Loaded - Starting initialization');
     
-    // 加载数据
+    // 1. 优先绑定核心导航和交互事件，确保界面可操作
     try {
+        bindNavigationEvents();
+        bindMobileEvents();
+        bindModalEvents();
+        bindActionButtons();
+        bindSettingsEvents();
+    } catch (e) {
+        console.error('Error binding events:', e);
+    }
+
+    // 2. 加载数据
+    try {
+        // 清除旧的本地存储数据（仅调试用）
+        // localStorage.removeItem('stockMovementData');
+        
+        await loadMockData(); // 加载基础数据（商品、供应商、客户、公司）
         loadStockMovementData();
         loadLogsData();
+
+        // 初始化筛选器（确保在数据加载后执行）
+        initInventoryFilters();
+        initLogFilters();
+        
+        // 渲染表格
         updateInventoryTable();
         updateCompanyTable();
+        updateSupplierTable();
+        updateCustomerTable(); 
+        updateBillsTable(); // 渲染对账单表格
+        
+        // 初始显示仪表盘或当前选中的部分
+        const activeLink = document.querySelector('.nav-link.active');
+        if (activeLink) {
+            const target = activeLink.getAttribute('data-target');
+            showSection(target);
+        }
+
+        // 渲染仪表盘最近活动
+        renderDashboardActivity();
     } catch (e) {
         console.error('Error loading data:', e);
     }
     
-    // 初始化图表
+    // 4. 初始化图表
     try {
         initCharts();
     } catch (e) {
         console.error('Chart initialization failed:', e);
     }
-    
-    // 绑定新增商品按钮事件
-    const addProductBtn = document.getElementById('add-product-btn');
-    if (addProductBtn) {
-        addProductBtn.addEventListener('click', function() {
-            showAddProductModal();
-        });
-    }
-    
-    // 绑定新增客户按钮事件
-    const addCustomerBtn = document.getElementById('add-customer-btn');
-    if (addCustomerBtn) {
-        addCustomerBtn.addEventListener('click', function() {
-            showAddCustomerModal();
-        });
-    }
+});
 
-    // 绑定新增公司按钮事件
-    const addCompanyBtn = document.getElementById('add-company-btn');
-    if (addCompanyBtn) {
-        addCompanyBtn.addEventListener('click', function() {
-            showAddCompanyModal();
-        });
-    }
-    
-    // 绑定进出货按钮事件
-    const addInboundBtn = document.getElementById('add-inbound-btn');
-    if (addInboundBtn) {
-        addInboundBtn.addEventListener('click', function() {
-            showAddInboundModal();
-        });
-    }
-    
-    const addOutboundBtn = document.getElementById('add-outbound-btn');
-    if (addOutboundBtn) {
-        addOutboundBtn.addEventListener('click', function() {
-            showSection('sales-order');
-            // 初始化销售单
-            initSalesOrder();
-        });
-    }
-    
-    // 绑定进出货标签页切换事件
-    const stockTabs = document.querySelectorAll('#stock-tabs button');
-    stockTabs.forEach(tab => {
-        tab.addEventListener('click', function() {
-            // 移除所有标签页的激活状态
-            stockTabs.forEach(t => {
-                t.classList.remove('active', 'border-primary', 'text-primary');
-                t.classList.add('border-transparent');
-            });
-            
-            // 激活当前标签页
-            this.classList.add('active', 'border-primary', 'text-primary');
-            this.classList.remove('border-transparent');
-            
-            // 渲染对应的数据
-            const tabType = this.getAttribute('data-tab');
-            renderStockMovementTable(tabType);
-        });
-    });
+// Deprecated function removed
 
-    // 导航切换
+// Deprecated event listener removed
+
+// 绑定导航事件
+function bindNavigationEvents() {
     const navLinks = document.querySelectorAll('.nav-link');
     console.log('Found nav links:', navLinks.length);
     navLinks.forEach(link => {
@@ -468,6 +531,25 @@ document.addEventListener('DOMContentLoaded', function() {
             this.classList.add('active', 'bg-gray-800', 'text-white');
         });
     });
+
+    // 进出货标签页切换
+    const stockTabs = document.querySelectorAll('#stock-tabs button');
+    stockTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            stockTabs.forEach(t => {
+                t.classList.remove('active', 'border-primary', 'text-primary');
+                t.classList.add('border-transparent');
+            });
+            this.classList.add('active', 'border-primary', 'text-primary');
+            this.classList.remove('border-transparent');
+            
+            // 重置分页
+            paginationState.stock.page = 1;
+            
+            const tabType = this.getAttribute('data-tab');
+            renderStockMovementTable(tabType);
+        });
+    });
     
     // 下拉菜单交互
     const navDropdowns = document.querySelectorAll('.nav-dropdown > a');
@@ -476,8 +558,6 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const submenu = this.nextElementSibling;
             const icon = this.querySelector('.fa-chevron-down');
-            
-            // 切换子菜单显示状态
             if (submenu.classList.contains('hidden')) {
                 submenu.classList.remove('hidden');
                 icon.style.transform = 'rotate(180deg)';
@@ -487,26 +567,23 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-    
-    // 移动端导航切换
+}
+
+// 绑定移动端事件
+function bindMobileEvents() {
     const mobileNavLinks = document.querySelectorAll('.mobile-nav-link');
     mobileNavLinks.forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
             const target = this.getAttribute('data-target');
             showSection(target);
-            
-            // 更新导航状态
             mobileNavLinks.forEach(item => item.classList.remove('active', 'bg-gray-800', 'text-white'));
             this.classList.add('active', 'bg-gray-800', 'text-white');
-            
-            // 关闭移动端侧边栏
             const mobileSidebar = document.getElementById('mobile-sidebar');
             if (mobileSidebar) mobileSidebar.classList.add('hidden');
         });
     });
     
-    // 移动端菜单按钮
     const mobileMenuBtn = document.getElementById('mobile-menu-button');
     if (mobileMenuBtn) {
         mobileMenuBtn.addEventListener('click', function() {
@@ -531,7 +608,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // 关闭移动端菜单按钮
     const closeMobileMenuBtn = document.getElementById('close-mobile-menu');
     if (closeMobileMenuBtn) {
         closeMobileMenuBtn.addEventListener('click', function() {
@@ -539,7 +615,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // 用户菜单按钮
     const userMenuBtn = document.getElementById('user-menu-button');
     if (userMenuBtn) {
         userMenuBtn.addEventListener('click', function() {
@@ -547,7 +622,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // 点击页面其他地方关闭用户菜单
     document.addEventListener('click', function(e) {
         const userMenu = document.getElementById('user-menu');
         const userMenuButton = document.getElementById('user-menu-button');
@@ -555,8 +629,10 @@ document.addEventListener('DOMContentLoaded', function() {
             userMenu.classList.add('hidden');
         }
     });
-    
-    // 模态框控制
+}
+
+// 绑定模态框事件
+function bindModalEvents() {
     const modal = document.getElementById('modal');
     const closeModal = document.getElementById('close-modal');
     const modalCancel = document.getElementById('modal-cancel');
@@ -573,7 +649,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // 点击模态框外部关闭
     if (modal) {
         modal.addEventListener('click', function(e) {
             if (e.target === modal) {
@@ -581,7 +656,40 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-});
+}
+
+// 绑定操作按钮事件
+function bindActionButtons() {
+    const addProductBtn = document.getElementById('add-product-btn');
+    if (addProductBtn) {
+        addProductBtn.addEventListener('click', showAddProductModal);
+    }
+    
+    const addCustomerBtn = document.getElementById('add-customer-btn');
+    if (addCustomerBtn) {
+        addCustomerBtn.addEventListener('click', showAddCustomerModal);
+    }
+
+    const addCompanyBtn = document.getElementById('add-company-btn');
+    if (addCompanyBtn) {
+        addCompanyBtn.addEventListener('click', showAddCompanyModal);
+    }
+    
+    const addInboundBtn = document.getElementById('add-inbound-btn');
+    if (addInboundBtn) {
+        addInboundBtn.addEventListener('click', showAddInboundModal);
+    }
+    
+    const addOutboundBtn = document.getElementById('add-outbound-btn');
+    if (addOutboundBtn) {
+        addOutboundBtn.addEventListener('click', function() {
+            showSection('sales-order');
+            if (typeof initSalesOrder === 'function') {
+                initSalesOrder();
+            }
+        });
+    }
+}
 
 // 显示指定部分
 function showSection(sectionId) {
@@ -874,7 +982,7 @@ function addProduct(productData) {
         // 如果存在相同商品，合并数据
         const oldQuantity = existingProduct.stockQuantity;
         existingProduct.stockQuantity += productData.quantity;
-        existingProduct.updatedAt = new Date().toISOString().split('T')[0];
+        existingProduct.updatedAt = getLocalISOString();
         
         // 显示成功消息
         alert(`商品 "${productData.name}" 已存在，已将数量合并。当前库存：${existingProduct.stockQuantity}`);
@@ -894,8 +1002,8 @@ function addProduct(productData) {
             minStock: 10, // 默认最小库存
             maxStock: 100, // 默认最大库存
             supplierId: productData.supplierId,
-            createdAt: new Date().toISOString().split('T')[0],
-            updatedAt: new Date().toISOString().split('T')[0]
+            createdAt: getLocalISOString(),
+            updatedAt: getLocalISOString()
         };
         
         // 添加到商品列表
@@ -908,6 +1016,8 @@ function addProduct(productData) {
         addLog('add', 'product', productData.name, `新增商品，数量：${productData.quantity}，成本价：${productData.costPrice}`);
     }
     
+    saveMockData(); // 保存数据
+    
     // 更新库存列表
     updateInventoryTable();
 }
@@ -919,16 +1029,26 @@ function updateInventoryTable() {
     if (!tbody) return;
     
     // 获取筛选条件
-    const companyFilter = document.getElementById('filter-company')?.value;
-    const statusFilter = document.getElementById('filter-status')?.value;
-    const supplierFilter = document.getElementById('filter-supplier')?.value;
-    const searchFilter = document.getElementById('filter-search')?.value.toLowerCase();
+    const companyFilterEl = document.getElementById('filter-company');
+    const companyFilter = companyFilterEl ? companyFilterEl.value : '';
+    
+    const statusFilterEl = document.getElementById('filter-status');
+    const statusFilter = statusFilterEl ? statusFilterEl.value : '';
+    
+    const supplierFilterEl = document.getElementById('filter-supplier');
+    const supplierFilter = supplierFilterEl ? supplierFilterEl.value : '';
+    
+    const searchFilterEl = document.getElementById('filter-search');
+    const searchFilter = searchFilterEl ? searchFilterEl.value.toLowerCase() : '';
 
     // 清空表格内容
     tbody.innerHTML = '';
     
     // 过滤数据
     let filteredProducts = mockData.products;
+
+    // 按更新时间倒序排列
+    filteredProducts.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
     if (companyFilter) {
         // 假设商品数据中有 company 字段，或者根据某种规则判断公司
@@ -960,13 +1080,29 @@ function updateInventoryTable() {
         );
     }
 
-    if (filteredProducts.length === 0) {
+    // 分页逻辑
+    paginationState.inventory.total = filteredProducts.length;
+    let { page, pageSize } = paginationState.inventory;
+    
+    // 如果当前页超出了总页数，且总页数大于0，则重置为最后一页
+    const totalPages = Math.ceil(filteredProducts.length / pageSize);
+    if (page > totalPages && totalPages > 0) {
+        paginationState.inventory.page = totalPages;
+        page = totalPages;
+    }
+
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
+
+    if (paginatedProducts.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="px-6 py-4 text-center text-gray-500">没有找到匹配的商品</td></tr>';
+        renderPaginationControl('inventory-pagination-container', 'inventory', updateInventoryTable);
         return;
     }
 
-    // 根据 filteredProducts 重新渲染表格
-    filteredProducts.forEach(product => {
+    // 根据 paginatedProducts 重新渲染表格
+    paginatedProducts.forEach(product => {
         // 获取供应商名称
         const supplier = mockData.suppliers.find(s => s.id === product.supplierId);
         const supplierName = supplier ? supplier.name : '未知供应商';
@@ -996,12 +1132,14 @@ function updateInventoryTable() {
 
         const formattedCreatedAt = createdAt.toLocaleString('zh-CN', {
             year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit', second: '2-digit'
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
         });
         
         const formattedUpdatedAt = updatedAt.toLocaleString('zh-CN', {
             year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit', second: '2-digit'
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
         });
         
         // 创建表格行
@@ -1053,6 +1191,9 @@ function updateInventoryTable() {
         // 添加到表格
         tbody.appendChild(row);
     });
+
+    // 渲染分页控件
+    renderPaginationControl('inventory-pagination-container', 'inventory', updateInventoryTable);
 }
 
 // 显示新增公司模态框
@@ -1113,12 +1254,13 @@ function showAddCompanyModal() {
             address: address,
             email: email || '-',
             status: 'active',
-            createdAt: new Date().toISOString().split('T')[0],
-            updatedAt: new Date().toISOString().split('T')[0]
+            createdAt: getLocalISOString(),
+            updatedAt: getLocalISOString()
         };
         
         // Update mock data and table
         mockData.companies.push(newCompany);
+        saveMockData(); // 保存数据
         addLog('add', 'company', name, `新增公司，联系人：${contactPerson}`);
         updateCompanyTable();
         alert('公司添加成功');
@@ -1131,7 +1273,43 @@ function updateCompanyTable() {
     const tbody = document.querySelector('#companies tbody');
     if (!tbody) return;
     tbody.innerHTML = '';
-    mockData.companies.forEach(company => {
+    
+    // 按更新时间倒序排列
+    const sortedCompanies = [...mockData.companies].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    
+    // 分页逻辑
+    paginationState.companies.total = sortedCompanies.length;
+    let { page, pageSize } = paginationState.companies;
+
+    // 如果当前页超出了总页数，且总页数大于0，则重置为最后一页
+    const totalPages = Math.ceil(sortedCompanies.length / pageSize);
+    if (page > totalPages && totalPages > 0) {
+        paginationState.companies.page = totalPages;
+        page = totalPages;
+    }
+
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedCompanies = sortedCompanies.slice(startIndex, endIndex);
+
+    if (paginatedCompanies.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">暂无公司记录</td></tr>';
+        renderPaginationControl('company-pagination-container', 'companies', updateCompanyTable);
+        return;
+    }
+    
+    paginatedCompanies.forEach(company => {
+        const formattedCreatedAt = new Date(company.createdAt).toLocaleString('zh-CN', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+        });
+        const formattedUpdatedAt = new Date(company.updatedAt).toLocaleString('zh-CN', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+        });
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap">
@@ -1149,14 +1327,14 @@ function updateCompanyTable() {
                         <span class="text-xs text-gray-500 mr-2">创建:</span>
                         <span class="flex items-center">
                             <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
-                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${company.createdAt}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedCreatedAt}</span>
                         </span>
                     </div>
                     <div class="flex items-center">
                         <span class="text-xs text-gray-500 mr-2">更新:</span>
                         <span class="flex items-center">
                             <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
-                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${company.updatedAt}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedUpdatedAt}</span>
                         </span>
                     </div>
                 </div>
@@ -1167,6 +1345,75 @@ function updateCompanyTable() {
             </td>
         `;
         tbody.appendChild(row);
+    });
+
+    // 渲染分页控件
+    renderPaginationControl('company-pagination-container', 'companies', updateCompanyTable);
+}
+
+// 显示新增供应商模态框
+function showAddSupplierModal() {
+    const content = `
+        <form id="add-supplier-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">供应商名称 <span class="text-danger">*</span></label>
+                <input type="text" name="name" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">联系人 <span class="text-danger">*</span></label>
+                <input type="text" name="contactPerson" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">联系电话 <span class="text-danger">*</span></label>
+                <input type="tel" name="contactPhone" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">电子邮箱</label>
+                <input type="email" name="email" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">付款条件</label>
+                <select name="paymentTerms" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <option value="Net 30">Net 30</option>
+                    <option value="Net 45">Net 45</option>
+                    <option value="Net 60">Net 60</option>
+                    <option value="COD">货到付款</option>
+                </select>
+            </div>
+        </form>
+    `;
+
+    showModal('新增供应商', content, function() {
+        const form = document.getElementById('add-supplier-form');
+        const formData = new FormData(form);
+        const name = formData.get('name').trim();
+        const contactPerson = formData.get('contactPerson').trim();
+        const contactPhone = formData.get('contactPhone').trim();
+        const email = formData.get('email').trim();
+        const paymentTerms = formData.get('paymentTerms');
+        
+        if (!name) { alert('请输入供应商名称'); return false; }
+        if (!contactPerson) { alert('请输入联系人'); return false; }
+        if (!contactPhone) { alert('请输入联系电话'); return false; }
+        
+        const newSupplier = {
+            id: 'S' + String(mockData.suppliers.length + 1).padStart(3, '0'),
+            name: name,
+            contactPerson: contactPerson,
+            contactPhone: contactPhone,
+            email: email || '-',
+            paymentTerms: paymentTerms,
+            status: 'active',
+            createdAt: getLocalISOString(),
+            updatedAt: getLocalISOString()
+        };
+        
+        mockData.suppliers.push(newSupplier);
+        saveMockData();
+        addLog('add', 'supplier', name, `新增供应商，联系人：${contactPerson}`);
+        updateSupplierTable();
+        alert('供应商添加成功');
+        return true;
     });
 }
 
@@ -1293,10 +1540,11 @@ function showAddInboundModal() {
                     paymentTerms: 'Net 30',
                     creditLimit: 0,
                     status: 'active',
-                    createdAt: new Date().toISOString().split('T')[0],
-                    updatedAt: new Date().toISOString().split('T')[0]
+                    createdAt: getLocalISOString(),
+                    updatedAt: getLocalISOString()
                 };
                 mockData.suppliers.push(newSupplier);
+                saveMockData(); // 保存数据
                 finalSupplierId = newSupplierId;
                 finalSupplierName = supplierNameInput;
                 
@@ -1338,11 +1586,16 @@ function showAddInboundModal() {
                     minStock: 10,
                     maxStock: 100,
                     supplierId: finalSupplierId, // 关联到确定的供应商
-                    createdAt: new Date().toISOString().split('T')[0],
-                    updatedAt: new Date().toISOString().split('T')[0]
+                    createdAt: getLocalISOString(),
+                    updatedAt: getLocalISOString()
                  };
                  mockData.products.push(finalProduct);
+                 saveMockData(); // 保存数据
                  addLog('add', 'product', finalProduct.name, '自动创建新商品');
+                 
+                 // 刷新商品筛选器（可选，但推荐）
+                 // 由于商品列表是动态渲染的，这里其实不需要像 select 那样手动 append option
+                 // 下次打开弹窗时，renderList 会自动包含新商品
              }
         }
 
@@ -1353,7 +1606,8 @@ function showAddInboundModal() {
 
         // --- 3. 更新库存与记录 ---
         finalProduct.stockQuantity += quantity;
-        finalProduct.updatedAt = new Date().toISOString().split('T')[0];
+        finalProduct.updatedAt = getLocalISOString();
+        saveMockData(); // 保存数据
         
         // 确定本次进货记录的进价信息
         let recordPrice = null;
@@ -1407,6 +1661,11 @@ function showAddInboundModal() {
             renderStockMovementTable(activeTab.getAttribute('data-tab'));
         }
         updateInventoryTable();
+        
+        // 刷新供应商表格
+        updateSupplierTable();
+        
+        renderDashboardActivity(); // 更新仪表盘最近活动
 
         alert(`进货记录添加成功`);
     });
@@ -1679,7 +1938,8 @@ function showAddOutboundModal() {
             
             // 更新库存
             product.stockQuantity -= quantity;
-            product.updatedAt = new Date().toISOString().split('T')[0];
+            product.updatedAt = getLocalISOString();
+            saveMockData(); // 保存数据
             
             // 添加出货记录
             const record = {
@@ -1706,6 +1966,7 @@ function showAddOutboundModal() {
                 renderStockMovementTable(activeTab.getAttribute('data-tab'));
             }
             updateInventoryTable();
+            renderDashboardActivity(); // 更新仪表盘最近活动
             
             alert('出货记录添加成功');
             return false;
@@ -1915,12 +2176,13 @@ function showAddCustomerModal() {
             paymentTerms: paymentTerms,
             creditLimit: 0, // 默认信用额度
             status: 'active',
-            createdAt: new Date().toISOString().split('T')[0],
-            updatedAt: new Date().toISOString().split('T')[0]
+            createdAt: getLocalISOString(),
+            updatedAt: getLocalISOString()
         };
 
         // 添加到模拟数据
         mockData.customers.push(newCustomer);
+        saveMockData(); // 保存数据
         
         // 记录日志
         addLog('add', 'customer', name, `新增客户，联系人：${contactPerson}`);
@@ -1943,7 +2205,42 @@ function updateCustomerTable() {
 
     tbody.innerHTML = ''; // 清空现有内容
 
-    mockData.customers.forEach(customer => {
+    // 按更新时间倒序排列
+    const sortedCustomers = [...mockData.customers].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    // 分页逻辑
+    paginationState.customers.total = sortedCustomers.length;
+    let { page, pageSize } = paginationState.customers;
+
+    // 如果当前页超出了总页数，且总页数大于0，则重置为最后一页
+    const totalPages = Math.ceil(sortedCustomers.length / pageSize);
+    if (page > totalPages && totalPages > 0) {
+        paginationState.customers.page = totalPages;
+        page = totalPages;
+    }
+
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedCustomers = sortedCustomers.slice(startIndex, endIndex);
+
+    if (paginatedCustomers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="px-6 py-4 text-center text-gray-500">暂无客户记录</td></tr>';
+        renderPaginationControl('customer-pagination-container', 'customers', updateCustomerTable);
+        return;
+    }
+
+    paginatedCustomers.forEach(customer => {
+        const formattedCreatedAt = new Date(customer.createdAt).toLocaleString('zh-CN', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+        });
+        const formattedUpdatedAt = new Date(customer.updatedAt).toLocaleString('zh-CN', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+        });
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap">
@@ -1963,14 +2260,14 @@ function updateCustomerTable() {
                         <span class="text-xs text-gray-500 mr-2">创建:</span>
                         <span class="flex items-center">
                             <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
-                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${customer.createdAt}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedCreatedAt}</span>
                         </span>
                     </div>
                     <div class="flex items-center">
                         <span class="text-xs text-gray-500 mr-2">更新:</span>
                         <span class="flex items-center">
                             <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
-                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${customer.updatedAt}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedUpdatedAt}</span>
                         </span>
                     </div>
                 </div>
@@ -1982,6 +2279,94 @@ function updateCustomerTable() {
         `;
         tbody.appendChild(row);
     });
+
+    // 渲染分页控件
+    renderPaginationControl('customer-pagination-container', 'customers', updateCustomerTable);
+}
+
+// 更新供应商列表表格
+function updateSupplierTable() {
+    const tbody = document.querySelector('#suppliers tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = ''; // 清空现有内容
+
+    // 按更新时间倒序排列
+    const sortedSuppliers = [...mockData.suppliers].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    // 分页逻辑
+    paginationState.suppliers.total = sortedSuppliers.length;
+    let { page, pageSize } = paginationState.suppliers;
+
+    // 如果当前页超出了总页数，且总页数大于0，则重置为最后一页
+    const totalPages = Math.ceil(sortedSuppliers.length / pageSize);
+    if (page > totalPages && totalPages > 0) {
+        paginationState.suppliers.page = totalPages;
+        page = totalPages;
+    }
+
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedSuppliers = sortedSuppliers.slice(startIndex, endIndex);
+
+    if (paginatedSuppliers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">暂无供应商记录</td></tr>';
+        renderPaginationControl('suppliers-pagination-container', 'suppliers', updateSupplierTable);
+        return;
+    }
+
+    paginatedSuppliers.forEach(supplier => {
+        const formattedCreatedAt = new Date(supplier.createdAt).toLocaleString('zh-CN', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+        });
+        const formattedUpdatedAt = new Date(supplier.updatedAt).toLocaleString('zh-CN', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+        });
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900">${supplier.name}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${supplier.contactPerson}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${supplier.contactPhone}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${supplier.email}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${supplier.paymentTerms}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">活跃</span>
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-500">
+                <div class="space-y-1">
+                    <div class="flex items-center">
+                        <span class="text-xs text-gray-500 mr-2">创建:</span>
+                        <span class="flex items-center">
+                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedCreatedAt}</span>
+                        </span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="text-xs text-gray-500 mr-2">更新:</span>
+                        <span class="flex items-center">
+                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedUpdatedAt}</span>
+                        </span>
+                    </div>
+                </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <a href="#" class="text-primary hover:text-primary-dark mr-3">编辑</a>
+                <a href="#" class="text-danger hover:text-danger-dark">删除</a>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    // 渲染分页控件
+    renderPaginationControl('suppliers-pagination-container', 'suppliers', updateSupplierTable);
 }
 
 // 根据商品分类获取图标
@@ -2031,23 +2416,84 @@ function renderLogsTable() {
     
     logsTableBody.innerHTML = '';
     
-    if (logsData.length === 0) {
+    // 获取筛选条件
+    const typeFilter = document.getElementById('log-filter-type') ? document.getElementById('log-filter-type').value : '';
+    const userFilter = document.getElementById('log-filter-user') ? document.getElementById('log-filter-user').value.toLowerCase().trim() : '';
+    const dateStartFilter = document.getElementById('log-filter-date-start') ? document.getElementById('log-filter-date-start').value : '';
+    const dateEndFilter = document.getElementById('log-filter-date-end') ? document.getElementById('log-filter-date-end').value : '';
+    const searchFilter = document.getElementById('log-filter-search') ? document.getElementById('log-filter-search').value.toLowerCase().trim() : '';
+
+    // 过滤数据
+    let filteredLogs = logsData.filter(log => {
+        // 类型筛选
+        if (typeFilter && log.actionType !== typeFilter) return false;
+        
+        // 操作人筛选 (模糊匹配)
+        if (userFilter && !log.userName.toLowerCase().includes(userFilter)) return false;
+        
+        // 日期范围筛选
+        if (dateStartFilter) {
+            const logDate = new Date(log.timestamp);
+            const startDate = new Date(dateStartFilter);
+            // Check if dateStartFilter includes time (contains ':')
+            if (!dateStartFilter.includes(':')) {
+                startDate.setHours(0, 0, 0, 0); 
+            }
+            if (logDate < startDate) return false;
+        }
+        if (dateEndFilter) {
+            const logDate = new Date(log.timestamp);
+            const endDate = new Date(dateEndFilter);
+            // Check if dateEndFilter includes time
+            if (!dateEndFilter.includes(':')) {
+                endDate.setHours(23, 59, 59, 999);
+            }
+            if (logDate > endDate) return false;
+        }
+        
+        // 搜索筛选 (仅操作对象)
+        if (searchFilter && !log.objectName.toLowerCase().includes(searchFilter)) return false;
+        
+        return true;
+    });
+
+    // 按时间倒序排列
+    filteredLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // 分页逻辑
+    paginationState.logs.total = filteredLogs.length;
+    let { page, pageSize } = paginationState.logs;
+
+    // 如果当前页超出了总页数，且总页数大于0，则重置为最后一页
+    const totalPages = Math.ceil(filteredLogs.length / pageSize);
+    if (page > totalPages && totalPages > 0) {
+        paginationState.logs.page = totalPages;
+        page = totalPages;
+    }
+
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
+
+    if (paginatedLogs.length === 0) {
         logsTableBody.innerHTML = `
             <tr>
-                <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">暂无日志记录</td>
+                <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">没有找到匹配的日志记录</td>
             </tr>
         `;
+        renderPaginationControl('logs-pagination-container', 'logs', renderLogsTable);
         return;
     }
     
-    logsData.forEach(log => {
+    paginatedLogs.forEach(log => {
         const formattedTime = new Date(log.timestamp).toLocaleString('zh-CN', {
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit'
+            second: '2-digit',
+            hour12: false
         });
         
         let actionTypeText = '';
@@ -2098,6 +2544,151 @@ function renderLogsTable() {
         
         logsTableBody.appendChild(row);
     });
+
+    // 渲染分页控件
+    renderPaginationControl('logs-pagination-container', 'logs', renderLogsTable);
+}
+
+// 从本地存储加载基础数据
+async function loadMockData() {
+    try {
+        // 尝试加载分散的数据文件
+        const tables = ['products', 'suppliers', 'customers', 'companies', 'bills', 'deliveryNotes', 'stockMovements', 'logs'];
+        const loadPromises = tables.map(table => 
+            fetch(`data/${table}.json`).then(res => res.ok ? res.json() : [])
+        );
+        
+        const results = await Promise.all(loadPromises);
+        
+        // 组装数据
+        defaultMockData = {
+            products: results[0] || [],
+            suppliers: results[1] || [],
+            customers: results[2] || [],
+            companies: results[3] || [],
+            bills: results[4] || [],
+            deliveryNotes: results[5] || []
+        };
+        
+        // 特殊处理独立变量
+        // 注意：这里仅当本地存储没有数据时才使用这些作为默认值
+        // stockMovementData = results[6] || [];
+        // logsData = results[7] || [];
+        
+        console.log('Loaded split data files');
+        
+    } catch (e) {
+        console.warn('Failed to load split data files, trying fallback to data.json or localStorage', e);
+        try {
+            // 1. 尝试从 data.json 加载默认数据
+            const response = await fetch('data.json');
+            if (response.ok) {
+                const combinedData = await response.json();
+                defaultMockData = combinedData;
+                // stockMovementData = combinedData.stockMovements || [];
+                // logsData = combinedData.logs || [];
+                console.log('Loaded default data from data.json');
+            } else {
+                defaultMockData = { products: [], suppliers: [], customers: [], companies: [] };
+            }
+        } catch (innerE) {
+            console.error('Error fetching data.json:', innerE);
+            defaultMockData = { products: [], suppliers: [], customers: [], companies: [] };
+        }
+    }
+
+    // 本地存储覆盖（如果存在）
+    const savedData = localStorage.getItem('mockData');
+    if (savedData) {
+        try {
+            const parsedData = JSON.parse(savedData);
+            // 确保 mockData 的每个属性都存在，避免 undefined
+            mockData = {
+                products: parsedData.products || defaultMockData.products || [],
+                suppliers: parsedData.suppliers || defaultMockData.suppliers || [],
+                customers: parsedData.customers || defaultMockData.customers || [],
+                companies: parsedData.companies || defaultMockData.companies || []
+            };
+            console.log('Merged localStorage data');
+        } catch (e) {
+            console.error('Failed to parse localStorage data, keeping default data:', e);
+            // 如果解析失败，不要直接覆盖保存，而是保留 defaultMockData，但提示用户
+            mockData = JSON.parse(JSON.stringify(defaultMockData));
+            alert('警告：本地数据解析失败，已加载默认数据。如果这是非预期的情况，请联系管理员。');
+        }
+    } else {
+        console.log('No localStorage data found, using default data');
+        mockData = JSON.parse(JSON.stringify(defaultMockData));
+        // 这里不立即保存，等到用户有操作时再保存，或者确认数据加载完整后再保存
+        // saveMockData(); 
+    }
+    
+    // 确保 mockData 结构完整
+    if (!mockData.products) mockData.products = [];
+    if (!mockData.suppliers) mockData.suppliers = [];
+    if (!mockData.customers) mockData.customers = [];
+    if (!mockData.companies) mockData.companies = [];
+    if (!mockData.bills) mockData.bills = [];
+}
+
+// 保存基础数据到本地存储和后端API（如果可用）
+async function saveMockData() {
+    // 安全检查：如果 mockData 为空或结构不完整，不保存，防止覆盖有效数据
+    if (!mockData || !Array.isArray(mockData.products)) {
+        console.error('Security check failed: mockData is incomplete, aborting save.');
+        return;
+    }
+
+    // 1. 保存到 LocalStorage (总是执行，作为离线/静态托管的后备)
+    try {
+        // 先备份旧数据（可选，防止意外覆盖）
+        const oldData = localStorage.getItem('mockData');
+        if (oldData) localStorage.setItem('mockData_backup', oldData);
+        
+        localStorage.setItem('mockData', JSON.stringify(mockData));
+        console.log('Saved mock data to localStorage');
+    } catch (e) {
+        console.error('Failed to save mock data to localStorage', e);
+        if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+             alert('保存失败：浏览器存储空间已满。请导出数据备份，并清理浏览器缓存。');
+        }
+    }
+
+    // 2. 尝试保存到后端文件 (仅在本地开发服务器环境生效)
+    try {
+        const promises = [];
+        
+        // 映射表名到数据源
+        const dataMap = {
+            'products': mockData.products,
+            'suppliers': mockData.suppliers,
+            'customers': mockData.customers,
+            'companies': mockData.companies,
+            'bills': defaultMockData.bills || [], 
+            'deliveryNotes': defaultMockData.deliveryNotes || [],
+            'stockMovements': stockMovementData,
+            'logs': logsData
+        };
+
+        for (const [table, data] of Object.entries(dataMap)) {
+            promises.push(
+                fetch(`/api/save/${table}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).then(res => {
+                    if (!res.ok) throw new Error(`Failed to save ${table}: ${res.statusText}`);
+                })
+            );
+        }
+
+        await Promise.all(promises);
+        console.log('Successfully synced all data to separate files');
+
+    } catch (e) {
+        // 网络错误通常意味着没有后端服务（纯静态环境），忽略
+        console.log('Running in static mode (no backend API detected) or partial save failed:', e);
+    }
 }
 
 // 从本地存储加载进出货记录数据
@@ -2160,6 +2751,105 @@ function loadStockMovementData() {
 
 
 
+// 删除进出货记录并回滚库存
+function deleteStockMovement(recordId) {
+    if (!confirm('确定要删除这条记录吗？这将自动回滚对应的库存数量。')) {
+        return;
+    }
+
+    const recordIndex = stockMovementData.findIndex(r => r.id === recordId);
+    if (recordIndex === -1) {
+        alert('记录未找到，可能已被删除');
+        return;
+    }
+
+    const record = stockMovementData[recordIndex];
+    const product = mockData.products.find(p => p.id === record.productId);
+
+    if (product) {
+        // 回滚库存逻辑
+        if (record.type === 'inbound') {
+            // 如果是进货记录，删除时应减少库存
+            if (product.stockQuantity < record.quantity) {
+                if (!confirm(`警告：删除此进货记录会导致库存变为负数（当前库存 ${product.stockQuantity}，需扣减 ${record.quantity}）。是否继续？`)) {
+                    return;
+                }
+            }
+            product.stockQuantity -= record.quantity;
+            product.updatedAt = getLocalISOString();
+        } else if (record.type === 'outbound') {
+            // 如果是出货记录，删除时应增加库存
+            product.stockQuantity += record.quantity;
+            product.updatedAt = getLocalISOString();
+        }
+        
+        // 保存基础数据（库存更新）
+        saveMockData();
+    } else {
+        alert('警告：关联的商品已不存在，库存将不会回滚，仅删除记录。');
+    }
+
+    // 删除记录
+    stockMovementData.splice(recordIndex, 1);
+    localStorage.setItem('stockMovementData', JSON.stringify(stockMovementData));
+
+    // 添加日志
+    addLog('delete', 'stock_movement', record.productName, `删除${record.type === 'inbound' ? '进货' : '出货'}记录，回滚数量：${record.quantity}`);
+
+    // 刷新界面
+    const activeTab = document.querySelector('#stock-tabs .active');
+    if (activeTab) {
+        renderStockMovementTable(activeTab.getAttribute('data-tab'));
+    } else {
+        renderStockMovementTable('all');
+    }
+    updateInventoryTable();
+    alert('记录已删除，库存已回滚');
+}
+
+// 渲染仪表盘最近活动
+function renderDashboardActivity() {
+    const tbody = document.querySelector('#dashboard-activity-table tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    // 获取最新的5条记录
+    const recentActivity = stockMovementData.slice(0, 5);
+    
+    if (recentActivity.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">暂无活动记录</td></tr>';
+        return;
+    }
+    
+    recentActivity.forEach(record => {
+        const typeText = record.type === 'inbound' ? '入库' : '出库';
+        const typeClass = record.type === 'inbound' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+        
+        const formattedTime = new Date(record.createdAt).toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${typeClass}">${typeText}</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.productName}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.quantity}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.operator}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formattedTime}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
 // 渲染进出货记录表格
 // 获取操作人员名称的首字母
 function getInitial(name) {
@@ -2167,7 +2857,13 @@ function getInitial(name) {
     return name.charAt(0).toUpperCase();
 }
 
-function renderStockMovementTable(filter = 'all') {
+function renderStockMovementTable(filter) {
+    // 如果没有提供filter，尝试从当前激活的标签页获取
+    if (!filter) {
+        const activeTab = document.querySelector('#stock-tabs button.active');
+        filter = activeTab ? activeTab.getAttribute('data-tab') : 'all';
+    }
+
     const tableBody = document.getElementById('stock-movement-table-body');
     if (!tableBody) return;
     const tableHead = document.getElementById('stock-movement-table-head');
@@ -2205,27 +2901,45 @@ function renderStockMovementTable(filter = 'all') {
         }
     }
     
-    if (filteredData.length === 0) {
+    // 按时间倒序排列 (使用 updatedAt)
+    filteredData.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    // 分页逻辑
+    paginationState.stock.total = filteredData.length;
+    let { page, pageSize } = paginationState.stock;
+    
+    // 如果当前页超出了总页数，且总页数大于0，则重置为最后一页
+    const totalPages = Math.ceil(filteredData.length / pageSize);
+    if (page > totalPages && totalPages > 0) {
+        paginationState.stock.page = totalPages;
+        page = totalPages;
+    }
+    
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+    
+    if (paginatedData.length === 0) {
         tableBody.innerHTML = `
             <tr>
                 <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">暂无记录</td>
             </tr>
         `;
+        renderPaginationControl('stock-pagination-container', 'stock', renderStockMovementTable);
         return;
     }
-    
-    // 按时间倒序排列
-    filteredData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     
     const supplierMap = new Map(mockData.suppliers.map(supplier => [supplier.id, supplier.name]));
     const productMap = new Map(mockData.products.map(product => [product.id, product]));
     
-    filteredData.forEach(record => {
+    paginatedData.forEach(record => {
         const typeText = record.type === 'inbound' ? '入库' : '出库';
         const typeClass = record.type === 'inbound' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
         const quantityClass = record.type === 'inbound' ? 'text-green-600' : 'text-blue-600';
         const quantitySign = record.type === 'inbound' ? '+' : '-';
         const product = productMap.get(record.productId);
+        // 优先使用当前商品的实时名称，如果商品已删除则使用记录中的名称快照
+        const displayProductName = product ? product.name : (record.productName || '未知商品');
         const supplierName = record.supplierName || (product ? supplierMap.get(product.supplierId) : '') || '-';
         
         const createdAt = new Date(record.createdAt);
@@ -2237,7 +2951,8 @@ function renderStockMovementTable(filter = 'all') {
             day: '2-digit',
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit'
+            second: '2-digit',
+            hour12: false
         });
         
         const formattedUpdatedAt = updatedAt.toLocaleString('zh-CN', {
@@ -2246,7 +2961,8 @@ function renderStockMovementTable(filter = 'all') {
             day: '2-digit',
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit'
+            second: '2-digit',
+            hour12: false
         });
         
         const row = document.createElement('tr');
@@ -2259,7 +2975,7 @@ function renderStockMovementTable(filter = 'all') {
             }
 
             row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.productName}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${displayProductName}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${quantityClass}">${quantitySign}${record.quantity} ${record.unit}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">${priceHtml}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${supplierName}</td>
@@ -2289,14 +3005,14 @@ function renderStockMovementTable(filter = 'all') {
                     <button class="text-yellow-600 hover:text-yellow-800 mr-3">
                         编辑
                     </button>
-                    <button class="text-red-600 hover:text-red-800">
+                    <button class="text-red-600 hover:text-red-800" onclick="deleteStockMovement('${record.id}')">
                         删除
                     </button>
                 </td>
             `;
         } else {
             row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.productName}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${displayProductName}</td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${typeClass}">${typeText}</span>
                 </td>
@@ -2327,7 +3043,7 @@ function renderStockMovementTable(filter = 'all') {
                     <button class="text-yellow-600 hover:text-yellow-800 mr-3">
                         编辑
                     </button>
-                    <button class="text-red-600 hover:text-red-800">
+                    <button class="text-red-600 hover:text-red-800" onclick="deleteStockMovement('${record.id}')">
                         删除
                     </button>
                 </td>
@@ -2336,6 +3052,9 @@ function renderStockMovementTable(filter = 'all') {
         
         tableBody.appendChild(row);
     });
+
+    // 渲染分页控件
+    renderPaginationControl('stock-pagination-container', 'stock', renderStockMovementTable);
 }
 
 // 添加进货记录
@@ -2369,10 +3088,12 @@ function addInboundRecord(recordData) {
     
     // 更新库存
     product.stockQuantity += recordData.quantity;
-    product.updatedAt = now.toISOString().split('T')[0];
+    product.updatedAt = getLocalISOString();
+    saveMockData(); // 保存最新的库存数据
     
     updateInventoryTable();
     renderStockMovementTable('all');
+    renderDashboardActivity(); // 更新仪表盘最近活动
     addLog('add', 'inventory', product.name, `进货入库，数量：${recordData.quantity}`);
 }
 
@@ -2438,5 +3159,110 @@ function loadLogsData() {
             }
         ];
         localStorage.setItem('logsData', JSON.stringify(logsData));
+    }
+}
+
+// 导出所有数据
+function exportAllData() {
+    const data = {
+        mockData: mockData,
+        stockMovementData: stockMovementData,
+        logsData: logsData,
+        exportTime: new Date().toISOString()
+    };
+    
+    const dataStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventory_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    addLog('export', 'system', '数据备份', '导出系统全部数据');
+}
+
+// 导入数据
+function importData(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            
+            if (data.mockData) {
+                mockData = data.mockData;
+                localStorage.setItem('mockData', JSON.stringify(mockData));
+            }
+            
+            if (data.stockMovementData) {
+                stockMovementData = data.stockMovementData;
+                localStorage.setItem('stockMovementData', JSON.stringify(stockMovementData));
+            }
+            
+            if (data.logsData) {
+                logsData = data.logsData;
+                localStorage.setItem('logsData', JSON.stringify(logsData));
+            }
+            
+            alert('数据导入成功！页面将刷新以应用更改。');
+            addLog('import', 'system', '数据恢复', '从备份文件导入数据');
+            location.reload();
+            
+        } catch (error) {
+            console.error('Import failed:', error);
+            alert('导入失败：文件格式不正确或已损坏。');
+        }
+    };
+    reader.readAsText(file);
+}
+
+// 绑定设置页面的事件
+function bindSettingsEvents() {
+    // 标签页切换
+    const settingsTabs = document.querySelectorAll('#settings-tabs button');
+    settingsTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            // 移除所有 active 类
+            settingsTabs.forEach(t => {
+                t.classList.remove('border-primary', 'text-primary');
+                t.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+            });
+            // 添加 active 类到当前 tab
+            this.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+            this.classList.add('border-primary', 'text-primary');
+            
+            // 隐藏所有内容区域
+            const contents = document.querySelectorAll('.settings-content');
+            contents.forEach(content => content.classList.add('hidden'));
+            
+            // 显示目标内容区域
+            const targetId = this.getAttribute('data-target');
+            document.getElementById(targetId).classList.remove('hidden');
+        });
+    });
+
+    // 导出按钮
+    const exportBtn = document.getElementById('export-data-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportAllData);
+    }
+
+    // 导入按钮
+    const importBtn = document.getElementById('import-data-btn');
+    const importInput = document.getElementById('import-data-input');
+    if (importBtn && importInput) {
+        importBtn.addEventListener('click', () => importInput.click());
+        importInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                if (confirm('导入数据将覆盖当前所有数据，确定要继续吗？')) {
+                    importData(e.target.files[0]);
+                }
+                e.target.value = ''; // 重置 input
+            }
+        });
     }
 }

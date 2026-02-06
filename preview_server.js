@@ -4,6 +4,23 @@ const path = require('path');
 
 const PORT = 8080;
 
+// Determine paths for packaged executable vs development
+const isPkg = typeof process.pkg !== 'undefined';
+
+// staticBase: Immutable application files (HTML, JS, CSS)
+// In development: current directory
+// In pkg: snapshot filesystem (inside the exe)
+const staticBase = __dirname;
+
+// dataBase: Mutable user data
+// In development: current directory
+// In pkg: The directory where the executable is located (external to the exe)
+const dataBase = isPkg ? path.dirname(process.execPath) : __dirname;
+
+console.log(`Server starting...`);
+console.log(`Static Base (App): ${staticBase}`);
+console.log(`Data Base (User): ${dataBase}`);
+
 const mimeTypes = {
   '.html': 'text/html',
   '.js': 'text/javascript',
@@ -28,7 +45,7 @@ const server = http.createServer(function (request, response) {
   // Handle CORS
   response.setHeader('Access-Control-Allow-Origin', '*');
   response.setHeader('Access-Control-Request-Method', '*');
-  response.setHeader('Access-Control-Allow-Methods', 'OPTIONS, GET');
+  response.setHeader('Access-Control-Allow-Methods', 'OPTIONS, GET, POST');
   response.setHeader('Access-Control-Allow-Headers', '*');
 
   if (request.method === 'OPTIONS') {
@@ -37,41 +54,112 @@ const server = http.createServer(function (request, response) {
     return;
   }
 
-  let filePath = '.' + request.url;
-  // 移除 query string (例如 ?ide_webview_request_time=...)
-  const queryIndex = filePath.indexOf('?');
-  if (queryIndex !== -1) {
-    filePath = filePath.substring(0, queryIndex);
+  // Handle data saving endpoint
+  if (request.url.startsWith('/api/save') && request.method === 'POST') {
+    let body = '';
+    request.on('data', chunk => {
+      body += chunk.toString();
+    });
+    request.on('end', () => {
+      try {
+        const data = JSON.parse(body);
+        
+        // Determine target file path in the external data directory
+        let targetSubPath = '/data.json'; // Default legacy
+        const parts = request.url.split('/');
+        
+        if (parts.length > 3) {
+            const tableName = parts[3];
+            if (/^[a-zA-Z0-9_]+$/.test(tableName)) {
+                targetSubPath = `/data/${tableName}.json`;
+            } else {
+                response.writeHead(400, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: false, error: 'Invalid table name' }));
+                return;
+            }
+        }
+
+        // Construct absolute path using dataBase (ensures writing to disk, not inside exe)
+        const targetFile = path.join(dataBase, targetSubPath);
+        const targetDir = path.dirname(targetFile);
+
+        // Ensure directory exists
+        if (!fs.existsSync(targetDir)) {
+            try {
+                fs.mkdirSync(targetDir, { recursive: true });
+            } catch (err) {
+                console.error('Error creating directory:', err);
+                response.writeHead(500, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ success: false, error: 'Failed to create directory' }));
+                return;
+            }
+        }
+
+        // Write to file
+        fs.writeFile(targetFile, JSON.stringify(data, null, 4), 'utf8', (err) => {
+          if (err) {
+            console.error(`Error writing to ${targetFile}:`, err);
+            response.writeHead(500, { 'Content-Type': 'application/json' });
+            response.end(JSON.stringify({ success: false, error: err.message }));
+          } else {
+            console.log(`Successfully saved data to ${targetFile}`);
+            response.writeHead(200, { 'Content-Type': 'application/json' });
+            response.end(JSON.stringify({ success: true }));
+          }
+        });
+      } catch (e) {
+        console.error('Invalid JSON received:', e);
+        response.writeHead(400, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ success: false, error: 'Invalid JSON' }));
+      }
+    });
+    return;
   }
-  
-  if (filePath === './') {
-    filePath = './index.html';
+
+  // Handle File Serving
+  let urlPath = request.url.split('?')[0];
+  if (urlPath === '/') {
+    urlPath = '/index.html';
   }
 
   // Prevent directory traversal
-  const normalizedPath = path.normalize(filePath);
-  if (normalizedPath.startsWith('..')) {
+  if (urlPath.includes('..')) {
       response.writeHead(403);
       response.end('Forbidden');
       return;
   }
 
-  const extname = String(path.extname(filePath)).toLowerCase();
+  // Strategy: 
+  // 1. If requesting /data/..., try to serve from dataBase (external disk) first.
+  // 2. Fallback to staticBase (bundled assets).
+  
+  let servePath = null;
+  
+  if (urlPath.startsWith('/data/')) {
+      const externalPath = path.join(dataBase, urlPath);
+      if (fs.existsSync(externalPath)) {
+          servePath = externalPath;
+      }
+  }
+
+  if (!servePath) {
+      servePath = path.join(staticBase, urlPath);
+  }
+
+  const extname = String(path.extname(servePath)).toLowerCase();
   const contentType = mimeTypes[extname] || 'application/octet-stream';
 
-  fs.readFile(filePath, function(error, content) {
+  fs.readFile(servePath, function(error, content) {
     if (error) {
       if(error.code == 'ENOENT') {
-        // Check if it is a directory and try to serve index.html or listing (simplified)
-        // For now, just 404
         response.writeHead(404, { 'Content-Type': 'text/plain' });
-        response.end('404 Not Found: ' + filePath, 'utf-8');
+        response.end('404 Not Found: ' + urlPath, 'utf-8');
       } else {
         response.writeHead(500);
-        response.end('Sorry, check with the site admin for error: '+error.code+' ..\n');
+        response.end('Server Error: '+error.code);
       }
     } else {
-      // Disable caching for development
+      // Disable caching for development/real-time updates
       response.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       response.setHeader('Pragma', 'no-cache');
       response.setHeader('Expires', '0');

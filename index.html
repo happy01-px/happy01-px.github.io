@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -12,6 +12,14 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
     <!-- Tailwind 配置 -->
     <script src="js/tailwind.config.js"></script>
+    <!-- React & ReactDOM (Ant Design 依赖) -->
+    <script src="lib/react.production.min.js"></script>
+    <script src="lib/react-dom.production.min.js"></script>
+    <!-- Day.js (Ant Design 依赖) -->
+    <script src="lib/dayjs.min.js"></script>
+    <!-- Ant Design -->
+    <script src="lib/antd.min.js"></script>
+    <link href="lib/reset.min.css" rel="stylesheet">
     <link href="css/style.css" rel="stylesheet">
 </head>
 
@@ -316,10 +324,10 @@
                     <div class="bg-white rounded-lg shadow-card p-6">
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-lg font-semibold text-gray-800">最近活动</h3>
-                            <a href="#" class="text-primary hover:text-primary-dark text-sm font-medium">查看全部</a>
+                            <a href="#" class="text-primary hover:text-primary-dark text-sm font-medium" onclick="document.querySelector('.nav-link[data-target=\'stock-movement\']').click()">查看全部</a>
                         </div>
                         <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
+                            <table class="min-w-full divide-y divide-gray-200" id="dashboard-activity-table">
                                 <thead>
                                     <tr>
                                         <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">活动类型</th>
@@ -330,53 +338,12 @@
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">入库</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">iPhone 13 Pro</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">50</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">张三</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-07-20 10:30</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">出库</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">MacBook Air M2</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">15</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">李四</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-07-19 15:45</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">盘点</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">iPad Pro</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-2</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">王五</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-07-18 09:15</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">入库</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">AirPods Pro</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">100</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">张三</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-07-17 14:20</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">出库</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Apple Watch</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">25</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">李四</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-07-16 11:05</td>
-                                    </tr>
+                                    <!-- Dynamic Content -->
                                 </tbody>
                             </table>
+                        </div>
+                        <div id="dashboard-pagination-container" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+                            <!-- Pagination will be rendered here by JS -->
                         </div>
                     </div>
                 </section>
@@ -667,49 +634,8 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                            <div class="flex-1 flex justify-between sm:hidden">
-                                <a href="#" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                    上一页
-                                </a>
-                                <a href="#" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                    下一页
-                                </a>
-                            </div>
-                            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                                <div>
-                                    <p class="text-sm text-gray-700">
-                                        显示 <span class="font-medium">1</span> 到 <span class="font-medium">5</span> 条，共 <span class="font-medium">25</span> 条记录
-                                    </p>
-                                </div>
-                                <div>
-                                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                            <span class="sr-only">上一页</span>
-                                            <i class="fa fa-chevron-left"></i>
-                                        </a>
-                                        <a href="#" aria-current="page" class="z-10 bg-primary border-primary text-white relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            1
-                                        </a>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            2
-                                        </a>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            3
-                                        </a>
-                                        <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                                            ...
-                                        </span>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            5
-                                        </a>
-                                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                            <span class="sr-only">下一页</span>
-                                            <i class="fa fa-chevron-right"></i>
-                                        </a>
-                                    </nav>
-                                </div>
-                            </div>
+                        <div id="inventory-pagination-container" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+                            <!-- Pagination will be rendered here by JS -->
                         </div>
                     </div>
                 </section>
@@ -904,7 +830,7 @@
                                         <th class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                                     </tr>
                                 </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
+                                <tbody class="bg-white divide-y divide-gray-200" id="bills-table-body">
                                     <tr>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="text-sm font-medium text-gray-900">苹果公司</div>
@@ -1010,6 +936,9 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div id="suppliers-pagination-container" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+                            <!-- Pagination will be rendered here by JS -->
+                        </div>
                     </div>
                 </section>
 
@@ -1109,6 +1038,9 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                        <div id="company-pagination-container" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+                            <!-- Pagination will be rendered here by JS -->
                         </div>
                     </div>
                 </section>
@@ -1251,6 +1183,9 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div id="customer-pagination-container" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+                            <!-- Pagination will be rendered here by JS -->
+                        </div>
                     </div>
                 </section>
 
@@ -1313,49 +1248,8 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                            <div class="flex-1 flex justify-between sm:hidden">
-                                <a href="#" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                    上一页
-                                </a>
-                                <a href="#" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                    下一页
-                                </a>
-                            </div>
-                            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                                <div>
-                                    <p class="text-sm text-gray-700">
-                                        显示 <span class="font-medium">1</span> 到 <span class="font-medium">10</span> 条，共 <span class="font-medium">50</span> 条记录
-                                    </p>
-                                </div>
-                                <div>
-                                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                            <span class="sr-only">上一页</span>
-                                            <i class="fa fa-chevron-left"></i>
-                                        </a>
-                                        <a href="#" aria-current="page" class="z-10 bg-primary border-primary text-white relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            1
-                                        </a>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            2
-                                        </a>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            3
-                                        </a>
-                                        <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                                            ...
-                                        </span>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            5
-                                        </a>
-                                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                            <span class="sr-only">下一页</span>
-                                            <i class="fa fa-chevron-right"></i>
-                                        </a>
-                                    </nav>
-                                </div>
-                            </div>
+                        <div id="stock-pagination-container" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+                            <!-- Pagination will be rendered here by JS -->
                         </div>
                     </div>
                 </section>
@@ -1372,7 +1266,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">操作类型</label>
-                                <select class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                <select id="log-filter-type" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                     <option value="">全部类型</option>
                                     <option value="add">新增</option>
                                     <option value="edit">编辑</option>
@@ -1383,25 +1277,18 @@
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">操作人</label>
-                                <select class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <option value="">全部用户</option>
-                                    <option value="U001">张三</option>
-                                    <option value="U002">李四</option>
-                                    <option value="U003">王五</option>
-                                </select>
+                                <input type="text" id="log-filter-user" placeholder="输入操作人..." class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">日期范围</label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="date" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <span>至</span>
-                                    <input type="date" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                </div>
+                                <div id="log-date-range-picker-container"></div>
+                                <input type="hidden" id="log-filter-date-start">
+                                <input type="hidden" id="log-filter-date-end">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
                                 <div class="relative">
-                                    <input type="text" placeholder="搜索日志..." class="w-full border border-gray-300 rounded-md pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                    <input type="text" id="log-filter-search" placeholder="搜索操作对象..." class="w-full border border-gray-300 rounded-md pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                                     <i class="fa fa-search absolute left-3 top-3 text-gray-400"></i>
                                 </div>
                             </div>
@@ -1427,49 +1314,8 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                            <div class="flex-1 flex justify-between sm:hidden">
-                                <a href="#" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                    上一页
-                                </a>
-                                <a href="#" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                    下一页
-                                </a>
-                            </div>
-                            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                                <div>
-                                    <p class="text-sm text-gray-700">
-                                        显示 <span class="font-medium">1</span> 到 <span class="font-medium">10</span> 条，共 <span class="font-medium">50</span> 条记录
-                                    </p>
-                                </div>
-                                <div>
-                                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                            <span class="sr-only">上一页</span>
-                                            <i class="fa fa-chevron-left"></i>
-                                        </a>
-                                        <a href="#" aria-current="page" class="z-10 bg-primary border-primary text-white relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            1
-                                        </a>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            2
-                                        </a>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            3
-                                        </a>
-                                        <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                                            ...
-                                        </span>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            5
-                                        </a>
-                                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                            <span class="sr-only">下一页</span>
-                                            <i class="fa fa-chevron-right"></i>
-                                        </a>
-                                    </nav>
-                                </div>
-                            </div>
+                        <div id="logs-pagination-container" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+                            <!-- Pagination will be rendered here by JS -->
                         </div>
                     </div>
                 </section>
@@ -1532,11 +1378,9 @@
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">日期范围</label>
-                                <div class="flex items-center space-x-2">
-                                    <input type="date" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <span>至</span>
-                                    <input type="date" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                </div>
+                                <div id="bills-date-range-picker-container"></div>
+                                <input type="hidden" id="bills-filter-date-start">
+                                <input type="hidden" id="bills-filter-date-end">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
@@ -1691,43 +1535,8 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                            <div class="flex-1 flex justify-between sm:hidden">
-                                <a href="#" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                    上一页
-                                </a>
-                                <a href="#" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                    下一页
-                                </a>
-                            </div>
-                            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                                <div>
-                                    <p class="text-sm text-gray-700">
-                                        显示 <span class="font-medium">1</span> 到 <span class="font-medium">4</span> 条，共 <span class="font-medium">12</span> 条记录
-                                    </p>
-                                </div>
-                                <div>
-                                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                            <span class="sr-only">上一页</span>
-                                            <i class="fa fa-chevron-left"></i>
-                                        </a>
-                                        <a href="#" aria-current="page" class="z-10 bg-primary border-primary text-white relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            1
-                                        </a>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            2
-                                        </a>
-                                        <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                                            3
-                                        </a>
-                                        <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                            <span class="sr-only">下一页</span>
-                                            <i class="fa fa-chevron-right"></i>
-                                        </a>
-                                    </nav>
-                                </div>
-                            </div>
+                        <div id="bills-pagination-container" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+                            <!-- Pagination will be rendered here by JS -->
                         </div>
                     </div>
                 </section>
@@ -1933,24 +1742,24 @@
 
                     <!-- 标签页 -->
                     <div class="mb-6 border-b border-gray-200">
-                        <ul class="flex flex-wrap -mb-px">
+                        <ul class="flex flex-wrap -mb-px" id="settings-tabs">
                             <li class="mr-2">
-                                <a href="#" class="inline-block p-4 border-b-2 border-primary text-primary rounded-t-lg active">基本设置</a>
+                                <button data-target="settings-basic" class="inline-block p-4 border-b-2 border-primary text-primary rounded-t-lg active hover:text-gray-700 hover:border-gray-300">基本设置</button>
                             </li>
                             <li class="mr-2">
-                                <a href="#" class="inline-block p-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 rounded-t-lg">用户管理</a>
+                                <button data-target="settings-user" class="inline-block p-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 rounded-t-lg">用户管理</button>
                             </li>
                             <li class="mr-2">
-                                <a href="#" class="inline-block p-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 rounded-t-lg">权限设置</a>
+                                <button data-target="settings-permission" class="inline-block p-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 rounded-t-lg">权限设置</button>
                             </li>
                             <li class="mr-2">
-                                <a href="#" class="inline-block p-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 rounded-t-lg">数据备份</a>
+                                <button data-target="settings-backup" class="inline-block p-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 rounded-t-lg">数据备份</button>
                             </li>
                         </ul>
                     </div>
 
                     <!-- 基本设置 -->
-                    <div class="bg-white rounded-lg shadow-card p-6">
+                    <div id="settings-basic" class="bg-white rounded-lg shadow-card p-6 settings-content">
                         <form>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                 <div>
@@ -2022,6 +1831,44 @@
                                 </button>
                             </div>
                         </form>
+                    </div>
+
+                    <!-- 用户管理 (Placeholder) -->
+                    <div id="settings-user" class="bg-white rounded-lg shadow-card p-6 settings-content hidden">
+                        <div class="text-center py-10 text-gray-500">
+                            <i class="fa fa-users text-4xl mb-4"></i>
+                            <p>用户管理功能开发中...</p>
+                        </div>
+                    </div>
+
+                    <!-- 权限设置 (Placeholder) -->
+                    <div id="settings-permission" class="bg-white rounded-lg shadow-card p-6 settings-content hidden">
+                        <div class="text-center py-10 text-gray-500">
+                            <i class="fa fa-lock text-4xl mb-4"></i>
+                            <p>权限设置功能开发中...</p>
+                        </div>
+                    </div>
+
+                    <!-- 数据备份 -->
+                    <div id="settings-backup" class="bg-white rounded-lg shadow-card p-6 settings-content hidden">
+                        <div class="space-y-6">
+                            <div class="border-b pb-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-2">数据导出</h3>
+                                <p class="text-sm text-gray-600 mb-4">将所有系统数据（库存、供应商、客户、日志等）导出为 JSON 文件。建议定期备份数据。</p>
+                                <button id="export-data-btn" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg flex items-center transition-all-300">
+                                    <i class="fa fa-download mr-2"></i> 导出备份数据
+                                </button>
+                            </div>
+                            
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800 mb-2">数据导入</h3>
+                                <p class="text-sm text-gray-600 mb-4">从 JSON 备份文件恢复数据。注意：这将覆盖当前系统中的所有数据。</p>
+                                <input type="file" id="import-data-input" accept=".json" class="hidden">
+                                <button id="import-data-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg flex items-center transition-all-300">
+                                    <i class="fa fa-upload mr-2"></i> 导入备份数据
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </section>
             </main>

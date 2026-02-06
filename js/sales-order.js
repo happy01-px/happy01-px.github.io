@@ -214,7 +214,7 @@ function submitSalesOrder() {
         if (product) {
             // 更新库存
             product.stockQuantity -= item.quantity;
-            product.updatedAt = new Date().toISOString().split('T')[0];
+            product.updatedAt = getLocalISOString();
             
             // 添加出货记录
             const record = {

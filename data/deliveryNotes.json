@@ -1,0 +1,77 @@
+[
+    {
+        "id": "D001",
+        "supplierId": "S001",
+        "orderId": "O001",
+        "deliveryDate": "2023-07-15",
+        "expectedDate": "2023-07-15",
+        "status": "received",
+        "totalAmount": 150000,
+        "notes": "iPhone 13 Pro 50台",
+        "createdAt": "2023-07-14",
+        "updatedAt": "2023-07-15",
+        "details": [
+            {
+                "id": "DD001",
+                "deliveryId": "D001",
+                "productId": "P001",
+                "quantity": 50,
+                "unitPrice": 6999,
+                "totalAmount": 349950,
+                "receivedQuantity": 50,
+                "notes": "",
+                "status": "received"
+            }
+        ]
+    },
+    {
+        "id": "D002",
+        "supplierId": "S002",
+        "orderId": "O002",
+        "deliveryDate": "2023-07-18",
+        "expectedDate": "2023-07-18",
+        "status": "partial",
+        "totalAmount": 120000,
+        "notes": "Samsung Galaxy S23 20台",
+        "createdAt": "2023-07-17",
+        "updatedAt": "2023-07-18",
+        "details": [
+            {
+                "id": "DD002",
+                "deliveryId": "D002",
+                "productId": "P006",
+                "quantity": 20,
+                "unitPrice": 5999,
+                "totalAmount": 119980,
+                "receivedQuantity": 15,
+                "notes": "5台有瑕疵，待退货",
+                "status": "partial"
+            }
+        ]
+    },
+    {
+        "id": "D003",
+        "supplierId": "S003",
+        "orderId": "O003",
+        "deliveryDate": "2023-07-20",
+        "expectedDate": "2023-07-20",
+        "status": "pending",
+        "totalAmount": 180000,
+        "notes": "Huawei Mate 50 Pro 30台",
+        "createdAt": "2023-07-19",
+        "updatedAt": "2023-07-19",
+        "details": [
+            {
+                "id": "DD003",
+                "deliveryId": "D003",
+                "productId": "P007",
+                "quantity": 30,
+                "unitPrice": 5999,
+                "totalAmount": 179970,
+                "receivedQuantity": 0,
+                "notes": "",
+                "status": "pending"
+            }
+        ]
+    }
+]

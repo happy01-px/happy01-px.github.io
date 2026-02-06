@@ -1,0 +1,67 @@
+[
+    {
+        "id": "S001",
+        "name": "苹果公司",
+        "contactPerson": "张经理",
+        "contactPhone": "13800138000",
+        "email": "zhang@apple.com",
+        "address": "上海市浦东新区张江高科技园区",
+        "paymentTerms": "Net 30",
+        "creditLimit": 1000000,
+        "status": "active",
+        "createdAt": "2023-01-01",
+        "updatedAt": "2023-06-01"
+    },
+    {
+        "id": "S002",
+        "name": "三星电子",
+        "contactPerson": "李经理",
+        "contactPhone": "13900139000",
+        "email": "li@samsung.com",
+        "address": "北京市朝阳区三星大厦",
+        "paymentTerms": "Net 45",
+        "creditLimit": 800000,
+        "status": "active",
+        "createdAt": "2023-02-01",
+        "updatedAt": "2023-06-01"
+    },
+    {
+        "id": "S003",
+        "name": "华为技术",
+        "contactPerson": "王经理",
+        "contactPhone": "13700137000",
+        "email": "wang@huawei.com",
+        "address": "深圳市南山区华为总部",
+        "paymentTerms": "Net 60",
+        "creditLimit": 900000,
+        "status": "active",
+        "createdAt": "2023-03-01",
+        "updatedAt": "2023-06-01"
+    },
+    {
+        "id": "S004",
+        "name": "拼多多",
+        "contactPerson": "-",
+        "contactPhone": "-",
+        "email": "-",
+        "address": "-",
+        "paymentTerms": "Net 30",
+        "creditLimit": 0,
+        "status": "active",
+        "createdAt": "2026-02-05",
+        "updatedAt": "2026-02-05"
+    },
+    {
+        "id": "S005",
+        "name": "超时",
+        "contactPerson": "-",
+        "contactPhone": "-",
+        "email": "-",
+        "address": "-",
+        "paymentTerms": "Net 30",
+        "creditLimit": 0,
+        "status": "active",
+        "createdAt": "2026-02-05",
+        "updatedAt": "2026-02-05"
+    }
+]

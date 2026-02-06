@@ -1,0 +1,54 @@
+[
+    {
+        "id": "SM1770283421927",
+        "type": "inbound",
+        "productId": "P007",
+        "productName": "扇贝",
+        "quantity": 5,
+        "unit": "个",
+        "supplierId": "S005",
+        "supplierName": "超时",
+        "price": 6,
+        "priceType": "custom",
+        "operator": "张三",
+        "remark": "-",
+        "createdAt": "2026-02-05T09:23:41.927Z",
+        "updatedAt": "2026-02-05T09:23:41.927Z"
+    },
+    {
+        "id": "SM001",
+        "type": "inbound",
+        "productId": "P001",
+        "productName": "iPhone 13 Pro",
+        "quantity": 50,
+        "unit": "个",
+        "operator": "张三",
+        "remark": "采购入库",
+        "createdAt": "2026-02-05T06:51:15.440Z",
+        "updatedAt": "2026-02-05T06:51:15.440Z"
+    },
+    {
+        "id": "SM002",
+        "type": "outbound",
+        "productId": "P002",
+        "productName": "MacBook Pro",
+        "quantity": 15,
+        "unit": "个",
+        "operator": "张三",
+        "remark": "客户订单#20240721-001",
+        "createdAt": "2026-02-04T06:51:15.440Z",
+        "updatedAt": "2026-02-04T06:51:15.440Z"
+    },
+    {
+        "id": "SM003",
+        "type": "inbound",
+        "productId": "P003",
+        "productName": "AirPods Pro",
+        "quantity": 100,
+        "unit": "个",
+        "operator": "李四",
+        "remark": "采购入库",
+        "createdAt": "2026-02-04T06:51:15.440Z",
+        "updatedAt": "2026-02-04T06:51:15.440Z"
+    }
+]
