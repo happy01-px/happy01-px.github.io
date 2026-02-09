@@ -33,9 +33,9 @@ function addSalesOrderRow() {
     currentSalesOrder.items.push({
         id: rowId,
         productId: '',
-        quantity: 1,
+        quantity: 1, // Keep for legacy or internal logic, but UI doesn't show it
         price: 0,
-        deliveryQty: 1,
+        deliveryQty: null, // Default to null/empty
         warehouse: '总仓库',
         remark: ''
     });
@@ -66,8 +66,6 @@ function renderSalesOrderTable() {
         const warehouseContainerId = `sales-order-warehouse-container-${item.id}`;
         const warehouseInputId = `sales-order-warehouse-input-${item.id}`;
         
-        const quantityContainerId = `sales-order-quantity-container-${item.id}`;
-        const quantityInputId = `sales-order-quantity-input-${item.id}`;
         const priceContainerId = `sales-order-price-container-${item.id}`;
         const priceInputId = `sales-order-price-input-${item.id}`;
         const deliveryQtyContainerId = `sales-order-deliveryQty-container-${item.id}`;
@@ -78,16 +76,12 @@ function renderSalesOrderTable() {
         row.innerHTML = `
             <td class="px-3 py-2 text-center">${index + 1}</td>
             <td class="px-3 py-2">
-                <div id="${productIdContainerId}" class="w-full"></div>
+                <div id="${productIdContainerId}" class="w-1/2"></div>
                 <input type="hidden" id="${productIdInputId}" value="${item.productId}">
             </td>
             <td class="px-3 py-2 text-gray-500" id="barcode-${item.id}">-</td>
             <td class="px-3 py-2 text-gray-500" id="spec-${item.id}">-</td>
             <td class="px-3 py-2 text-gray-500" id="stock-${item.id}">0</td>
-            <td class="px-3 py-2">
-                <div id="${quantityContainerId}"></div>
-                <input type="hidden" id="${quantityInputId}" value="${item.quantity}">
-            </td>
             <td class="px-3 py-2">
                 <div id="${priceContainerId}"></div>
                 <input type="hidden" id="${priceInputId}" value="${item.price}">
@@ -96,8 +90,11 @@ function renderSalesOrderTable() {
                 ${(item.quantity * item.price).toFixed(2)}
             </td>
             <td class="px-3 py-2">
-                <div id="${deliveryQtyContainerId}"></div>
-                <input type="hidden" id="${deliveryQtyInputId}" value="${item.deliveryQty}">
+                <div class="flex items-center">
+                    <div id="${deliveryQtyContainerId}"></div>
+                    <span id="delivery-qty-error-${item.id}" class="text-red-500 text-xs ml-2"></span>
+                </div>
+                <input type="hidden" id="${deliveryQtyInputId}" value="${item.deliveryQty !== null ? item.deliveryQty : ''}">
             </td>
             <td class="px-3 py-2">
                 <div id="${warehouseContainerId}" class="w-24"></div>
@@ -118,24 +115,23 @@ function renderSalesOrderTable() {
         // Render Antd Components
         if (window.renderAntdSelect) {
             // Product Select
-            window.renderAntdSelect(productIdContainerId, productIdInputId, productOptions, { placeholder: '请选择产品', showSearch: true }, (val) => {
+            window.renderAntdSelect(productIdContainerId, productIdInputId, productOptions, { 
+                placeholder: '请选择产品', 
+                showSearch: true,
+                value: item.productId // Pass current value to ensure it displays correctly
+            }, (val) => {
                 updateSalesOrderItem(item.id, 'productId', val);
             });
             // Warehouse Select
-            window.renderAntdSelect(warehouseContainerId, warehouseInputId, warehouseOptions, { placeholder: '总仓库' }, (val) => {
+            window.renderAntdSelect(warehouseContainerId, warehouseInputId, warehouseOptions, { 
+                placeholder: '总仓库',
+                value: item.warehouse 
+            }, (val) => {
                 updateSalesOrderItem(item.id, 'warehouse', val);
             });
         }
 
         if (window.renderAntdInput) {
-            // Quantity
-            window.renderAntdInput(quantityContainerId, quantityInputId, { 
-                defaultValue: item.quantity, 
-                type: 'number', 
-                min: 1,
-                style: { width: '80px', height: '32px' } 
-            }, (val) => updateSalesOrderItem(item.id, 'quantity', val));
-
             // Price
             window.renderAntdInput(priceContainerId, priceInputId, { 
                 defaultValue: item.price, 
@@ -149,7 +145,7 @@ function renderSalesOrderTable() {
             window.renderAntdInput(deliveryQtyContainerId, deliveryQtyInputId, { 
                 defaultValue: item.deliveryQty, 
                 type: 'number', 
-                min: 0,
+                placeholder: '必填',
                 style: { width: '80px', height: '32px' } 
             }, (val) => updateSalesOrderItem(item.id, 'deliveryQty', val));
 
@@ -254,10 +250,29 @@ function submitSalesOrder() {
         return;
     }
     
+    // 检查送货数量
+    for (const item of validItems) {
+        // 重置错误提示
+        const errorEl = document.getElementById(`delivery-qty-error-${item.id}`);
+        if (errorEl) errorEl.textContent = '';
+
+        if (item.deliveryQty === null || item.deliveryQty === '' || isNaN(item.deliveryQty)) {
+            alert('请填写送货数量！');
+            if (errorEl) errorEl.textContent = '必填';
+            return;
+        }
+
+        if (item.deliveryQty <= 0) {
+            // alert('送货数量必须大于0！');
+            if (errorEl) errorEl.textContent = '数量异常';
+            return;
+        }
+    }
+    
     // 检查库存
     for (const item of validItems) {
         const product = mockData.products.find(p => p.id === item.productId);
-        if (product && product.stockQuantity < item.quantity) {
+        if (product && product.stockQuantity < item.deliveryQty) {
             alert(`商品 ${product.name} 库存不足！当前库存：${product.stockQuantity}`);
             return;
         }
@@ -268,7 +283,7 @@ function submitSalesOrder() {
         const product = mockData.products.find(p => p.id === item.productId);
         if (product) {
             // 更新库存
-            product.stockQuantity -= item.quantity;
+            product.stockQuantity -= item.deliveryQty;
             product.updatedAt = getLocalISOString();
             
             // 添加出货记录
@@ -277,7 +292,7 @@ function submitSalesOrder() {
                 type: 'outbound',
                 productId: product.id,
                 productName: product.name,
-                quantity: item.quantity,
+                quantity: item.deliveryQty,
                 unit: product.unit,
                 operator: currentUser.name,
                 remark: item.remark || `销售出库 - ${document.getElementById('sales-order-no').textContent}`,
@@ -287,7 +302,7 @@ function submitSalesOrder() {
             stockMovementData.unshift(record);
             
             // 添加日志
-            addLog('add', 'stock_movement', product.name, `销售出库 ${item.quantity} ${product.unit}`);
+            addLog('add', 'stock_movement', product.name, `销售出库 ${item.deliveryQty} ${product.unit}`);
         }
     });
     

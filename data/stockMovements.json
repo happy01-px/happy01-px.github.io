@@ -1,5 +1,21 @@
 [
     {
+        "id": "SM1770626012921",
+        "type": "inbound",
+        "productId": "P008",
+        "productName": "测试弹窗",
+        "quantity": 1,
+        "unit": "个",
+        "supplierId": "S005",
+        "supplierName": "测试公司",
+        "price": null,
+        "priceType": "none",
+        "operator": "张三",
+        "remark": "-",
+        "createdAt": "2026-02-09T08:33:32.921Z",
+        "updatedAt": "2026-02-09T08:33:32.921Z"
+    },
+    {
         "id": "SM1770284342212",
         "type": "inbound",
         "productId": "P007",

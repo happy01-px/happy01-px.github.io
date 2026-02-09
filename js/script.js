@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// 当前登录用户
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// 当前登录用户
 const currentUser = {
     id: 'U001',
     name: '张三',
@@ -359,28 +359,40 @@ const renderAntdSelect = (containerId, inputId, options, placeholderOrConfig, on
     }
 
     const App = () => {
+        const { useEffect } = React;
         const isTagMode = config.mode === 'tags';
         const isMultiMode = config.mode === 'multiple';
         const controlSearchValue = !!config.controlSearchValue;
         const keepSearchTextOnBlur = !!config.keepSearchTextOnBlur;
         const enableCreateOption = !!config.enableCreateOption;
 
-        const initialVal = (() => {
-            const dv = config.defaultValue;
+        const processValue = (v) => {
             if ((isTagMode || isMultiMode) && !config.keepArray) {
-                if (Array.isArray(dv)) {
-                    const lastItem = dv.length > 0 ? dv[dv.length - 1] : undefined;
+                if (Array.isArray(v)) {
+                    const lastItem = v.length > 0 ? v[v.length - 1] : undefined;
                     return lastItem ? [lastItem] : [];
                 }
-                if (dv === undefined || dv === null || dv === '') return [];
-                return [dv];
+                if (v === undefined || v === null || v === '') return [];
+                return [v];
             }
-            return dv;
+            return v;
+        };
+
+        const initialVal = (() => {
+            const dv = config.value !== undefined ? config.value : config.defaultValue;
+            return processValue(dv);
         })();
 
         const [val, setVal] = useState(initialVal);
         const [searchText, setSearchText] = useState('');
         const [open, setOpen] = useState(false);
+
+        // 监听外部 value 变化
+        useEffect(() => {
+            if (config.value !== undefined) {
+                setVal(processValue(config.value));
+            }
+        }, [config.value]);
 
         const handleSearch = (value) => {
             setSearchText(value);

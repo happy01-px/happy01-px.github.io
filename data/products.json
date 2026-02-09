@@ -1,5 +1,19 @@
 [
     {
+        "id": "P008",
+        "name": "测试弹窗",
+        "category": "未分类",
+        "unit": "个",
+        "costPrice": null,
+        "retailPrice": 0,
+        "stockQuantity": 0,
+        "minStock": 10,
+        "maxStock": 100,
+        "supplierId": "S005",
+        "createdAt": "2026-02-09T16:33:32",
+        "updatedAt": "2026-02-09T16:49:01"
+    },
+    {
         "id": "P007",
         "name": "fdf",
         "category": "未分类",
@@ -96,19 +110,5 @@
         "supplierId": "S001",
         "createdAt": "2023-03-05",
         "updatedAt": "2023-07-05"
-    },
-    {
-        "id": "P008",
-        "name": "测试弹窗",
-        "category": "未分类",
-        "unit": "个",
-        "costPrice": null,
-        "retailPrice": 0,
-        "stockQuantity": 1,
-        "minStock": 10,
-        "maxStock": 100,
-        "supplierId": "S005",
-        "createdAt": "2026-02-09T16:33:32",
-        "updatedAt": "2026-02-09T16:33:32"
     }
 ]

@@ -1,5 +1,16 @@
 [
     {
+        "id": "LOG1770626012921",
+        "timestamp": "2026-02-09T08:33:32.921Z",
+        "userId": "U001",
+        "userName": "张三",
+        "actionType": "add",
+        "objectType": "stock_movement",
+        "objectName": "测试弹窗",
+        "details": "进货 1 个",
+        "ipAddress": "192.168.1.100"
+    },
+    {
         "id": "LOG1770626012920",
         "timestamp": "2026-02-09T08:33:32.920Z",
         "userId": "U001",
