@@ -1,19 +1,35 @@
 [
     {
-        "id": "SM1770283421927",
+        "id": "SM1770284342212",
         "type": "inbound",
         "productId": "P007",
-        "productName": "扇贝",
-        "quantity": 5,
+        "productName": "fdf",
+        "quantity": 2,
         "unit": "个",
-        "supplierId": "S005",
-        "supplierName": "超时",
-        "price": 6,
+        "supplierId": "S004",
+        "supplierName": "拼多多",
+        "price": 4555,
         "priceType": "custom",
         "operator": "张三",
         "remark": "-",
-        "createdAt": "2026-02-05T09:23:41.927Z",
-        "updatedAt": "2026-02-05T09:23:41.927Z"
+        "createdAt": "2026-02-05T09:39:02.212Z",
+        "updatedAt": "2026-02-05T09:39:02.212Z"
+    },
+    {
+        "id": "SM1770284075749",
+        "type": "inbound",
+        "productId": "P006",
+        "productName": "airpods",
+        "quantity": 2,
+        "unit": "个",
+        "supplierId": "S004",
+        "supplierName": "拼多多",
+        "price": 1000,
+        "priceType": "custom",
+        "operator": "张三",
+        "remark": "-",
+        "createdAt": "2026-02-05T09:34:35.749Z",
+        "updatedAt": "2026-02-05T09:34:35.749Z"
     },
     {
         "id": "SM001",
@@ -24,8 +40,8 @@
         "unit": "个",
         "operator": "张三",
         "remark": "采购入库",
-        "createdAt": "2026-02-05T06:51:15.440Z",
-        "updatedAt": "2026-02-05T06:51:15.440Z"
+        "createdAt": "2026-01-21T08:31:57.473Z",
+        "updatedAt": "2026-01-21T08:31:57.473Z"
     },
     {
         "id": "SM002",
@@ -36,8 +52,8 @@
         "unit": "个",
         "operator": "张三",
         "remark": "客户订单#20240721-001",
-        "createdAt": "2026-02-04T06:51:15.440Z",
-        "updatedAt": "2026-02-04T06:51:15.440Z"
+        "createdAt": "2026-01-20T08:31:57.473Z",
+        "updatedAt": "2026-01-20T08:31:57.473Z"
     },
     {
         "id": "SM003",
@@ -48,7 +64,7 @@
         "unit": "个",
         "operator": "李四",
         "remark": "采购入库",
-        "createdAt": "2026-02-04T06:51:15.440Z",
-        "updatedAt": "2026-02-04T06:51:15.440Z"
+        "createdAt": "2026-01-20T08:31:57.473Z",
+        "updatedAt": "2026-01-20T08:31:57.473Z"
     }
 ]

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// 当前登录用户
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// 当前登录用户
 const currentUser = {
     id: 'U001',
     name: '张三',
@@ -7,6 +7,611 @@ const currentUser = {
 
 // --- Ant Design 集成 ---
 // 延迟初始化以确保资源加载
+// 渲染 Ant Design Select 组件
+const renderAntdSelect = (containerId, inputId, options, placeholderOrConfig, onChangeCallback) => {
+    if (!window.React || !window.ReactDOM || !window.antd) return false;
+    
+    // 防止重复注入样式，并应用强制高度修复
+    if (!document.getElementById('antd-select-fix-style')) {
+        const fixStyles = document.createElement('style');
+        fixStyles.id = 'antd-select-fix-style';
+        fixStyles.innerHTML = `
+             /* 1. 强制 Select 输入框高度固定 */
+             /* 针对所有 Ant Design Select 选择器，使用 32px (Ant Design 默认高度，匹配 RangePicker) */
+             .ant-select .ant-select-selector {
+                 height: 32px !important;       
+                 min-height: 32px !important;
+                 max-height: 32px !important;
+                 padding: 0 11px !important;    /* 移除垂直内边距，完全依靠 flex 居中 */
+                 border-radius: 0.375rem !important;
+                 border-color: #d1d5db !important;
+                 display: flex !important;
+                 align-items: center !important;
+                 background-color: white !important;
+                 position: relative !important;
+                 overflow: hidden !important;
+                 box-shadow: none !important;
+             }
+             
+             /* 聚焦状态优化 */
+             .ant-select-focused .ant-select-selector {
+                 border-color: #3b82f6 !important; /* blue-500 */
+                 box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+             }
+             
+             /* 2. 限制下拉菜单高度 */
+             .ant-select-dropdown {
+                 max-height: 250px !important;
+                 z-index: 10000 !important;
+                 padding: 4px 0 !important;
+                 border-radius: 0.375rem !important;
+                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+             }
+             .ant-select-dropdown .rc-virtual-list-holder {
+                 max-height: 250px !important;
+             }
+ 
+             /* 8. 修复 Tags 模式下的输入体验 (模仿 Single Select) */
+             
+             /* 让 Search Input 绝对定位覆盖整个区域，确保始终可点击输入 */
+              .ant-select.ant-select-multiple.ant-select-tag-single-mode .ant-select-selection-search {
+                 position: absolute !important;
+                 inset: 0 !important;
+                 left: 0 !important;
+                 right: 0 !important;
+                 width: 100% !important;
+                 max-width: 100% !important;
+                 height: 100% !important;
+                 margin: 0 !important;
+                 display: flex !important;
+                 align-items: center !important;
+                 flex: 1 1 auto !important;
+                 min-width: 0 !important;
+                 z-index: 1 !important; /* 不遮挡 clear/arrow */
+             }
+ 
+              .ant-select.ant-select-multiple.ant-select-tag-single-mode .ant-select-selector {
+                 padding-left: 8px !important;
+              }
+
+              .ant-select.ant-select-multiple.ant-select-tag-single-mode .ant-select-selection-overflow {
+                 position: relative !important;
+                 width: 100% !important;
+              }
+
+              .ant-select.ant-select-multiple.ant-select-tag-single-mode .ant-select-selection-overflow-item-suffix {
+                 position: absolute !important;
+                 inset: 0 !important;
+                 width: 100% !important;
+                 display: flex !important;
+                 align-items: center !important;
+                 opacity: 1 !important;
+                 z-index: 1 !important;
+              }
+
+              .ant-select.ant-select-multiple.ant-select-tag-single-mode .ant-select-selection-search-input {
+                 padding: 0 30px 0 8px !important;
+                 box-sizing: border-box !important;
+                 width: 100% !important;
+                 flex: 1 1 auto !important;
+                 min-width: 0 !important;
+                 text-align: left !important;
+              }
+
+             /* 确保 Tag 在下方显示，且不干扰输入 */
+              .ant-select.ant-select-multiple.ant-select-tag-single-mode .ant-select-selection-item {
+                 position: absolute !important;
+                 left: 8px !important;
+                 top: 50% !important;
+                 transform: translateY(-50%) !important;
+                 z-index: 1 !important;
+                 pointer-events: none !important; /* 点击穿透到 Search Input */
+                 max-width: calc(100% - 45px) !important;
+             }
+
+              .ant-select.ant-select-multiple.ant-select-tag-single-mode .ant-select-selection-placeholder {
+                 left: 20px !important;
+              }
+             
+             /* 当有搜索内容时，隐藏背后的 Tag */
+              .ant-select.ant-select-multiple.ant-select-tag-single-mode.has-search-text .ant-select-selection-item {
+                 opacity: 0 !important;
+                 visibility: hidden !important;
+             }
+             
+             /* 搜索框容器 - 单选模式 */
+             .ant-select-single .ant-select-selection-search {
+                 position: absolute !important;
+                 left: 0 !important;
+                 right: 0 !important;
+                 top: 0 !important;
+                 bottom: 0 !important;
+                 display: flex !important;
+                 align-items: center !important;
+                 margin: 0 !important;
+             }
+
+             .ant-select-single .ant-select-selection-search-input {
+                 padding: 0 30px 0 11px !important;
+                 box-sizing: border-box !important;
+                 width: 100% !important;
+                 flex: 1 1 auto !important;
+                 min-width: 0 !important;
+             }
+             
+             /* 搜索框容器 - 多选/标签模式 */
+             .ant-select-multiple .ant-select-selection-search {
+                 position: relative !important;
+                 inset: auto !important;
+                 width: auto !important;
+                 min-width: 4px !important;
+                 margin-left: 0 !important; 
+                 display: flex !important;
+                 align-items: center !important;
+                 height: 100% !important;
+                 order: 999999 !important; /* 确保在最后 */
+             }
+             
+             /* 搜索输入框本体 */
+             .ant-select-selection-search-input {
+                 height: 100% !important;
+                 width: 100% !important;
+                 display: block !important;
+                 padding: 0 !important;
+                 margin: 0 !important;
+                 opacity: 1 !important;
+             }
+ 
+             /* 占位符 & 选中项 - 单选模式 */
+             .ant-select-single .ant-select-selection-placeholder,
+             .ant-select-single .ant-select-selection-item {
+                 position: absolute !important;
+                 left: 11px !important;
+                 right: 30px !important;
+                 top: 50% !important;
+                 transform: translateY(-50%) !important;
+                 line-height: 30px !important; 
+                 display: block !important; 
+                 overflow: hidden !important;
+                 white-space: nowrap !important;
+                 text-overflow: ellipsis !important;
+                 pointer-events: none !important;
+                 margin: 0 !important;
+                 padding: 0 !important;
+                 background: none !important;
+                 border: none !important;
+                 font-size: 14px !important;
+             }
+
+             /* 占位符 - 多选模式 */
+             .ant-select-multiple .ant-select-selection-placeholder {
+                 position: absolute !important;
+                 left: 11px !important;
+                 right: 30px !important;
+                 top: 50% !important;
+                 transform: translateY(-50%) !important;
+                 line-height: 30px !important;
+                 pointer-events: none !important;
+                 z-index: 1 !important;
+             }
+
+             /* 选中项 - 多选模式 (Tags) - 仿单选样式 */
+             .ant-select-multiple .ant-select-selection-item {
+                 position: relative !important;
+                 display: flex !important;
+                 align-items: center !important;
+                 height: 30px !important;
+                 margin: 0 !important;
+                 padding: 0 !important;
+                 background: none !important;
+                 border: none !important;
+                 border-radius: 0 !important;
+                 line-height: 30px !important;
+                 top: auto !important;
+                 transform: none !important;
+                 left: auto !important;
+                 right: auto !important;
+                 user-select: none !important;
+                 color: rgba(0, 0, 0, 0.88) !important;
+             }
+             
+             .ant-select-multiple .ant-select-selection-item-content {
+                 margin-right: 0 !important;
+                 font-size: 14px !important;
+             }
+             
+             /* 隐藏 Tag 模式下的删除图标 */
+             .ant-select-multiple .ant-select-selection-item-remove {
+                 display: none !important;
+             }
+ 
+             /* 4. 图标垂直居中 (Arrow / Clear) */
+             .ant-select-arrow, 
+             .ant-select-clear {
+                 top: 50% !important;
+                 transform: translateY(-50%) !important;
+                 margin-top: 0 !important; 
+                 right: 11px !important;
+                 width: 12px !important;
+                 height: 12px !important;
+                 display: flex !important;
+                 align-items: center !important;
+                 justify-content: center !important;
+                 color: #9ca3af !important; /* gray-400 */
+                 font-size: 12px !important;
+                 z-index: 5 !important;
+             }
+
+             /* 5. 强制调整 Ant Design 日历组件样式以保持一致 */
+             .ant-picker {
+                 height: 32px !important;
+                 padding: 0 11px !important;
+                 border-radius: 0.375rem !important;
+                 border-color: #d1d5db !important;
+                 box-shadow: none !important;
+             }
+             .ant-picker-focused {
+                 border-color: #3b82f6 !important;
+                 box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+             }
+             .ant-picker-input > input {
+                 font-size: 14px !important;
+             }
+ 
+             /* 6. 隐藏干扰元素 */
+            /* .ant-select-selection-overflow { display: none !important; } */
+            .ant-select-selection-search-mirror { display: none !important; }
+            .ant-select-multiple .ant-select-selection-item-remove { display: none !important; }
+            
+            /* 针对 tags/multiple 模式的特殊处理 */
+            .ant-select-selection-overflow {
+                display: flex !important;
+                flex-wrap: nowrap !important;
+                overflow: hidden !important;
+                width: 100% !important;
+                height: 100% !important;
+                align-items: center !important;
+            }
+            
+            .ant-select-selection-overflow-item {
+                flex: none !important;
+                max-width: 100% !important;
+            }
+
+            .ant-select-multiple .ant-select-selection-overflow-item-suffix {
+                display: flex !important;
+                flex: 1 1 auto !important;
+                min-width: 8px !important;
+                width: auto !important;
+            }
+
+            .ant-select-multiple .ant-select-selection-search {
+                width: 100% !important;
+                flex: 1 1 auto !important;
+            }
+
+            .ant-select-multiple .ant-select-selection-search-input {
+                width: 100% !important;
+                min-width: 0 !important;
+            }
+
+            /* 7. 分页组件样式修复 */
+            /* 确保分页选择器有足够宽度显示 "10 / page" */
+            .ant-pagination-options-size-changer {
+                width: auto !important;
+                min-width: 100px !important; 
+            }
+            
+            /* 调整分页选择器内部间距 */
+            .ant-pagination-options-size-changer .ant-select-selector {
+                padding: 0 8px !important; 
+            }
+            
+            .ant-pagination-options-size-changer .ant-select-selection-item {
+                left: 8px !important;
+                right: 25px !important; 
+            }
+            
+            .ant-pagination-options-size-changer .ant-select-arrow {
+                right: 8px !important;
+            }
+
+            /* 确保分页按钮高度和对齐一致 */
+            .ant-pagination-item, 
+            .ant-pagination-prev, 
+            .ant-pagination-next,
+            .ant-pagination-total-text {
+                height: 32px !important;
+                line-height: 30px !important;
+                border-radius: 4px !important;
+                vertical-align: middle !important;
+            }
+            
+            .ant-pagination-prev .ant-pagination-item-link,
+            .ant-pagination-next .ant-pagination-item-link {
+                height: 100% !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                border-radius: 4px !important;
+                border-color: #d1d5db !important;
+            }
+            
+            /* 修正分页选项容器对齐 */
+            .ant-pagination-options {
+                height: 32px !important;
+                vertical-align: middle !important;
+            }
+       `;
+        document.head.appendChild(fixStyles);
+    }
+
+    const { Select } = window.antd;
+    const React = window.React;
+    const ReactDOM = window.ReactDOM;
+    const { useState } = React;
+
+    let placeholder = placeholderOrConfig;
+    let config = {};
+    if (typeof placeholderOrConfig === 'object') {
+        config = placeholderOrConfig;
+        placeholder = config.placeholder;
+    }
+
+    const App = () => {
+        const isTagMode = config.mode === 'tags';
+        const isMultiMode = config.mode === 'multiple';
+        const controlSearchValue = !!config.controlSearchValue;
+        const keepSearchTextOnBlur = !!config.keepSearchTextOnBlur;
+        const enableCreateOption = !!config.enableCreateOption;
+
+        const initialVal = (() => {
+            const dv = config.defaultValue;
+            if ((isTagMode || isMultiMode) && !config.keepArray) {
+                if (Array.isArray(dv)) {
+                    const lastItem = dv.length > 0 ? dv[dv.length - 1] : undefined;
+                    return lastItem ? [lastItem] : [];
+                }
+                if (dv === undefined || dv === null || dv === '') return [];
+                return [dv];
+            }
+            return dv;
+        })();
+
+        const [val, setVal] = useState(initialVal);
+        const [searchText, setSearchText] = useState('');
+        const [open, setOpen] = useState(false);
+
+        const handleSearch = (value) => {
+            setSearchText(value);
+            if (config.onSearch) config.onSearch(value);
+        };
+
+        const normalizeText = (v) => String(v ?? '').trim();
+        const normalizeCompareText = (v) => normalizeText(v).toLowerCase();
+
+        const canCreate = (() => {
+            if (!enableCreateOption || !isTagMode) return false;
+            const text = normalizeText(searchText);
+            if (!text) return false;
+            const exists = (options || []).some(o => {
+                const label = normalizeCompareText(o?.label);
+                const value = normalizeCompareText(o?.value);
+                const t = normalizeCompareText(text);
+                return label === t || value === t;
+            });
+            return !exists;
+        })();
+
+        const handleChange = (value) => {
+            let nextVal = value;      // 用于 UI 显示 (Select value prop)
+            let exportVal = value;    // 用于输出 (Input value & callback)
+            
+            // 清空搜索文本
+            setSearchText('');
+            setOpen(false);
+
+            if (Array.isArray(value)) {
+                if (config.mode === 'tags' || config.mode === 'multiple') {
+                    if (!config.keepArray) {
+                        // 强制单选行为：取最后一个值
+                        const lastItem = value.length > 0 ? value[value.length - 1] : undefined;
+                        
+                        // UI 上，如果是 tags 模式，value 必须是数组
+                        nextVal = lastItem ? [lastItem] : [];
+                        
+                        // 输出值
+                        exportVal = lastItem || '';
+                    }
+                }
+            }
+            
+            setVal(nextVal);
+
+            const input = document.getElementById(inputId);
+            if (input) {
+                input.value = Array.isArray(exportVal) ? exportVal.join(',') : (exportVal || '');
+                // 触发原生事件以便兼容性
+                const event = new Event('change', { bubbles: true });
+                input.dispatchEvent(event);
+                
+                if (onChangeCallback) onChangeCallback(exportVal);
+            }
+        };
+        
+        // 构建 className
+        let className = config.className || '';
+        if (isTagMode) {
+            className += ' ant-select-tag-single-mode'; // 标记为 Tag 单选模式
+            if (searchText) {
+                className += ' has-search-text'; // 标记有搜索内容
+            }
+        }
+
+        const notFoundContent = config.notFoundContent ?? undefined;
+
+        const dropdownRender = enableCreateOption
+            ? (menu) => React.createElement(
+                'div',
+                null,
+                menu,
+                canCreate
+                    ? React.createElement(
+                        'div',
+                        {
+                            style: {
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                color: '#1677ff'
+                            },
+                            onMouseDown: (e) => e.preventDefault(),
+                            onClick: () => {
+                                const text = normalizeText(searchText);
+                                if (!text) return;
+                                handleChange([text]);
+                            }
+                        },
+                        React.createElement('i', { className: 'fa fa-plus', style: { fontSize: '12px' } }),
+                        React.createElement('span', null, `新建 "${normalizeText(searchText)}"`)
+                    )
+                    : null
+            )
+            : undefined;
+
+        const props = {
+            placeholder: placeholder,
+            style: { width: '100%' },
+            showSearch: true,
+            allowClear: true,
+            optionFilterProp: "label",
+            ...config, // 允许覆盖配置，如 mode: 'tags'
+            className: className,
+            value: val, // 受控模式
+            onChange: handleChange,
+            onSearch: handleSearch, // 监听搜索
+            onBlur: () => {
+                if (!keepSearchTextOnBlur) setSearchText('');
+            },
+            onClear: () => {
+                setSearchText('');
+                setOpen(false);
+                const clearedVal = (isTagMode || isMultiMode) ? [] : undefined;
+                setVal(clearedVal);
+
+                const input = document.getElementById(inputId);
+                if (input) {
+                    input.value = '';
+                    const event = new Event('change', { bubbles: true });
+                    input.dispatchEvent(event);
+                }
+                if (onChangeCallback) onChangeCallback('');
+            },
+            notFoundContent: notFoundContent,
+            options: options,
+            // 显式限制下拉菜单样式
+            listHeight: 256,
+            dropdownStyle: { maxHeight: 256, overflow: 'auto', zIndex: 10001 },
+            filterOption: (input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase()),
+        };
+
+        if (controlSearchValue) {
+            props.searchValue = searchText;
+            props.autoClearSearchValue = false;
+        }
+
+        if (enableCreateOption) {
+            props.open = open;
+            props.onDropdownVisibleChange = setOpen;
+            props.dropdownRender = dropdownRender;
+        }
+
+        return React.createElement(Select, props);
+    };
+    
+    // 渲染组件
+    const container = document.getElementById(containerId);
+    if (!container) return false;
+
+    if (!container._reactRoot) {
+        container._reactRoot = ReactDOM.createRoot(container);
+    }
+    container._reactRoot.render(React.createElement(App));
+            return true;
+        };
+
+        // Function to render Ant Design Input
+        const renderAntdInput = (containerId, inputId, placeholderOrConfig, onChangeCallback) => {
+            if (!window.React || !window.ReactDOM || !window.antd) return false;
+            
+            const { Input } = window.antd;
+            const React = window.React;
+            const ReactDOM = window.ReactDOM;
+            const { useState, useEffect } = React;
+
+            let placeholder = '';
+            let config = {};
+            if (typeof placeholderOrConfig === 'object') {
+                config = placeholderOrConfig;
+                placeholder = config.placeholder || '';
+            } else {
+                placeholder = placeholderOrConfig || '';
+            }
+
+            const App = () => {
+                const [val, setVal] = useState(config.defaultValue || '');
+
+                const handleChange = (e) => {
+                    const newValue = e.target.value;
+                    setVal(newValue);
+                    
+                    const input = document.getElementById(inputId);
+                    if (input) {
+                        input.value = newValue;
+                        // Trigger native events for legacy compatibility
+                        const event = new Event('input', { bubbles: true });
+                        input.dispatchEvent(event);
+                        const changeEvent = new Event('change', { bubbles: true });
+                        input.dispatchEvent(changeEvent);
+                    }
+                    
+                    if (onChangeCallback) onChangeCallback(newValue);
+                };
+
+                let prefix = null;
+                if (config.prefixIcon) {
+                    prefix = React.createElement('i', { className: config.prefixIcon, style: { color: '#9ca3af' } });
+                }
+
+                return React.createElement(Input, {
+                    id: inputId + '_antd',
+                    placeholder: placeholder,
+                    value: val,
+                    onChange: handleChange,
+                    allowClear: true,
+                    prefix: prefix,
+                    style: { height: '32px' }, // Enforce 32px height to match Select/Datepicker
+                    ...config
+                });
+            };
+            
+            const container = document.getElementById(containerId);
+            if (!container) return false;
+
+            if (!container._reactRoot) {
+                container._reactRoot = ReactDOM.createRoot(container);
+            }
+            container._reactRoot.render(React.createElement(App));
+            return true;
+        };
+
+// Expose to global scope for other scripts
+window.renderAntdSelect = renderAntdSelect;
+window.renderAntdInput = renderAntdInput;
+
 const initAntdComponents = () => {
     // 检查依赖是否加载
     if (!window.React || !window.ReactDOM || !window.dayjs || !window.antd) {
@@ -18,6 +623,133 @@ const initAntdComponents = () => {
     const React = window.React;
     const ReactDOM = window.ReactDOM;
     const dayjs = window.dayjs;
+
+    if (!window.__antdMessageHostInited && message && typeof message.useMessage === 'function') {
+        const hostId = 'antd-message-host';
+        let host = document.getElementById(hostId);
+        if (!host) {
+            host = document.createElement('div');
+            host.id = hostId;
+            document.body.appendChild(host);
+        }
+
+        if (!window.__antdMessageRoot) {
+            window.__antdMessageRoot = ReactDOM.createRoot(host);
+        }
+
+        const { useEffect } = React;
+        const MessageHost = () => {
+            const tuple = message.useMessage();
+            const messageApi = tuple[0];
+            const contextHolder = tuple[1];
+
+            useEffect(() => {
+                window.__antdMessageApi = messageApi;
+            }, [messageApi]);
+
+            return contextHolder;
+        };
+
+        window.__antdMessageRoot.render(React.createElement(MessageHost));
+        window.__antdMessageHostInited = true;
+    }
+
+    window.showAntdMessage = function(type, content, options) {
+        const api = window.__antdMessageApi;
+        const opts = options && typeof options === 'object' ? options : {};
+        const safeType = type || 'info';
+
+        if (api && typeof api.open === 'function') {
+            api.open({ type: safeType, content: content, ...opts });
+            return;
+        }
+
+        if (message && typeof message[safeType] === 'function') {
+            message[safeType](content);
+            return;
+        }
+
+        if (message && typeof message.info === 'function') {
+            message.info(content);
+        }
+    };
+
+    if (!window.__antdConfirmHostInited && window.antd && window.antd.Modal) {
+        const hostId = 'antd-confirm-host';
+        let host = document.getElementById(hostId);
+        if (!host) {
+            host = document.createElement('div');
+            host.id = hostId;
+            document.body.appendChild(host);
+        }
+
+        if (!window.__antdConfirmRoot) {
+            window.__antdConfirmRoot = ReactDOM.createRoot(host);
+        }
+
+        const { Modal } = window.antd;
+        const { useEffect } = React;
+        const ConfirmHost = () => {
+            const [state, setState] = React.useState({
+                open: false,
+                title: '',
+                content: '',
+                okText: '确定',
+                cancelText: '取消',
+                resolve: null
+            });
+
+            useEffect(() => {
+                window.__openAntdConfirm = (opts) => {
+                    const next = opts && typeof opts === 'object' ? opts : {};
+                    return new Promise((resolve) => {
+                        setState({
+                            open: true,
+                            title: next.title || '确认',
+                            content: next.content || '',
+                            okText: next.okText || '确定',
+                            cancelText: next.cancelText || '取消',
+                            resolve
+                        });
+                    });
+                };
+            }, []);
+
+            const closeWith = (result) => {
+                const r = state.resolve;
+                setState((s) => ({ ...s, open: false }));
+                if (typeof r === 'function') r(result);
+            };
+
+            return React.createElement(
+                Modal,
+                {
+                    title: state.title,
+                    open: state.open,
+                    okText: state.okText,
+                    cancelText: state.cancelText,
+                    onOk: () => closeWith(true),
+                    onCancel: () => closeWith(false),
+                    maskClosable: false,
+                    destroyOnClose: true
+                },
+                typeof state.content === 'string'
+                    ? React.createElement('div', null, state.content)
+                    : state.content
+            );
+        };
+
+        window.__antdConfirmRoot.render(React.createElement(ConfirmHost));
+        window.__antdConfirmHostInited = true;
+    }
+
+    window.showAntdConfirm = function(opts) {
+        if (typeof window.__openAntdConfirm === 'function') {
+            return window.__openAntdConfirm(opts);
+        }
+        const content = opts && typeof opts === 'object' ? (opts.content || '确认？') : '确认？';
+        return Promise.resolve(confirm(content));
+    };
 
     // 配置全局 message
     message.config({
@@ -33,13 +765,13 @@ const initAntdComponents = () => {
             if (!msg) return;
             const strMsg = String(msg);
             if (strMsg.includes('成功') || strMsg.includes('完成')) {
-                message.success(strMsg);
+                window.showAntdMessage('success', strMsg);
             } else if (strMsg.includes('失败') || strMsg.includes('错误') || strMsg.includes('请') || strMsg.includes('无效')) {
-                message.error(strMsg);
+                window.showAntdMessage('error', strMsg);
             } else if (strMsg.includes('警告')) {
-                message.warning(strMsg);
+                window.showAntdMessage('warning', strMsg);
             } else {
-                message.info(strMsg);
+                window.showAntdMessage('info', strMsg);
             }
         };
         window.alertOverridden = true;
@@ -126,6 +858,70 @@ const initAntdComponents = () => {
     // 初始化各个模块的 DatePicker
     const logInit = renderDatePicker('log-date-range-picker-container', 'log-filter-date-start', 'log-filter-date-end', window.renderLogsTable);
     const billsInit = renderDatePicker('bills-date-range-picker-container', 'bills-filter-date-start', 'bills-filter-date-end', window.renderBillsTable); // 假设有 renderBillsTable
+
+    // 初始化报表筛选器
+    const initReportFilters = () => {
+        if (!window.renderAntdSelect) return;
+        
+        // Report Type
+        const reportTypeOptions = [
+            { value: 'inventory-turnover', label: '库存周转率' },
+            { value: 'sales-trend', label: '销售趋势' },
+            { value: 'accounts-receivable', label: '应收账款' },
+            { value: 'supplier-performance', label: '供应商表现' }
+        ];
+        renderAntdSelect('report-type-container', 'report-type-select', reportTypeOptions, '库存周转率');
+
+        // Time Range
+        const timeRangeOptions = [
+            { value: 'last-month', label: '上个月' },
+            { value: 'last-quarter', label: '上季度' },
+            { value: 'last-year', label: '去年' },
+            { value: 'custom', label: '自定义' }
+        ];
+        renderAntdSelect('report-time-range-container', 'report-time-range-select', timeRangeOptions, '上个月');
+
+        // Company
+        const companyOptions = [
+             { value: '', label: '全部公司' },
+             { value: 'chemical', label: '化工' },
+             { value: 'labor', label: '劳保' }
+        ];
+        renderAntdSelect('report-company-container', 'report-company-select', companyOptions, '全部公司');
+    };
+    initReportFilters();
+
+    // Initialize Input Components
+    if (window.renderAntdInput) {
+        // Inventory Search
+        renderAntdInput('filter-search-container', 'filter-search', { placeholder: '搜索商品...', prefixIcon: 'fa fa-search' }, (val) => {
+             if (window.updateInventoryTable) window.updateInventoryTable();
+        });
+
+        // Log Filter User
+        renderAntdInput('log-filter-user-container', 'log-filter-user', { placeholder: '输入操作人...' }, (val) => {
+             if (window.renderLogsTable) {
+                  if (window.paginationState && window.paginationState.logs) window.paginationState.logs.page = 1;
+                  window.renderLogsTable();
+             }
+        });
+
+        // Log Filter Search
+        renderAntdInput('log-filter-search-container', 'log-filter-search', { placeholder: '搜索操作对象...', prefixIcon: 'fa fa-search' }, (val) => {
+             if (window.renderLogsTable) {
+                  if (window.paginationState && window.paginationState.logs) window.paginationState.logs.page = 1;
+                  window.renderLogsTable();
+             }
+        });
+
+        // Bills Filter Search
+        renderAntdInput('bills-filter-search-container', 'bills-filter-search', { placeholder: '搜索对账单...', prefixIcon: 'fa fa-search' }, (val) => {
+             if (window.updateBillsTable) {
+                  if (window.paginationState && window.paginationState.bills) window.paginationState.bills.page = 1;
+                  window.updateBillsTable();
+             }
+        });
+    }
 
     // 只要有一个成功初始化，就认为成功（或者可以更严格）
     return logInit || billsInit;
@@ -303,43 +1099,89 @@ window.changePage = function() {};
 
 // 初始化库存筛选器
 function initInventoryFilters() {
-    const companyFilter = document.getElementById('filter-company');
-    const statusFilter = document.getElementById('filter-status');
-    const supplierFilter = document.getElementById('filter-supplier');
     const searchFilter = document.getElementById('filter-search');
 
-    // 动态生成供应商选项
-    if (supplierFilter) {
-        let supplierOptions = '<option value="">全部供应商</option>';
-        mockData.suppliers.forEach(supplier => {
-            supplierOptions += `<option value="${supplier.id}">${supplier.name}</option>`;
-        });
-        supplierFilter.innerHTML = supplierOptions;
-    }
+    // 定义选项数据
+    const companyOptions = [
+        { value: '化工', label: '化工' },
+        { value: '劳保', label: '劳保' }
+    ];
+    
+    const statusOptions = [
+        { value: 'normal', label: '正常' },
+        { value: 'low', label: '库存不足' },
+        { value: 'overstock', label: '库存过剩' },
+        { value: 'out', label: '缺货' }
+    ];
 
-    // 绑定事件监听
-    const filters = [companyFilter, statusFilter, supplierFilter, searchFilter];
-    filters.forEach(filter => {
-        if (filter) {
-            const handler = () => {
-                paginationState.inventory.page = 1; // 重置到第一页
-                updateInventoryTable();
-            };
-            filter.addEventListener('input', handler);
-            filter.addEventListener('change', handler);
+    // 初始化 Select 组件
+    const initSelects = () => {
+        // 确保依赖和数据都已就绪
+        if (!window.antd || !window.React || !window.ReactDOM || !mockData.suppliers) {
+            setTimeout(initSelects, 100);
+            return;
         }
-    });
+
+        const supplierOptions = mockData.suppliers.map(s => ({ value: s.id, label: s.name }));
+
+        renderAntdSelect('filter-company-container', 'filter-company', companyOptions, '全部公司', () => {
+            paginationState.inventory.page = 1;
+            updateInventoryTable();
+        });
+
+        renderAntdSelect('filter-status-container', 'filter-status', statusOptions, '全部状态', () => {
+             paginationState.inventory.page = 1;
+             updateInventoryTable();
+        });
+
+        renderAntdSelect('filter-supplier-container', 'filter-supplier', supplierOptions, '全部供应商', () => {
+             paginationState.inventory.page = 1;
+             updateInventoryTable();
+        });
+    };
+    
+    // 启动初始化
+    initSelects();
+
+    // 绑定搜索框事件
+    if (searchFilter) {
+        const handler = () => {
+            paginationState.inventory.page = 1; // 重置到第一页
+            updateInventoryTable();
+        };
+        searchFilter.addEventListener('input', handler);
+    }
 }
 
 // 初始化日志筛选器
 function initLogFilters() {
-    const typeFilter = document.getElementById('log-filter-type');
     const userFilter = document.getElementById('log-filter-user');
-    const dateStartFilter = document.getElementById('log-filter-date-start');
-    const dateEndFilter = document.getElementById('log-filter-date-end');
     const searchFilter = document.getElementById('log-filter-search');
 
-    const filters = [typeFilter, userFilter, searchFilter]; // Removed date filters from listener because they are handled by React component
+    // 操作类型选项
+    const typeOptions = [
+        { value: 'add', label: '新增' },
+        { value: 'edit', label: '编辑' },
+        { value: 'delete', label: '删除' },
+        { value: 'import', label: '导入' },
+        { value: 'export', label: '导出' }
+    ];
+
+    // 初始化 Select 组件
+    const initSelects = () => {
+        if (!window.antd || !window.React || !window.ReactDOM) {
+            setTimeout(initSelects, 100);
+            return;
+        }
+
+        renderAntdSelect('log-filter-type-container', 'log-filter-type', typeOptions, '全部类型', () => {
+            paginationState.logs.page = 1;
+            renderLogsTable();
+        });
+    };
+    initSelects();
+
+    const filters = [userFilter, searchFilter]; // Removed date filters from listener because they are handled by React component
     filters.forEach(filter => {
         if (filter) {
             const handler = () => {
@@ -352,11 +1194,57 @@ function initLogFilters() {
     });
 }
 
+// 初始化对账单筛选器
+function initBillFilters() {
+    const searchFilter = document.getElementById('bills-filter-search');
+
+    const statusOptions = [
+        { value: 'pending', label: '待核对' },
+        { value: 'verified', label: '已核对' },
+        { value: 'paid', label: '已付款' }
+    ];
+
+    const initSelects = () => {
+        if (!window.antd || !window.React || !window.ReactDOM || !mockData.suppliers) {
+            setTimeout(initSelects, 100);
+            return;
+        }
+
+        const supplierOptions = mockData.suppliers.map(s => ({ value: s.name, label: s.name }));
+
+        renderAntdSelect('bills-filter-supplier-container', 'bills-filter-supplier', supplierOptions, '全部供应商', () => {
+            paginationState.bills.page = 1;
+            updateBillsTable();
+        });
+
+        renderAntdSelect('bills-filter-status-container', 'bills-filter-status', statusOptions, '全部状态', () => {
+            paginationState.bills.page = 1;
+            updateBillsTable();
+        });
+    };
+    initSelects();
+
+    if (searchFilter) {
+        const handler = () => {
+            paginationState.bills.page = 1;
+            updateBillsTable();
+        };
+        searchFilter.addEventListener('input', handler);
+    }
+}
+
 // 更新对账单列表
 function updateBillsTable() {
     const tbody = document.getElementById('bills-table-body');
     if (!tbody) return;
     tbody.innerHTML = '';
+
+    // 获取筛选条件
+    const supplierFilter = document.getElementById('bills-filter-supplier') ? document.getElementById('bills-filter-supplier').value : '';
+    const statusFilter = document.getElementById('bills-filter-status') ? document.getElementById('bills-filter-status').value : '';
+    const dateStartFilter = document.getElementById('bills-filter-date-start') ? document.getElementById('bills-filter-date-start').value : '';
+    const dateEndFilter = document.getElementById('bills-filter-date-end') ? document.getElementById('bills-filter-date-end').value : '';
+    const searchFilter = document.getElementById('bills-filter-search') ? document.getElementById('bills-filter-search').value.toLowerCase().trim() : '';
 
     // 确保 mockData.bills 存在
     if (!mockData.bills) mockData.bills = [];
@@ -371,7 +1259,36 @@ function updateBillsTable() {
         ];
     }
 
-    let filteredBills = [...mockData.bills];
+    let filteredBills = mockData.bills.filter(bill => {
+        // 供应商筛选
+        if (supplierFilter && bill.supplierName !== supplierFilter) return false;
+        
+        // 状态筛选
+        if (statusFilter && bill.status !== statusFilter) return false;
+
+        // 日期范围筛选
+        if (dateStartFilter) {
+            const billDate = new Date(bill.createdAt);
+            const startDate = new Date(dateStartFilter);
+            if (!dateStartFilter.includes(':')) startDate.setHours(0, 0, 0, 0);
+            if (billDate < startDate) return false;
+        }
+        if (dateEndFilter) {
+            const billDate = new Date(bill.createdAt);
+            const endDate = new Date(dateEndFilter);
+            if (!dateEndFilter.includes(':')) endDate.setHours(23, 59, 59, 999);
+            if (billDate > endDate) return false;
+        }
+
+        // 搜索筛选
+        if (searchFilter) {
+            const searchStr = searchFilter.toLowerCase();
+            return (bill.id && bill.id.toLowerCase().includes(searchStr)) || 
+                   (bill.supplierName && bill.supplierName.toLowerCase().includes(searchStr));
+        }
+
+        return true;
+    });
     
     // 按创建时间倒序
     filteredBills.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -482,6 +1399,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // 初始化筛选器（确保在数据加载后执行）
         initInventoryFilters();
         initLogFilters();
+        initBillFilters();
         
         // 渲染表格
         updateInventoryTable();
@@ -905,18 +1823,8 @@ function showModal(title, content, confirmCallback) {
 
 // 显示新增商品模态框
 function showAddProductModal() {
-    // 构建供应商选项
-    let supplierOptions = '<option value="">请选择供应商</option>';
-    mockData.suppliers.forEach(supplier => {
-        supplierOptions += `<option value="${supplier.id}">${supplier.name}</option>`;
-    });
-    
     // 商品分类选项
     const categories = ['电子产品', '服装', '家具', '图书'];
-    let categoryOptions = '<option value="">请选择分类</option>';
-    categories.forEach(category => {
-        categoryOptions += `<option value="${category}">${category}</option>`;
-    });
     
     // 构建表单内容
     const formContent = `
@@ -927,9 +1835,8 @@ function showAddProductModal() {
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">分类 <span class="text-danger">*</span></label>
-                <select name="category" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                    ${categoryOptions}
-                </select>
+                <div id="modal-category-container" class="w-full"></div>
+                <input type="hidden" name="category" id="modal-category-input" required>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">数量 <span class="text-danger">*</span></label>
@@ -941,9 +1848,8 @@ function showAddProductModal() {
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">供应商 <span class="text-danger">*</span></label>
-                <select name="supplierId" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                    ${supplierOptions}
-                </select>
+                <div id="modal-supplier-container" class="w-full"></div>
+                <input type="hidden" name="supplierId" id="modal-supplier-input" required>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
@@ -958,6 +1864,13 @@ function showAddProductModal() {
         const form = document.getElementById('add-product-form');
         const formData = new FormData(form);
         
+        // 验证必填项
+        if (!formData.get('name')) { alert('请输入商品名称'); return false; }
+        if (!formData.get('category')) { alert('请选择分类'); return false; }
+        if (!formData.get('quantity')) { alert('请输入数量'); return false; }
+        if (!formData.get('costPrice')) { alert('请输入成本价'); return false; }
+        if (!formData.get('supplierId')) { alert('请选择供应商'); return false; }
+
         // 构建商品对象
         const productData = {
             name: formData.get('name'),
@@ -971,6 +1884,13 @@ function showAddProductModal() {
         // 添加商品
         addProduct(productData);
     });
+
+    // 渲染 Antd Select 组件
+    const categoryOptions = categories.map(c => ({ value: c, label: c }));
+    renderAntdSelect('modal-category-container', 'modal-category-input', categoryOptions, '请选择分类');
+
+    const supplierOptions = mockData.suppliers.map(s => ({ value: s.id, label: s.name }));
+    renderAntdSelect('modal-supplier-container', 'modal-supplier-input', supplierOptions, '请选择供应商');
 }
 
 // 添加商品
@@ -1373,12 +2293,8 @@ function showAddSupplierModal() {
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">付款条件</label>
-                <select name="paymentTerms" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                    <option value="Net 30">Net 30</option>
-                    <option value="Net 45">Net 45</option>
-                    <option value="Net 60">Net 60</option>
-                    <option value="COD">货到付款</option>
-                </select>
+                <div id="add-supplier-payment-container" class="w-full"></div>
+                <input type="hidden" name="paymentTerms" id="add-supplier-payment-input">
             </div>
         </form>
     `;
@@ -1415,31 +2331,25 @@ function showAddSupplierModal() {
         alert('供应商添加成功');
         return true;
     });
+
+    const paymentOptions = [
+        { value: 'Net 30', label: 'Net 30' },
+        { value: 'Net 45', label: 'Net 45' },
+        { value: 'Net 60', label: 'Net 60' },
+        { value: 'COD', label: '货到付款' }
+    ];
+    renderAntdSelect('add-supplier-payment-container', 'add-supplier-payment-input', paymentOptions, '请选择付款条件');
 }
 
 // 显示新增进货模态框
 function showAddInboundModal() {
-    // 使用自定义下拉框替代原生select，以支持模糊搜索和滚动加载
+    // 使用 Ant Design Select 组件替代原生实现
     const content = `
         <form id="add-inbound-form" class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">商品 <span class="text-danger">*</span></label>
-                <div class="relative group">
-                    <input type="hidden" name="productId" id="inbound-product-id" required>
-                    <input type="text" id="inbound-product-search" placeholder="请选择或搜索商品..." autocomplete="off"
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer">
-                    <!-- 下拉图标 -->
-                    <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                    <!-- 下拉列表容器 -->
-                    <div id="inbound-product-dropdown" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto hidden">
-                        <div id="inbound-product-list" class="divide-y divide-gray-100">
-                            <!-- 动态加载选项 -->
-                        </div>
-                        <div id="inbound-product-loading" class="text-center py-2 text-gray-500 text-sm hidden">加载中...</div>
-                    </div>
-                </div>
+                <div id="inbound-product-select-container" class="w-full"></div>
+                <input type="hidden" name="productId" id="inbound-product-id" required>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">数量 <span class="text-danger">*</span></label>
@@ -1451,21 +2361,8 @@ function showAddInboundModal() {
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">供应商 <span class="text-danger">*</span></label>
-                <div class="relative group">
-                    <input type="hidden" name="supplierId" id="inbound-supplier-id" required>
-                    <input type="text" id="inbound-supplier-search" placeholder="请选择或搜索供应商..." autocomplete="off"
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer">
-                    <!-- 下拉图标 -->
-                    <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                    <!-- 下拉列表容器 -->
-                    <div id="inbound-supplier-dropdown" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto hidden">
-                        <div id="inbound-supplier-list" class="divide-y divide-gray-100">
-                            <!-- 动态加载选项 -->
-                        </div>
-                    </div>
-                </div>
+                <div id="inbound-supplier-select-container" class="w-full"></div>
+                <input type="hidden" name="supplierId" id="inbound-supplier-id" required>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
@@ -1477,15 +2374,17 @@ function showAddInboundModal() {
     showModal('新增进货', content, function() {
         const form = document.getElementById('add-inbound-form');
         const formData = new FormData(form);
-        const productId = formData.get('productId'); // 获取隐藏域的值
+        
+        // 获取 Select 组件设置的 hidden input 值
+        // 注意：如果是新增的项，值为输入的文本；如果是选择的项，值为 ID
+        const rawProductId = document.getElementById('inbound-product-id').value;
+        const rawSupplierId = document.getElementById('inbound-supplier-id').value;
+        
         const quantityStr = formData.get('quantity');
-        const supplierId = formData.get('supplierId');
-        const supplierNameInput = document.getElementById('inbound-supplier-search').value.trim();
-        const productNameInput = document.getElementById('inbound-product-search').value.trim();
         const costPriceStr = formData.get('costPrice');
         
         // 必填校验
-        if (!productId && !productNameInput) {
+        if (!rawProductId) {
             alert('请选择或输入商品（必填）');
             return false;
         }
@@ -1493,8 +2392,7 @@ function showAddInboundModal() {
             alert('请输入数量（必填）');
             return false;
         }
-        // 供应商校验：必须有 ID 或者有输入名称
-        if (!supplierId && !supplierNameInput) {
+        if (!rawSupplierId) {
             alert('请选择或输入供应商（必填）');
             return false;
         }
@@ -1512,27 +2410,28 @@ function showAddInboundModal() {
         }
 
         // --- 1. 处理供应商逻辑 ---
-        let finalSupplierId = supplierId;
+        let finalSupplierId = null;
         let finalSupplierName = '';
 
-        // 如果有 ID，说明是选择的现有供应商
-        if (finalSupplierId) {
-            const supplier = mockData.suppliers.find(s => s.id === finalSupplierId);
-            finalSupplierName = supplier ? supplier.name : '未知供应商';
-        } 
-        // 如果没有 ID 但有输入名称，说明是新供应商
-        else if (supplierNameInput) {
-            // 先检查是否正好同名
-            const existingSupplier = mockData.suppliers.find(s => s.name === supplierNameInput);
-            if (existingSupplier) {
-                finalSupplierId = existingSupplier.id;
-                finalSupplierName = existingSupplier.name;
+        // 尝试按 ID 查找
+        let supplier = mockData.suppliers.find(s => s.id === rawSupplierId);
+        
+        if (supplier) {
+            // 找到了现有供应商
+            finalSupplierId = supplier.id;
+            finalSupplierName = supplier.name;
+        } else {
+            // 可能是输入了名称，尝试按名称查找
+            supplier = mockData.suppliers.find(s => s.name === rawSupplierId);
+            if (supplier) {
+                finalSupplierId = supplier.id;
+                finalSupplierName = supplier.name;
             } else {
-                // 创建新供应商
+                // 完全是新的供应商，创建它
                 const newSupplierId = 'S' + String(mockData.suppliers.length + 1).padStart(3, '0');
                 const newSupplier = {
                     id: newSupplierId,
-                    name: supplierNameInput,
+                    name: rawSupplierId, // 使用输入值作为名称
                     contactPerson: '-',
                     contactPhone: '-',
                     email: '-',
@@ -1546,7 +2445,7 @@ function showAddInboundModal() {
                 mockData.suppliers.push(newSupplier);
                 saveMockData(); // 保存数据
                 finalSupplierId = newSupplierId;
-                finalSupplierName = supplierNameInput;
+                finalSupplierName = rawSupplierId;
                 
                 addLog('add', 'supplier', finalSupplierName, '自动创建新供应商');
                 
@@ -1563,21 +2462,20 @@ function showAddInboundModal() {
 
         // --- 2. 处理商品逻辑 ---
         let finalProduct = null;
-        if (productId) {
-            finalProduct = mockData.products.find(p => p.id === productId);
-        }
         
-        // 如果没有找到商品（或没传ID），但有输入名称
-        if (!finalProduct && productNameInput) {
-             // 先检查同名
-             finalProduct = mockData.products.find(p => p.name === productNameInput);
+        // 尝试按 ID 查找
+        finalProduct = mockData.products.find(p => p.id === rawProductId);
+        
+        if (!finalProduct) {
+             // 尝试按名称查找
+             finalProduct = mockData.products.find(p => p.name === rawProductId);
              
              if (!finalProduct) {
                  // 创建新商品
                  const newProductId = 'P' + String(mockData.products.length + 1).padStart(3, '0');
                  finalProduct = {
                     id: newProductId,
-                    name: productNameInput,
+                    name: rawProductId, // 使用输入值作为名称
                     category: '未分类',
                     unit: '个',
                     costPrice: costPriceInput !== null ? costPriceInput : null,
@@ -1592,10 +2490,6 @@ function showAddInboundModal() {
                  mockData.products.push(finalProduct);
                  saveMockData(); // 保存数据
                  addLog('add', 'product', finalProduct.name, '自动创建新商品');
-                 
-                 // 刷新商品筛选器（可选，但推荐）
-                 // 由于商品列表是动态渲染的，这里其实不需要像 select 那样手动 append option
-                 // 下次打开弹窗时，renderList 会自动包含新商品
              }
         }
 
@@ -1616,15 +2510,12 @@ function showAddInboundModal() {
         if (costPriceInput !== null) {
             recordPrice = costPriceInput;
             recordPriceType = 'custom';
-            // 如果是现有商品，这里暂时不更新商品的主成本价，除非有明确需求
-            // 如果是新商品，上面创建时已经设置了
         } else {
             // 没有输入进价
             if (finalProduct.costPrice !== null && finalProduct.costPrice !== undefined) {
                 recordPrice = finalProduct.costPrice;
                 recordPriceType = 'default';
             } else {
-                // 新商品且未输入进价，或者原商品本身就没设置成本价
                 recordPrice = null;
                 recordPriceType = 'none';
             }
@@ -1670,230 +2561,88 @@ function showAddInboundModal() {
         alert(`进货记录添加成功`);
     });
 
-    // --- 商品下拉逻辑 ---
-    const searchInput = document.getElementById('inbound-product-search');
-    const hiddenInput = document.getElementById('inbound-product-id');
-    const dropdown = document.getElementById('inbound-product-dropdown');
-    const listEl = document.getElementById('inbound-product-list');
-    const loadingEl = document.getElementById('inbound-product-loading');
+    // --- 初始化 Ant Design Select 组件 ---
+
+    // 1. 准备数据
+    const productOptions = mockData.products.map(p => ({ 
+        value: p.id, 
+        label: p.name 
+    }));
     
-    // --- 供应商下拉逻辑 ---
-    const supplierSearchInput = document.getElementById('inbound-supplier-search');
-    const supplierHiddenInput = document.getElementById('inbound-supplier-id');
-    const supplierDropdown = document.getElementById('inbound-supplier-dropdown');
-    const supplierListEl = document.getElementById('inbound-supplier-list');
+    const supplierOptions = mockData.suppliers.map(s => ({ 
+        value: s.id, 
+        label: s.name 
+    }));
 
-    let filteredProducts = [...mockData.products];
-    const pageSize = 10;
-    let page = 1;
-
-    // 渲染商品列表
-    const renderList = (append = false) => {
-        if (!listEl) return;
-        if (!append) listEl.innerHTML = '';
-        
-        const start = (page - 1) * pageSize;
-        const end = page * pageSize;
-        const items = filteredProducts.slice(start, end);
-
-        if (items.length === 0 && !append) {
-            listEl.innerHTML = '<div class="px-3 py-2 text-gray-500 text-sm">无匹配商品</div>';
-            return;
-        }
-
-        const html = items.map(p => `
-            <div class="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm border-b border-gray-50 last:border-b-0" 
-                 data-id="${p.id}" 
-                 data-name="${p.name}" 
-                 data-supplier="${p.supplierId || ''}">
-                <div class="font-medium text-gray-900">${p.name}</div>
-                <div class="text-xs text-gray-500 flex justify-between">
-                    <span>库存: ${p.stockQuantity}</span>
-                    <span>编码: ${p.id}</span>
-                </div>
-            </div>
-        `).join('');
-
-        if (append) {
-            listEl.insertAdjacentHTML('beforeend', html);
-        } else {
-            listEl.innerHTML = html;
-        }
-    };
-
-    // 渲染供应商列表
-    const renderSupplierList = (filter = '') => {
-        if (!supplierListEl) return;
-        
-        const keyword = filter.toLowerCase();
-        const items = mockData.suppliers.filter(s => 
-            s.name.toLowerCase().includes(keyword) || 
-            s.id.toLowerCase().includes(keyword)
+    const buildNoDataNode = () => {
+        if (!window.React) return 'No data';
+        return window.React.createElement(
+            'div',
+            {
+                style: {
+                    padding: '8px 12px',
+                    color: 'rgba(0, 0, 0, 0.45)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                }
+            },
+            window.React.createElement('i', { className: 'fa fa-inbox', style: { fontSize: '12px' } }),
+            window.React.createElement('span', null, 'No data')
         );
-
-        if (items.length === 0) {
-            supplierListEl.innerHTML = '<div class="px-3 py-2 text-gray-500 text-sm">无匹配供应商</div>';
-            return;
-        }
-
-        const html = items.map(s => `
-            <div class="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm border-b border-gray-50 last:border-b-0" 
-                 data-id="${s.id}" 
-                 data-name="${s.name}">
-                <div class="font-medium text-gray-900">${s.name}</div>
-            </div>
-        `).join('');
-
-        supplierListEl.innerHTML = html;
     };
 
-    // 初始化渲染
-    renderList();
-    renderSupplierList();
-
-    // --- 商品事件监听 ---
-    if (searchInput && dropdown) {
-        searchInput.addEventListener('click', (e) => {
-            e.stopPropagation();
-            dropdown.classList.remove('hidden');
-            supplierDropdown.classList.add('hidden'); // 关闭另一个
+    // 2. 渲染供应商选择器 (封装以便重用)
+    const renderSupplierSelect = (defaultValue = undefined) => {
+        renderAntdSelect('inbound-supplier-select-container', 'inbound-supplier-id', supplierOptions, {
+            placeholder: '请选择或搜索供应商...',
+            mode: 'tags',
+            controlSearchValue: true,
+            keepSearchTextOnBlur: true,
+            enableCreateOption: true,
+            notFoundContent: buildNoDataNode(),
+            defaultValue: defaultValue
         });
-
-        searchInput.addEventListener('input', (e) => {
-            const keyword = e.target.value.trim().toLowerCase();
-            if (keyword === '') {
-                filteredProducts = [...mockData.products];
-            } else {
-                filteredProducts = mockData.products.filter(p => 
-                    p.name.toLowerCase().includes(keyword) || 
-                    p.id.toLowerCase().includes(keyword)
-                );
-            }
-            page = 1;
-            renderList(false);
-            dropdown.classList.remove('hidden');
-            hiddenInput.value = '';
-        });
-    }
-
-    if (listEl) {
-        listEl.addEventListener('click', (e) => {
-            const item = e.target.closest('[data-id]');
-            if (!item) return;
-
-            const id = item.dataset.id;
-            const name = item.dataset.name;
-            const supplierId = item.dataset.supplier;
-
-            searchInput.value = name;
-            hiddenInput.value = id;
-            dropdown.classList.add('hidden');
-
-            // 自动选择供应商
-            if (supplierHiddenInput && supplierSearchInput) {
-                supplierHiddenInput.value = supplierId;
-                const supplier = mockData.suppliers.find(s => s.id === supplierId);
-                if (supplier) {
-                    supplierSearchInput.value = supplier.name;
-                } else {
-                    supplierSearchInput.value = '';
-                }
-            }
-        });
-    }
-
-    if (dropdown) {
-        dropdown.addEventListener('scroll', () => {
-            if (dropdown.scrollTop + dropdown.clientHeight >= dropdown.scrollHeight - 20) {
-                if (page * pageSize < filteredProducts.length) {
-                    loadingEl.classList.remove('hidden');
-                    if (dropdown.dataset.loading === 'true') return;
-                    dropdown.dataset.loading = 'true';
-                    
-                    setTimeout(() => {
-                        page++;
-                        renderList(true);
-                        loadingEl.classList.add('hidden');
-                        dropdown.dataset.loading = 'false';
-                    }, 200);
-                }
-            }
-        });
-    }
-
-    // --- 供应商事件监听 ---
-    if (supplierSearchInput && supplierDropdown) {
-        supplierSearchInput.addEventListener('click', (e) => {
-            e.stopPropagation();
-            supplierDropdown.classList.remove('hidden');
-            dropdown.classList.add('hidden'); // 关闭另一个
-        });
-
-        supplierSearchInput.addEventListener('input', (e) => {
-            const keyword = e.target.value.trim();
-            renderSupplierList(keyword);
-            supplierDropdown.classList.remove('hidden');
-            supplierHiddenInput.value = '';
-        });
-    }
-
-    if (supplierListEl) {
-        supplierListEl.addEventListener('click', (e) => {
-            const item = e.target.closest('[data-id]');
-            if (!item) return;
-
-            const id = item.dataset.id;
-            const name = item.dataset.name;
-
-            supplierSearchInput.value = name;
-            supplierHiddenInput.value = id;
-            supplierDropdown.classList.add('hidden');
-        });
-    }
-
-    // 点击外部关闭所有下拉
-    const closeDropdowns = (e) => {
-        const isClickInsideProduct = searchInput && searchInput.contains(e.target) || dropdown && dropdown.contains(e.target);
-        const isClickInsideSupplier = supplierSearchInput && supplierSearchInput.contains(e.target) || supplierDropdown && supplierDropdown.contains(e.target);
-
-        if (!isClickInsideProduct && dropdown) {
-            dropdown.classList.add('hidden');
-        }
-        if (!isClickInsideSupplier && supplierDropdown) {
-            supplierDropdown.classList.add('hidden');
-        }
     };
-    
-    if (window.inboundDropdownCloser) {
-        document.removeEventListener('click', window.inboundDropdownCloser);
-    }
-    window.inboundDropdownCloser = closeDropdowns;
-    document.addEventListener('click', window.inboundDropdownCloser);
+    renderSupplierSelect();
+
+    // 3. 渲染商品选择器
+    renderAntdSelect('inbound-product-select-container', 'inbound-product-id', productOptions, {
+        placeholder: '请选择或搜索商品...',
+        mode: 'tags',
+        controlSearchValue: true,
+        keepSearchTextOnBlur: true,
+        enableCreateOption: true,
+        notFoundContent: buildNoDataNode()
+    }, (value) => {
+        // 当商品改变时，自动关联供应商
+        // value 可能是 ID 或 新输入的名称
+        const product = mockData.products.find(p => p.id === value);
+        if (product && product.supplierId) {
+            // 如果选中了现有商品且该商品有供应商，自动选中该供应商
+            // 通过重新渲染组件并设置 defaultValue 来实现
+            renderSupplierSelect(product.supplierId);
+            
+            // 同时更新 hidden input 的值，因为 defaultValue 只是视觉上的初始值
+            // renderAntdSelect 内部的 App 初始化时会触发 onChange 吗？通常不会。
+            // 所以我们需要手动更新 hidden input
+            const supplierInput = document.getElementById('inbound-supplier-id');
+            if (supplierInput) {
+                supplierInput.value = product.supplierId;
+            }
+        }
+    });
 }
 
 // 显示新增出货模态框
 function showAddOutboundModal() {
-    // 使用自定义下拉框替代原生select，以支持模糊搜索和滚动加载
+    // 使用 Ant Design Select 组件替代原生实现
     const content = `
         <form id="add-outbound-form" class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">商品 <span class="text-danger">*</span></label>
-                <div class="relative group">
-                    <input type="hidden" name="productId" id="outbound-product-id" required>
-                    <input type="text" id="outbound-product-search" placeholder="请选择或搜索商品..." autocomplete="off"
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer">
-                    <!-- 下拉图标 -->
-                    <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                    <!-- 下拉列表容器 -->
-                    <div id="outbound-product-dropdown" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto hidden">
-                        <div id="outbound-product-list" class="divide-y divide-gray-100">
-                            <!-- 动态加载选项 -->
-                        </div>
-                        <div id="outbound-product-loading" class="text-center py-2 text-gray-500 text-sm hidden">加载中...</div>
-                    </div>
-                </div>
+                <div id="outbound-product-select-container" class="w-full"></div>
+                <input type="hidden" name="productId" id="outbound-product-id" required>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">数量 <span class="text-danger">*</span></label>
@@ -1909,7 +2658,7 @@ function showAddOutboundModal() {
     showModal('新增出货', content, function() {
         const form = document.getElementById('add-outbound-form');
         const formData = new FormData(form);
-        const productId = formData.get('productId');
+        const productId = document.getElementById('outbound-product-id').value;
         const quantityStr = formData.get('quantity');
 
         // 必填校验
@@ -1969,126 +2718,20 @@ function showAddOutboundModal() {
             renderDashboardActivity(); // 更新仪表盘最近活动
             
             alert('出货记录添加成功');
-            return false;
+            return true;
+        } else {
+             alert('商品无效，请重新选择');
+             return false;
         }
     });
 
-    // --- 商品下拉逻辑 ---
-    const searchInput = document.getElementById('outbound-product-search');
-    const hiddenInput = document.getElementById('outbound-product-id');
-    const dropdown = document.getElementById('outbound-product-dropdown');
-    const listEl = document.getElementById('outbound-product-list');
-    const loadingEl = document.getElementById('outbound-product-loading');
-    
-    let filteredProducts = [...mockData.products];
-    const pageSize = 10;
-    let page = 1;
+    // 初始化 Ant Design Select
+    const productOptions = mockData.products.map(p => ({ 
+        value: p.id, 
+        label: `${p.name} (库存: ${p.stockQuantity})` 
+    }));
 
-    // 渲染商品列表
-    const renderList = (append = false) => {
-        if (!listEl) return;
-        if (!append) listEl.innerHTML = '';
-        
-        const start = (page - 1) * pageSize;
-        const end = page * pageSize;
-        const items = filteredProducts.slice(start, end);
-
-        if (items.length === 0 && !append) {
-            listEl.innerHTML = '<div class="px-3 py-2 text-gray-500 text-sm">无匹配商品</div>';
-            return;
-        }
-
-        const html = items.map(p => `
-            <div class="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm border-b border-gray-50 last:border-b-0" 
-                 data-id="${p.id}" 
-                 data-name="${p.name}">
-                <div class="font-medium text-gray-900">${p.name}</div>
-                <div class="text-xs text-gray-500 flex justify-between">
-                    <span>库存: ${p.stockQuantity}</span>
-                    <span>编码: ${p.id}</span>
-                </div>
-            </div>
-        `).join('');
-
-        if (append) {
-            listEl.insertAdjacentHTML('beforeend', html);
-        } else {
-            listEl.innerHTML = html;
-        }
-    };
-
-    // 初始化渲染
-    renderList();
-
-    // --- 商品事件监听 ---
-    if (searchInput && dropdown) {
-        searchInput.addEventListener('click', (e) => {
-            e.stopPropagation();
-            dropdown.classList.remove('hidden');
-        });
-
-        searchInput.addEventListener('input', (e) => {
-            const keyword = e.target.value.trim().toLowerCase();
-            if (keyword === '') {
-                filteredProducts = [...mockData.products];
-            } else {
-                filteredProducts = mockData.products.filter(p => 
-                    p.name.toLowerCase().includes(keyword) || 
-                    p.id.toLowerCase().includes(keyword)
-                );
-            }
-            page = 1;
-            renderList(false);
-            dropdown.classList.remove('hidden');
-            hiddenInput.value = '';
-        });
-    }
-
-    if (listEl) {
-        listEl.addEventListener('click', (e) => {
-            const item = e.target.closest('[data-id]');
-            if (!item) return;
-
-            const id = item.dataset.id;
-            const name = item.dataset.name;
-
-            searchInput.value = name;
-            hiddenInput.value = id;
-            dropdown.classList.add('hidden');
-        });
-    }
-
-    if (dropdown) {
-        dropdown.addEventListener('scroll', () => {
-            if (dropdown.scrollTop + dropdown.clientHeight >= dropdown.scrollHeight - 20) {
-                if (page * pageSize < filteredProducts.length) {
-                    loadingEl.classList.remove('hidden');
-                    if (dropdown.dataset.loading === 'true') return;
-                    dropdown.dataset.loading = 'true';
-                    
-                    setTimeout(() => {
-                        page++;
-                        renderList(true);
-                        loadingEl.classList.add('hidden');
-                        dropdown.dataset.loading = 'false';
-                    }, 200);
-                }
-            }
-        });
-    }
-
-    // 点击外部关闭
-    const closeDropdown = (e) => {
-        if (searchInput && dropdown && !searchInput.contains(e.target) && !dropdown.contains(e.target)) {
-            dropdown.classList.add('hidden');
-        }
-    };
-    
-    if (window.outboundDropdownCloser) {
-        document.removeEventListener('click', window.outboundDropdownCloser);
-    }
-    window.outboundDropdownCloser = closeDropdown;
-    document.addEventListener('click', window.outboundDropdownCloser);
+    renderAntdSelect('outbound-product-select-container', 'outbound-product-id', productOptions, '请选择或搜索商品...');
 }
 
 // 显示新增客户模态框
@@ -2117,12 +2760,8 @@ function showAddCustomerModal() {
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">付款条件 <span class="text-danger">*</span></label>
-                <select name="paymentTerms" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                    <option value="Net 30">Net 30</option>
-                    <option value="Net 45">Net 45</option>
-                    <option value="Net 60">Net 60</option>
-                    <option value="COD">货到付款</option>
-                </select>
+                <div id="add-customer-payment-container" class="w-full"></div>
+                <input type="hidden" name="paymentTerms" id="add-customer-payment-input" required>
             </div>
         </form>
     `;
@@ -2136,7 +2775,7 @@ function showAddCustomerModal() {
         const contactPhone = formData.get('contactPhone').trim();
         const address = formData.get('address').trim();
         const email = formData.get('email').trim();
-        const paymentTerms = formData.get('paymentTerms');
+        const paymentTerms = document.getElementById('add-customer-payment-input').value; // Get from hidden input
 
         // 非空校验
         if (!name) {
@@ -2196,6 +2835,15 @@ function showAddCustomerModal() {
         alert('客户添加成功');
         return true;
     });
+
+    // Render Antd Select for Payment Terms
+    const paymentOptions = [
+        { value: 'Net 30', label: 'Net 30' },
+        { value: 'Net 45', label: 'Net 45' },
+        { value: 'Net 60', label: 'Net 60' },
+        { value: 'COD', label: '货到付款' }
+    ];
+    renderAntdSelect('add-customer-payment-container', 'add-customer-payment-input', paymentOptions, 'Net 30');
 }
 
 // 更新客户列表表格
@@ -2752,10 +3400,12 @@ function loadStockMovementData() {
 
 
 // 删除进出货记录并回滚库存
-function deleteStockMovement(recordId) {
-    if (!confirm('确定要删除这条记录吗？这将自动回滚对应的库存数量。')) {
-        return;
-    }
+async function deleteStockMovement(recordId) {
+    const ok = await window.showAntdConfirm({
+        title: '删除记录',
+        content: '确定要删除这条记录吗？这将自动回滚对应的库存数量。'
+    });
+    if (!ok) return;
 
     const recordIndex = stockMovementData.findIndex(r => r.id === recordId);
     if (recordIndex === -1) {
@@ -2771,9 +3421,13 @@ function deleteStockMovement(recordId) {
         if (record.type === 'inbound') {
             // 如果是进货记录，删除时应减少库存
             if (product.stockQuantity < record.quantity) {
-                if (!confirm(`警告：删除此进货记录会导致库存变为负数（当前库存 ${product.stockQuantity}，需扣减 ${record.quantity}）。是否继续？`)) {
-                    return;
-                }
+                const ok2 = await window.showAntdConfirm({
+                    title: '警告',
+                    content: `删除此进货记录会导致库存变为负数（当前库存 ${product.stockQuantity}，需扣减 ${record.quantity}）。是否继续？`,
+                    okText: '继续',
+                    cancelText: '取消'
+                });
+                if (!ok2) return;
             }
             product.stockQuantity -= record.quantity;
             product.updatedAt = getLocalISOString();
@@ -3256,9 +3910,15 @@ function bindSettingsEvents() {
     const importInput = document.getElementById('import-data-input');
     if (importBtn && importInput) {
         importBtn.addEventListener('click', () => importInput.click());
-        importInput.addEventListener('change', (e) => {
+        importInput.addEventListener('change', async (e) => {
             if (e.target.files.length > 0) {
-                if (confirm('导入数据将覆盖当前所有数据，确定要继续吗？')) {
+                const ok = await window.showAntdConfirm({
+                    title: '导入数据',
+                    content: '导入数据将覆盖当前所有数据，确定要继续吗？',
+                    okText: '继续',
+                    cancelText: '取消'
+                });
+                if (ok) {
                     importData(e.target.files[0]);
                 }
                 e.target.value = ''; // 重置 input

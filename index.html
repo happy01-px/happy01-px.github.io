@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -365,35 +365,23 @@
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">出货公司</label>
-                                <select id="filter-company" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <option value="">全部公司</option>
-                                    <option value="化工">化工</option>
-                                    <option value="劳保">劳保</option>
-                                </select>
+                                <div id="filter-company-container" class="w-full"></div>
+                                <input type="hidden" id="filter-company">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">库存状态</label>
-                                <select id="filter-status" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <option value="">全部状态</option>
-                                    <option value="normal">正常</option>
-                                    <option value="low">库存不足</option>
-                                    <option value="overstock">库存过剩</option>
-                                    <option value="out">缺货</option>
-                                </select>
+                                <div id="filter-status-container" class="w-full"></div>
+                                <input type="hidden" id="filter-status">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">供应商</label>
-                                <select id="filter-supplier" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <option value="">全部供应商</option>
-                                    <!-- 供应商选项将由 JS 动态生成 -->
-                                </select>
+                                <div id="filter-supplier-container" class="w-full"></div>
+                                <input type="hidden" id="filter-supplier">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
-                                <div class="relative">
-                                    <input id="filter-search" type="text" placeholder="搜索商品..." class="w-full border border-gray-300 rounded-md pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <i class="fa fa-search absolute left-3 top-3 text-gray-400"></i>
-                                </div>
+                                <div id="filter-search-container" class="w-full"></div>
+                                <input type="hidden" id="filter-search">
                             </div>
                         </div>
                     </div>
@@ -697,9 +685,8 @@
                                 </div>
                                 <div class="flex items-center">
                                     <label class="w-24 text-sm text-gray-600 text-right mr-2">默认仓库</label>
-                                    <select class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-primary">
-                                        <option>总仓库</option>
-                                    </select>
+                                    <div id="sales-order-warehouse-container" class="w-full"></div>
+                                    <input type="hidden" id="sales-order-warehouse-input" value="总仓库">
                                 </div>
                             </div>
                         </div>
@@ -1266,18 +1253,13 @@
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">操作类型</label>
-                                <select id="log-filter-type" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <option value="">全部类型</option>
-                                    <option value="add">新增</option>
-                                    <option value="edit">编辑</option>
-                                    <option value="delete">删除</option>
-                                    <option value="import">导入</option>
-                                    <option value="export">导出</option>
-                                </select>
+                                <div id="log-filter-type-container" class="w-full"></div>
+                                <input type="hidden" id="log-filter-type">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">操作人</label>
-                                <input type="text" id="log-filter-user" placeholder="输入操作人..." class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                <div id="log-filter-user-container"></div>
+                                <input type="hidden" id="log-filter-user">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">日期范围</label>
@@ -1287,10 +1269,8 @@
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
-                                <div class="relative">
-                                    <input type="text" id="log-filter-search" placeholder="搜索操作对象..." class="w-full border border-gray-300 rounded-md pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <i class="fa fa-search absolute left-3 top-3 text-gray-400"></i>
-                                </div>
+                                <div id="log-filter-search-container"></div>
+                                <input type="hidden" id="log-filter-search">
                             </div>
                         </div>
                     </div>
@@ -1360,21 +1340,13 @@
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">供应商</label>
-                                <select class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <option value="">全部供应商</option>
-                                    <option value="1">苹果公司</option>
-                                    <option value="2">三星电子</option>
-                                    <option value="3">华为技术</option>
-                                </select>
+                                <div id="bills-filter-supplier-container" class="w-full"></div>
+                                <input type="hidden" id="bills-filter-supplier">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">对账状态</label>
-                                <select class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <option value="">全部状态</option>
-                                    <option value="pending">待核对</option>
-                                    <option value="verified">已核对</option>
-                                    <option value="paid">已付款</option>
-                                </select>
+                                <div id="bills-filter-status-container" class="w-full"></div>
+                                <input type="hidden" id="bills-filter-status">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">日期范围</label>
@@ -1384,10 +1356,8 @@
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
-                                <div class="relative">
-                                    <input type="text" placeholder="搜索对账单..." class="w-full border border-gray-300 rounded-md pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <i class="fa fa-search absolute left-3 top-3 text-gray-400"></i>
-                                </div>
+                                <div id="bills-filter-search-container"></div>
+                                <input type="hidden" id="bills-filter-search">
                             </div>
                         </div>
                     </div>
@@ -1592,29 +1562,18 @@
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">报表类型</label>
-                                <select class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <option value="inventory-turnover">库存周转率</option>
-                                    <option value="sales-trend">销售趋势</option>
-                                    <option value="accounts-receivable">应收账款</option>
-                                    <option value="supplier-performance">供应商表现</option>
-                                </select>
+                                <div id="report-type-container" class="w-full"></div>
+                                <input type="hidden" id="report-type-select" value="inventory-turnover">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">时间范围</label>
-                                <select class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <option value="last-month">上个月</option>
-                                    <option value="last-quarter">上季度</option>
-                                    <option value="last-year">去年</option>
-                                    <option value="custom">自定义</option>
-                                </select>
+                                <div id="report-time-range-container" class="w-full"></div>
+                                <input type="hidden" id="report-time-range-select" value="last-month">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">出货公司</label>
-                                <select class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <option value="">全部公司</option>
-                                    <option value="chemical">化工</option>
-                                    <option value="labor">劳保</option>
-                                </select>
+                                <div id="report-company-container" class="w-full"></div>
+                                <input type="hidden" id="report-company-select" value="">
                             </div>
                             <div class="flex items-end">
                                 <button class="w-full bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg flex items-center justify-center transition-all-300">

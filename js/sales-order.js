@@ -13,6 +13,12 @@ function initSalesOrder() {
     const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     document.getElementById('sales-order-no').textContent = `XS${dateStr}${randomNum}`;
     
+    // Render default warehouse select
+    if (window.renderAntdSelect) {
+        const warehouseOptions = [{ value: '总仓库', label: '总仓库' }];
+        window.renderAntdSelect('sales-order-warehouse-container', 'sales-order-warehouse-input', warehouseOptions, '选择仓库');
+    }
+
     // 清空现有数据
     currentSalesOrder.items = [];
     renderSalesOrderTable();
@@ -50,52 +56,56 @@ function renderSalesOrderTable() {
     tbody.innerHTML = '';
     
     // 构建商品选项
-    let productOptions = '<option value="">请选择产品</option>';
-    mockData.products.forEach(p => {
-        productOptions += `<option value="${p.id}">${p.name}</option>`;
-    });
+    const productOptions = mockData.products.map(p => ({ value: p.id, label: p.name }));
+    const warehouseOptions = [{ value: '总仓库', label: '总仓库' }];
     
     currentSalesOrder.items.forEach((item, index) => {
         const row = document.createElement('tr');
+        const productIdContainerId = `sales-order-product-container-${item.id}`;
+        const productIdInputId = `sales-order-product-input-${item.id}`;
+        const warehouseContainerId = `sales-order-warehouse-container-${item.id}`;
+        const warehouseInputId = `sales-order-warehouse-input-${item.id}`;
+        
+        const quantityContainerId = `sales-order-quantity-container-${item.id}`;
+        const quantityInputId = `sales-order-quantity-input-${item.id}`;
+        const priceContainerId = `sales-order-price-container-${item.id}`;
+        const priceInputId = `sales-order-price-input-${item.id}`;
+        const deliveryQtyContainerId = `sales-order-deliveryQty-container-${item.id}`;
+        const deliveryQtyInputId = `sales-order-deliveryQty-input-${item.id}`;
+        const remarkContainerId = `sales-order-remark-container-${item.id}`;
+        const remarkInputId = `sales-order-remark-input-${item.id}`;
+
         row.innerHTML = `
             <td class="px-3 py-2 text-center">${index + 1}</td>
             <td class="px-3 py-2">
-                <select class="w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:border-primary" 
-                    onchange="updateSalesOrderItem(${item.id}, 'productId', this.value)">
-                    ${productOptions.replace(`value="${item.productId}"`, `value="${item.productId}" selected`)}
-                </select>
+                <div id="${productIdContainerId}" class="w-full"></div>
+                <input type="hidden" id="${productIdInputId}" value="${item.productId}">
             </td>
             <td class="px-3 py-2 text-gray-500" id="barcode-${item.id}">-</td>
             <td class="px-3 py-2 text-gray-500" id="spec-${item.id}">-</td>
             <td class="px-3 py-2 text-gray-500" id="stock-${item.id}">0</td>
             <td class="px-3 py-2">
-                <input type="number" value="${item.quantity}" min="1" 
-                    class="w-20 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:border-primary"
-                    onchange="updateSalesOrderItem(${item.id}, 'quantity', this.value)">
+                <div id="${quantityContainerId}"></div>
+                <input type="hidden" id="${quantityInputId}" value="${item.quantity}">
             </td>
             <td class="px-3 py-2">
-                <input type="number" value="${item.price}" min="0" step="0.01" 
-                    class="w-24 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:border-primary"
-                    onchange="updateSalesOrderItem(${item.id}, 'price', this.value)">
+                <div id="${priceContainerId}"></div>
+                <input type="hidden" id="${priceInputId}" value="${item.price}">
             </td>
             <td class="px-3 py-2 text-gray-800 font-medium" id="amount-${item.id}">
                 ${(item.quantity * item.price).toFixed(2)}
             </td>
             <td class="px-3 py-2">
-                <input type="number" value="${item.deliveryQty}" min="0" 
-                    class="w-20 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:border-primary"
-                    onchange="updateSalesOrderItem(${item.id}, 'deliveryQty', this.value)">
+                <div id="${deliveryQtyContainerId}"></div>
+                <input type="hidden" id="${deliveryQtyInputId}" value="${item.deliveryQty}">
             </td>
             <td class="px-3 py-2">
-                <select class="w-24 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:border-primary"
-                    onchange="updateSalesOrderItem(${item.id}, 'warehouse', this.value)">
-                    <option value="总仓库" ${item.warehouse === '总仓库' ? 'selected' : ''}>总仓库</option>
-                </select>
+                <div id="${warehouseContainerId}" class="w-24"></div>
+                <input type="hidden" id="${warehouseInputId}" value="${item.warehouse}">
             </td>
             <td class="px-3 py-2">
-                <input type="text" value="${item.remark}" 
-                    class="w-full border border-gray-300 rounded px-2 py-1 focus:outline-none focus:border-primary"
-                    onchange="updateSalesOrderItem(${item.id}, 'remark', this.value)">
+                <div id="${remarkContainerId}"></div>
+                <input type="hidden" id="${remarkInputId}" value="${item.remark}">
             </td>
             <td class="px-3 py-2 text-center">
                 <button class="text-red-500 hover:text-red-700" onclick="removeSalesOrderRow(${item.id})">
@@ -104,6 +114,51 @@ function renderSalesOrderTable() {
             </td>
         `;
         tbody.appendChild(row);
+        
+        // Render Antd Components
+        if (window.renderAntdSelect) {
+            // Product Select
+            window.renderAntdSelect(productIdContainerId, productIdInputId, productOptions, { placeholder: '请选择产品', showSearch: true }, (val) => {
+                updateSalesOrderItem(item.id, 'productId', val);
+            });
+            // Warehouse Select
+            window.renderAntdSelect(warehouseContainerId, warehouseInputId, warehouseOptions, { placeholder: '总仓库' }, (val) => {
+                updateSalesOrderItem(item.id, 'warehouse', val);
+            });
+        }
+
+        if (window.renderAntdInput) {
+            // Quantity
+            window.renderAntdInput(quantityContainerId, quantityInputId, { 
+                defaultValue: item.quantity, 
+                type: 'number', 
+                min: 1,
+                style: { width: '80px', height: '32px' } 
+            }, (val) => updateSalesOrderItem(item.id, 'quantity', val));
+
+            // Price
+            window.renderAntdInput(priceContainerId, priceInputId, { 
+                defaultValue: item.price, 
+                type: 'number', 
+                min: 0, 
+                step: 0.01,
+                style: { width: '100px', height: '32px' } 
+            }, (val) => updateSalesOrderItem(item.id, 'price', val));
+
+            // Delivery Qty
+            window.renderAntdInput(deliveryQtyContainerId, deliveryQtyInputId, { 
+                defaultValue: item.deliveryQty, 
+                type: 'number', 
+                min: 0,
+                style: { width: '80px', height: '32px' } 
+            }, (val) => updateSalesOrderItem(item.id, 'deliveryQty', val));
+
+            // Remark
+            window.renderAntdInput(remarkContainerId, remarkInputId, { 
+                defaultValue: item.remark,
+                style: { width: '100%', height: '32px' } 
+            }, (val) => updateSalesOrderItem(item.id, 'remark', val));
+        }
         
         // 如果有选中的商品，更新相关信息
         if (item.productId) {
@@ -245,8 +300,12 @@ function submitSalesOrder() {
 }
 
 // 取消销售单
-function cancelSalesOrder() {
-    if (confirm('确定要取消当前销售单吗？所有未保存的数据将丢失。')) {
-        showSection('stock-movement');
-    }
+async function cancelSalesOrder() {
+    const ok = await (window.showAntdConfirm ? window.showAntdConfirm({
+        title: '取消销售单',
+        content: '确定要取消当前销售单吗？所有未保存的数据将丢失。',
+        okText: '确定',
+        cancelText: '取消'
+    }) : Promise.resolve(confirm('确定要取消当前销售单吗？所有未保存的数据将丢失。')));
+    if (ok) showSection('stock-movement');
 }
