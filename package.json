@@ -6,13 +6,16 @@
   "bin": "preview_server.js",
   "scripts": {
     "start": "node preview_server.js",
+    "test": "node scripts/smoke-check.js",
     "build": "pkg ."
   },
   "pkg": {
     "assets": [
       "index.html",
+      "assets/**/*",
       "css/**/*",
       "js/**/*",
+      "lib/**/*",
       "data/**/*"
     ],
     "targets": [

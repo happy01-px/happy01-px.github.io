@@ -1,3 +1,9 @@
+html,
+body {
+    margin: 0;
+    padding: 0;
+}
+
 @layer utilities {
     .content-auto {
         content-visibility: auto;
@@ -16,4 +22,79 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
     }
+}
+
+#desktop-sidebar .desktop-antd-menu .ant-menu {
+    background: transparent !important;
+    border-inline-end: none !important;
+    color: rgba(255, 255, 255, 0.78);
+}
+
+#desktop-sidebar .desktop-antd-menu .ant-menu-item,
+#desktop-sidebar .desktop-antd-menu .ant-menu-submenu-title {
+    width: calc(100% - 12px);
+    margin: 4px 6px;
+    border-radius: 10px;
+    height: 44px;
+    line-height: 44px;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+}
+
+#desktop-sidebar .desktop-antd-menu .ant-menu-sub.ant-menu-inline {
+    background: transparent !important;
+    border-radius: 12px;
+    margin: 2px 6px 6px;
+    padding: 4px 0;
+}
+
+#desktop-sidebar .desktop-antd-menu .ant-menu-sub.ant-menu-inline .ant-menu-item {
+    width: calc(100% - 8px);
+    margin: 2px 4px;
+    height: 38px;
+    line-height: 38px;
+    font-size: 14px;
+}
+
+#desktop-sidebar .desktop-antd-menu .ant-menu-item .fa,
+#desktop-sidebar .desktop-antd-menu .ant-menu-submenu-title .fa {
+    width: 16px;
+    text-align: center;
+    font-size: 15px;
+}
+
+#desktop-sidebar .desktop-antd-menu .ant-menu-submenu-title {
+    padding-inline: 16px !important;
+}
+
+#desktop-sidebar .desktop-antd-menu .ant-menu-submenu-arrow,
+#desktop-sidebar .desktop-antd-menu .ant-menu-submenu-expand-icon {
+    color: rgba(255, 255, 255, 0.82) !important;
+}
+
+#desktop-sidebar .desktop-antd-menu .ant-menu-submenu-title:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+#desktop-sidebar .desktop-antd-menu .ant-menu-submenu-selected > .ant-menu-submenu-title,
+#desktop-sidebar .desktop-antd-menu .ant-menu-submenu-open > .ant-menu-submenu-title {
+    background: transparent !important;
+}
+
+#desktop-sidebar .desktop-antd-menu .ant-menu-submenu .ant-menu-item-selected {
+    box-shadow: none !important;
+}
+
+#desktop-sidebar .desktop-antd-menu .ant-menu-item-selected::after,
+#desktop-sidebar .desktop-antd-menu .ant-menu-item::after,
+#desktop-sidebar .desktop-antd-menu .ant-menu-submenu::after {
+    display: none !important;
+}
+
+#desktop-sidebar .desktop-antd-menu .ant-menu-item .ant-menu-title-content,
+#desktop-sidebar .desktop-antd-menu .ant-menu-submenu-title .ant-menu-title-content {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

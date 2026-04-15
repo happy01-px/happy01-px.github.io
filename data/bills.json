@@ -1,62 +1,34 @@
 [
     {
-        "id": "B001",
-        "type": "supplier",
-        "relatedId": "S001",
-        "periodStart": "2023-06-01",
-        "periodEnd": "2023-06-30",
-        "billAmount": 250000,
-        "paymentStatus": "paid",
-        "paymentDate": "2023-07-10",
-        "paymentMethod": "银行转账",
-        "notes": "六月货款",
+        "id": "BILL-2023-0001",
+        "supplierName": "苹果公司",
+        "period": "2023-06-01 至 2023-06-30",
+        "amount": "¥250,000",
         "status": "paid",
-        "createdAt": "2023-07-05",
-        "updatedAt": "2023-07-10"
+        "createdAt": "2023-07-05"
     },
     {
-        "id": "B002",
-        "type": "supplier",
-        "relatedId": "S002",
-        "periodStart": "2023-06-01",
-        "periodEnd": "2023-06-30",
-        "billAmount": 180000,
-        "paymentStatus": "pending",
-        "paymentDate": null,
-        "paymentMethod": null,
-        "notes": "六月货款",
+        "id": "BILL-2023-0002",
+        "supplierName": "三星电子",
+        "period": "2023-06-01 至 2023-06-30",
+        "amount": "¥180,000",
         "status": "verified",
-        "createdAt": "2023-07-08",
-        "updatedAt": "2023-07-08"
+        "createdAt": "2023-07-08"
     },
     {
-        "id": "B003",
-        "type": "supplier",
-        "relatedId": "S003",
-        "periodStart": "2023-06-01",
-        "periodEnd": "2023-06-30",
-        "billAmount": 210000,
-        "paymentStatus": "pending",
-        "paymentDate": null,
-        "paymentMethod": null,
-        "notes": "六月货款",
+        "id": "BILL-2023-0003",
+        "supplierName": "华为技术",
+        "period": "2023-06-01 至 2023-06-30",
+        "amount": "¥210,000",
         "status": "pending",
-        "createdAt": "2023-07-10",
-        "updatedAt": "2023-07-10"
+        "createdAt": "2023-07-10"
     },
     {
-        "id": "B004",
-        "type": "supplier",
-        "relatedId": "S001",
-        "periodStart": "2023-07-01",
-        "periodEnd": "2023-07-15",
-        "billAmount": 150000,
-        "paymentStatus": "pending",
-        "paymentDate": null,
-        "paymentMethod": null,
-        "notes": "七月上半月货款",
+        "id": "BILL-2023-0004",
+        "supplierName": "苹果公司",
+        "period": "2023-07-01 至 2023-07-15",
+        "amount": "¥150,000",
         "status": "pending",
-        "createdAt": "2023-07-18",
-        "updatedAt": "2023-07-18"
+        "createdAt": "2023-07-18"
     }
 ]

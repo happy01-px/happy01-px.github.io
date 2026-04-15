@@ -1,5 +1,60 @@
 [
     {
+        "id": "LOG1776244075705182",
+        "timestamp": "2026-04-15T09:07:55.705Z",
+        "userId": "U001",
+        "userName": "张三",
+        "actionType": "add",
+        "objectType": "delivery-note",
+        "objectName": "XS202604150003",
+        "details": "新增销售出库单：京东商城 / XS202604150003",
+        "ipAddress": "192.168.1.100"
+    },
+    {
+        "id": "LOG1776244020578739",
+        "timestamp": "2026-04-15T09:07:00.578Z",
+        "userId": "U001",
+        "userName": "张三",
+        "actionType": "add",
+        "objectType": "delivery-note",
+        "objectName": "XS202604150002",
+        "details": "新增销售出库单：京东商城 / XS202604150002",
+        "ipAddress": "192.168.1.100"
+    },
+    {
+        "id": "LOG1776236852835469",
+        "timestamp": "2026-04-15T07:07:32.835Z",
+        "userId": "U001",
+        "userName": "张三",
+        "actionType": "add",
+        "objectType": "delivery-note",
+        "objectName": "XS202604150001",
+        "details": "新增销售出库单：京东商城 / XS202604150001",
+        "ipAddress": "192.168.1.100"
+    },
+    {
+        "id": "LOG1770631125761",
+        "timestamp": "2026-02-09T09:58:45.761Z",
+        "userId": "U001",
+        "userName": "张三",
+        "actionType": "add",
+        "objectType": "stock_movement",
+        "objectName": "AirPods Pro",
+        "details": "销售出库 3 个",
+        "ipAddress": "192.168.1.100"
+    },
+    {
+        "id": "LOG1770626941248",
+        "timestamp": "2026-02-09T08:49:01.248Z",
+        "userId": "U001",
+        "userName": "张三",
+        "actionType": "delete",
+        "objectType": "stock_movement",
+        "objectName": "测试弹窗",
+        "details": "删除进货记录，回滚数量：1",
+        "ipAddress": "192.168.1.100"
+    },
+    {
         "id": "LOG1770626012921",
         "timestamp": "2026-02-09T08:33:32.921Z",
         "userId": "U001",

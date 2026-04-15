@@ -1,6 +1,62 @@
 {
     "products": [
         {
+            "id": "P008",
+            "name": "测试弹窗",
+            "category": "未分类",
+            "unit": "个",
+            "costPrice": null,
+            "retailPrice": 0,
+            "stockQuantity": 0,
+            "minStock": 10,
+            "maxStock": 100,
+            "supplierId": "S005",
+            "createdAt": "2026-02-09T16:33:32",
+            "updatedAt": "2026-02-09T16:49:01"
+        },
+        {
+            "id": "P007",
+            "name": "fdf",
+            "category": "未分类",
+            "unit": "个",
+            "costPrice": 4555,
+            "retailPrice": 5466,
+            "stockQuantity": 2,
+            "minStock": 10,
+            "maxStock": 100,
+            "supplierId": "S004",
+            "createdAt": "2026-02-05T17:39:02",
+            "updatedAt": "2026-02-05T17:39:02"
+        },
+        {
+            "id": "P006",
+            "name": "airpods",
+            "category": "未分类",
+            "unit": "个",
+            "costPrice": 1000,
+            "retailPrice": 1200,
+            "stockQuantity": 2,
+            "minStock": 10,
+            "maxStock": 100,
+            "supplierId": "S004",
+            "createdAt": "2026-02-05",
+            "updatedAt": "2026-02-05"
+        },
+        {
+            "id": "P004",
+            "name": "AirPods Pro",
+            "category": "电子产品",
+            "unit": "个",
+            "costPrice": 1799,
+            "retailPrice": 1999,
+            "stockQuantity": 210,
+            "minStock": 50,
+            "maxStock": 200,
+            "supplierId": "S001",
+            "createdAt": "2023-04-20",
+            "updatedAt": "2023-07-20"
+        },
+        {
             "id": "P001",
             "name": "iPhone 13 Pro",
             "category": "电子产品",
@@ -12,6 +68,20 @@
             "maxStock": 200,
             "supplierId": "S001",
             "createdAt": "2023-01-15",
+            "updatedAt": "2023-07-15"
+        },
+        {
+            "id": "P005",
+            "name": "Apple Watch",
+            "category": "电子产品",
+            "unit": "个",
+            "costPrice": 3199,
+            "retailPrice": 3499,
+            "stockQuantity": 75,
+            "minStock": 30,
+            "maxStock": 100,
+            "supplierId": "S001",
+            "createdAt": "2023-05-15",
             "updatedAt": "2023-07-15"
         },
         {
@@ -41,34 +111,6 @@
             "supplierId": "S001",
             "createdAt": "2023-03-05",
             "updatedAt": "2023-07-05"
-        },
-        {
-            "id": "P004",
-            "name": "AirPods Pro",
-            "category": "电子产品",
-            "unit": "个",
-            "costPrice": 1799,
-            "retailPrice": 1999,
-            "stockQuantity": 210,
-            "minStock": 50,
-            "maxStock": 200,
-            "supplierId": "S001",
-            "createdAt": "2023-04-20",
-            "updatedAt": "2023-07-20"
-        },
-        {
-            "id": "P005",
-            "name": "Apple Watch",
-            "category": "电子产品",
-            "unit": "个",
-            "costPrice": 3199,
-            "retailPrice": 3499,
-            "stockQuantity": 75,
-            "minStock": 30,
-            "maxStock": 100,
-            "supplierId": "S001",
-            "createdAt": "2023-05-15",
-            "updatedAt": "2023-07-15"
         }
     ],
     "suppliers": [
@@ -110,6 +152,32 @@
             "status": "active",
             "createdAt": "2023-03-01",
             "updatedAt": "2023-06-01"
+        },
+        {
+            "id": "S004",
+            "name": "拼多多",
+            "contactPerson": "-",
+            "contactPhone": "-",
+            "email": "-",
+            "address": "-",
+            "paymentTerms": "Net 30",
+            "creditLimit": 0,
+            "status": "active",
+            "createdAt": "2026-02-05",
+            "updatedAt": "2026-02-05"
+        },
+        {
+            "id": "S005",
+            "name": "测试公司",
+            "contactPerson": "-",
+            "contactPhone": "-",
+            "email": "-",
+            "address": "-",
+            "paymentTerms": "Net 30",
+            "creditLimit": 0,
+            "status": "active",
+            "createdAt": "2026-02-09T16:33:32",
+            "updatedAt": "2026-02-09T16:33:32"
         }
     ],
     "customers": [
@@ -316,6 +384,224 @@
             ]
         }
     ],
-    "stockMovements": [],
-    "logs": []
+    "stockMovements": [
+        {
+            "id": "SM1770626012921",
+            "type": "inbound",
+            "productId": "P008",
+            "productName": "测试弹窗",
+            "quantity": 1,
+            "unit": "个",
+            "supplierId": "S005",
+            "supplierName": "测试公司",
+            "price": null,
+            "priceType": "none",
+            "operator": "张三",
+            "remark": "-",
+            "createdAt": "2026-02-09T08:33:32.921Z",
+            "updatedAt": "2026-02-09T08:33:32.921Z"
+        },
+        {
+            "id": "SM1770284342212",
+            "type": "inbound",
+            "productId": "P007",
+            "productName": "fdf",
+            "quantity": 2,
+            "unit": "个",
+            "supplierId": "S004",
+            "supplierName": "拼多多",
+            "price": 4555,
+            "priceType": "custom",
+            "operator": "张三",
+            "remark": "-",
+            "createdAt": "2026-02-05T09:39:02.212Z",
+            "updatedAt": "2026-02-05T09:39:02.212Z"
+        },
+        {
+            "id": "SM1770284075749",
+            "type": "inbound",
+            "productId": "P006",
+            "productName": "airpods",
+            "quantity": 2,
+            "unit": "个",
+            "supplierId": "S004",
+            "supplierName": "拼多多",
+            "price": 1000,
+            "priceType": "custom",
+            "operator": "张三",
+            "remark": "-",
+            "createdAt": "2026-02-05T09:34:35.749Z",
+            "updatedAt": "2026-02-05T09:34:35.749Z"
+        },
+        {
+            "id": "SM001",
+            "type": "inbound",
+            "productId": "P001",
+            "productName": "iPhone 13 Pro",
+            "quantity": 50,
+            "unit": "个",
+            "operator": "张三",
+            "remark": "采购入库",
+            "createdAt": "2026-01-21T08:31:57.473Z",
+            "updatedAt": "2026-01-21T08:31:57.473Z"
+        },
+        {
+            "id": "SM002",
+            "type": "outbound",
+            "productId": "P002",
+            "productName": "MacBook Pro",
+            "quantity": 15,
+            "unit": "个",
+            "operator": "张三",
+            "remark": "客户订单#20240721-001",
+            "createdAt": "2026-01-20T08:31:57.473Z",
+            "updatedAt": "2026-01-20T08:31:57.473Z"
+        },
+        {
+            "id": "SM003",
+            "type": "inbound",
+            "productId": "P003",
+            "productName": "AirPods Pro",
+            "quantity": 100,
+            "unit": "个",
+            "operator": "李四",
+            "remark": "采购入库",
+            "createdAt": "2026-01-20T08:31:57.473Z",
+            "updatedAt": "2026-01-20T08:31:57.473Z"
+        }
+    ],
+    "logs": [
+        {
+            "id": "LOG1770626012921",
+            "timestamp": "2026-02-09T08:33:32.921Z",
+            "userId": "U001",
+            "userName": "张三",
+            "actionType": "add",
+            "objectType": "stock_movement",
+            "objectName": "测试弹窗",
+            "details": "进货 1 个",
+            "ipAddress": "192.168.1.100"
+        },
+        {
+            "id": "LOG1770626012920",
+            "timestamp": "2026-02-09T08:33:32.920Z",
+            "userId": "U001",
+            "userName": "张三",
+            "actionType": "add",
+            "objectType": "product",
+            "objectName": "测试弹窗",
+            "details": "自动创建新商品",
+            "ipAddress": "192.168.1.100"
+        },
+        {
+            "id": "LOG1770626012919",
+            "timestamp": "2026-02-09T08:33:32.919Z",
+            "userId": "U001",
+            "userName": "张三",
+            "actionType": "add",
+            "objectType": "supplier",
+            "objectName": "测试公司",
+            "details": "自动创建新供应商",
+            "ipAddress": "192.168.1.100"
+        },
+        {
+            "id": "LOG1770284342212",
+            "timestamp": "2026-02-05T09:39:02.212Z",
+            "userId": "U001",
+            "userName": "张三",
+            "actionType": "add",
+            "objectType": "stock_movement",
+            "objectName": "fdf",
+            "details": "进货 2 个",
+            "ipAddress": "192.168.1.100"
+        },
+        {
+            "id": "LOG1770284342211",
+            "timestamp": "2026-02-05T09:39:02.211Z",
+            "userId": "U001",
+            "userName": "张三",
+            "actionType": "add",
+            "objectType": "product",
+            "objectName": "fdf",
+            "details": "自动创建新商品",
+            "ipAddress": "192.168.1.100"
+        },
+        {
+            "id": "LOG1770284075749",
+            "timestamp": "2026-02-05T09:34:35.749Z",
+            "userId": "U001",
+            "userName": "张三",
+            "actionType": "add",
+            "objectType": "stock_movement",
+            "objectName": "airpods",
+            "details": "进货 2 个",
+            "ipAddress": "192.168.1.100"
+        },
+        {
+            "id": "LOG1770284075748",
+            "timestamp": "2026-02-05T09:34:35.748Z",
+            "userId": "U001",
+            "userName": "张三",
+            "actionType": "add",
+            "objectType": "product",
+            "objectName": "airpods",
+            "details": "自动创建新商品",
+            "ipAddress": "192.168.1.100"
+        },
+        {
+            "id": "LOG1770284075747",
+            "timestamp": "2026-02-05T09:34:35.747Z",
+            "userId": "U001",
+            "userName": "张三",
+            "actionType": "add",
+            "objectType": "supplier",
+            "objectName": "拼多多",
+            "details": "自动创建新供应商",
+            "ipAddress": "192.168.1.100"
+        },
+        {
+            "id": "LOG1",
+            "timestamp": "2026-01-21T08:31:57.473Z",
+            "userId": "U001",
+            "userName": "张三",
+            "actionType": "add",
+            "objectType": "product",
+            "objectName": "iPhone 13 Pro",
+            "details": "新增商品，数量：50，成本价：6999",
+            "ipAddress": "192.168.1.100"
+        },
+        {
+            "id": "LOG2",
+            "timestamp": "2026-01-20T08:31:57.473Z",
+            "userId": "U002",
+            "userName": "李四",
+            "actionType": "edit",
+            "objectType": "supplier",
+            "objectName": "苹果公司",
+            "details": "更新供应商联系方式",
+            "ipAddress": "192.168.1.101"
+        },
+        {
+            "id": "LOG3",
+            "timestamp": "2026-01-20T08:31:57.473Z",
+            "userId": "U001",
+            "userName": "张三",
+            "actionType": "edit",
+            "objectType": "inventory",
+            "objectName": "MacBook Pro",
+            "details": "入库操作，原数量：20，新数量：35",
+            "ipAddress": "192.168.1.100"
+        },
+        {
+            "id": "LOG4",
+            "timestamp": "2026-01-20T08:31:57.473Z",
+            "userId": "U003",
+            "userName": "王五",
+            "actionType": "delete",
+            "objectType": "product",
+            "objectName": "旧款iPad",
+            "details": "删除商品",
+            "ipAddress": "192.168.1.102"
+        }
+    ]
 }

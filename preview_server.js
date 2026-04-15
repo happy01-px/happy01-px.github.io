@@ -3,6 +3,11 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 8080;
+const HOST = '127.0.0.1';
+const MAX_BODY_SIZE = 10 * 1024 * 1024;
+const LOCAL_HOSTNAMES = new Set(['127.0.0.1', 'localhost']);
+const LOCAL_REMOTE_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+let currentPort = PORT;
 
 // Determine paths for packaged executable vs development
 const isPkg = typeof process.pkg !== 'undefined';
@@ -33,54 +38,144 @@ const mimeTypes = {
   '.wav': 'audio/wav',
   '.mp4': 'video/mp4',
   '.woff': 'application/font-woff',
+  '.woff2': 'font/woff2',
   '.ttf': 'application/font-ttf',
   '.eot': 'application/vnd.ms-fontobject',
   '.otf': 'application/font-otf',
   '.wasm': 'application/wasm'
 };
 
-const server = http.createServer(function (request, response) {
-  console.log('request ', request.url);
+function isLocalHostname(hostname) {
+  return LOCAL_HOSTNAMES.has(hostname);
+}
 
-  // Handle CORS
-  response.setHeader('Access-Control-Allow-Origin', '*');
-  response.setHeader('Access-Control-Request-Method', '*');
+function getHostnameFromHeader(value) {
+  if (!value) return null;
+
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return null;
+  }
+}
+
+function isLocalRequest(request) {
+  const remoteAddress = request.socket.remoteAddress;
+  if (remoteAddress && !LOCAL_REMOTE_ADDRESSES.has(remoteAddress)) {
+    return false;
+  }
+
+  const hostHeader = request.headers.host;
+  if (hostHeader) {
+    const hostName = hostHeader.split(':')[0];
+    if (!isLocalHostname(hostName)) {
+      return false;
+    }
+  }
+
+  const originHostname = getHostnameFromHeader(request.headers.origin);
+  if (request.headers.origin && !originHostname) {
+    return false;
+  }
+  if (originHostname && !isLocalHostname(originHostname)) {
+    return false;
+  }
+
+  const refererHostname = getHostnameFromHeader(request.headers.referer);
+  if (request.headers.referer && !refererHostname) {
+    return false;
+  }
+  if (refererHostname && !isLocalHostname(refererHostname)) {
+    return false;
+  }
+
+  return true;
+}
+
+function applyCorsHeaders(request, response) {
+  const origin = request.headers.origin;
+  const originHostname = getHostnameFromHeader(origin);
+
+  if (origin && originHostname && isLocalHostname(originHostname)) {
+    response.setHeader('Access-Control-Allow-Origin', origin);
+    response.setHeader('Vary', 'Origin');
+  }
+
   response.setHeader('Access-Control-Allow-Methods', 'OPTIONS, GET, POST');
-  response.setHeader('Access-Control-Allow-Headers', '*');
+  response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+function getResponseContentType(contentType) {
+  if (
+    contentType.startsWith('text/') ||
+    contentType === 'application/json' ||
+    contentType === 'text/javascript' ||
+    contentType === 'image/svg+xml'
+  ) {
+    return `${contentType}; charset=utf-8`;
+  }
+
+  return contentType;
+}
+
+const server = http.createServer(function (request, response) {
+  console.log('request ', request.method, request.url);
+
+  if (!isLocalRequest(request)) {
+    response.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('Forbidden');
+    return;
+  }
+
+  applyCorsHeaders(request, response);
 
   if (request.method === 'OPTIONS') {
-    response.writeHead(200);
+    response.writeHead(204);
     response.end();
+    return;
+  }
+
+  if (!['GET', 'POST'].includes(request.method)) {
+    response.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('Method Not Allowed');
     return;
   }
 
   // Handle data saving endpoint
   if (request.url.startsWith('/api/save') && request.method === 'POST') {
     let body = '';
+    let bodyTooLarge = false;
     request.on('data', chunk => {
+      if (bodyTooLarge) return;
       body += chunk.toString();
+      if (body.length > MAX_BODY_SIZE) {
+        bodyTooLarge = true;
+        response.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8' });
+        response.end(JSON.stringify({ success: false, error: 'Payload too large' }));
+        request.destroy();
+      }
     });
     request.on('end', () => {
+      if (bodyTooLarge) return;
+
       try {
         const data = JSON.parse(body);
         
         // Determine target file path in the external data directory
-        let targetSubPath = '/data.json'; // Default legacy
+        let targetFile = path.join(dataBase, 'data.json'); // Default legacy
         const parts = request.url.split('/');
         
         if (parts.length > 3) {
             const tableName = parts[3];
             if (/^[a-zA-Z0-9_]+$/.test(tableName)) {
-                targetSubPath = `/data/${tableName}.json`;
+                targetFile = path.join(dataBase, 'data', `${tableName}.json`);
             } else {
-                response.writeHead(400, { 'Content-Type': 'application/json' });
+                response.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                 response.end(JSON.stringify({ success: false, error: 'Invalid table name' }));
                 return;
             }
         }
 
-        // Construct absolute path using dataBase (ensures writing to disk, not inside exe)
-        const targetFile = path.join(dataBase, targetSubPath);
         const targetDir = path.dirname(targetFile);
 
         // Ensure directory exists
@@ -89,7 +184,7 @@ const server = http.createServer(function (request, response) {
                 fs.mkdirSync(targetDir, { recursive: true });
             } catch (err) {
                 console.error('Error creating directory:', err);
-                response.writeHead(500, { 'Content-Type': 'application/json' });
+                response.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
                 response.end(JSON.stringify({ success: false, error: 'Failed to create directory' }));
                 return;
             }
@@ -99,17 +194,17 @@ const server = http.createServer(function (request, response) {
         fs.writeFile(targetFile, JSON.stringify(data, null, 4), 'utf8', (err) => {
           if (err) {
             console.error(`Error writing to ${targetFile}:`, err);
-            response.writeHead(500, { 'Content-Type': 'application/json' });
+            response.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
             response.end(JSON.stringify({ success: false, error: err.message }));
           } else {
             console.log(`Successfully saved data to ${targetFile}`);
-            response.writeHead(200, { 'Content-Type': 'application/json' });
+            response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             response.end(JSON.stringify({ success: true }));
           }
         });
       } catch (e) {
         console.error('Invalid JSON received:', e);
-        response.writeHead(400, { 'Content-Type': 'application/json' });
+        response.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
         response.end(JSON.stringify({ success: false, error: 'Invalid JSON' }));
       }
     });
@@ -136,14 +231,14 @@ const server = http.createServer(function (request, response) {
   let servePath = null;
   
   if (urlPath.startsWith('/data/')) {
-      const externalPath = path.join(dataBase, urlPath);
+      const externalPath = path.join(dataBase, urlPath.replace(/^\/+/, ''));
       if (fs.existsSync(externalPath)) {
           servePath = externalPath;
       }
   }
 
   if (!servePath) {
-      servePath = path.join(staticBase, urlPath);
+      servePath = path.join(staticBase, urlPath.replace(/^\/+/, ''));
   }
 
   const extname = String(path.extname(servePath)).toLowerCase();
@@ -152,10 +247,10 @@ const server = http.createServer(function (request, response) {
   fs.readFile(servePath, function(error, content) {
     if (error) {
       if(error.code == 'ENOENT') {
-        response.writeHead(404, { 'Content-Type': 'text/plain' });
+        response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
         response.end('404 Not Found: ' + urlPath, 'utf-8');
       } else {
-        response.writeHead(500);
+        response.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
         response.end('Server Error: '+error.code);
       }
     } else {
@@ -164,21 +259,25 @@ const server = http.createServer(function (request, response) {
       response.setHeader('Pragma', 'no-cache');
       response.setHeader('Expires', '0');
       
-      response.writeHead(200, { 'Content-Type': contentType });
+      response.writeHead(200, { 'Content-Type': getResponseContentType(contentType) });
       response.end(content, 'utf-8');
     }
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server running at http://127.0.0.1:${PORT}/`);
+server.listen(currentPort, HOST, () => {
+  console.log(`Server running at http://${HOST}:${currentPort}/`);
 });
 
 server.on('error', (e) => {
   if (e.code === 'EADDRINUSE') {
-    console.log(`Port ${PORT} is in use, retrying on ${PORT + 1}...`);
+    const nextPort = currentPort + 1;
+    console.log(`Port ${currentPort} is in use, retrying on ${nextPort}...`);
     server.close();
-    server.listen(PORT + 1);
+    currentPort = nextPort;
+    server.listen(currentPort, HOST, () => {
+      console.log(`Server running at http://${HOST}:${currentPort}/`);
+    });
   } else {
     console.error(e);
   }

@@ -1,15 +1,15 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>仓库库存管理系统</title>
     <!-- Tailwind CSS v3 -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="lib/tailwindcdn.min.js"></script>
     <!-- Font Awesome -->
-    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <link href="lib/font-awesome/font-awesome.min.css" rel="stylesheet">
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <script src="lib/chart.umd.min.js"></script>
     <!-- Tailwind 配置 -->
     <script src="js/tailwind.config.js"></script>
     <!-- React & ReactDOM (Ant Design 依赖) -->
@@ -23,15 +23,16 @@
     <link href="css/style.css" rel="stylesheet">
 </head>
 
-<body class="bg-gray-100 font-sans antialiased">
+<body class="m-0 bg-gray-100 font-sans antialiased">
     <div class="flex h-screen overflow-hidden">
         <!-- 侧边栏 -->
-        <aside id="desktop-sidebar" class="w-64 bg-dark text-white hidden md:flex flex-col">
-            <div class="h-16 flex items-center justify-center border-b border-gray-700">
-                <h1 class="text-xl font-bold">库存管理系统</h1>
+        <aside id="desktop-sidebar" class="w-48 bg-dark text-white hidden md:flex flex-col">
+            <div class="h-16 flex items-center justify-center border-b border-gray-700 px-3">
+                <h1 class="text-xl font-bold text-center">库存管理系统</h1>
             </div>
-            <nav class="flex-1 overflow-y-auto py-4">
-                <ul class="list-none">
+            <nav class="desktop-antd-menu flex-1 overflow-y-auto py-4">
+                <div id="desktop-sidebar-menu" class="px-2"></div>
+                <ul class="list-none hidden">
                     <li>
                         <a href="#dashboard" class="flex items-center px-6 py-3 text-gray-300 hover:bg-gray-800 hover:text-white transition-all-300 nav-link active" data-target="dashboard">
                             <i class="fa fa-dashboard w-6"></i>
@@ -124,7 +125,7 @@
                         </div>
                         <div class="relative">
                             <button id="user-menu-button" class="flex items-center text-gray-700 hover:text-gray-900">
-                                <img src="https://randomuser.me/api/portraits/men/1.jpg" alt="用户头像" class="h-8 w-8 rounded-full">
+                                <img src="assets/admin-avatar.svg" alt="用户头像" class="h-8 w-8 rounded-full">
                                 <span class="ml-2 hidden md:block">管理员</span>
                                 <i class="fa fa-chevron-down ml-1 text-xs hidden md:block"></i>
                             </button>
@@ -630,159 +631,214 @@
 
                 <!-- 新增出货页面 (Sales Order Page) -->
                 <section id="sales-order" class="page-section hidden">
-                    <!-- Header -->
-                    <div class="mb-6 flex justify-between items-center border-b pb-4">
+                    <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
                         <div class="flex items-center">
-                            <button onclick="document.querySelector('.nav-link[data-target=\'stock-movement\']').click()" class="mr-4 text-gray-500 hover:text-gray-800 transition-colors p-2 rounded-full hover:bg-gray-100 focus:outline-none" title="返回进出货管理">
+                            <button
+                                onclick="showSection('stock-movement')"
+                                class="mr-4 rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 focus:outline-none"
+                                title="返回进出货管理"
+                            >
                                 <i class="fa fa-arrow-left text-xl"></i>
                             </button>
-                            <h2 class="text-2xl font-bold text-gray-800">快捷开单</h2>
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-800">新增出货</h2>
+                                <p class="text-gray-600">按销售出库单格式填写公司、客户和商品信息。</p>
+                            </div>
                         </div>
-                        <div class="flex items-center space-x-6">
-                            <div class="text-sm">
-                                <span class="text-gray-500">业务员：</span>
-                                <span class="font-medium">miaozhang</span>
-                            </div>
-                            <div class="text-sm">
-                                <span class="text-gray-500">销售单号：</span>
-                                <span class="font-medium text-gray-800" id="sales-order-no">XS202505130002</span>
-                            </div>
-                            <div class="bg-blue-50 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">17</div>
+                        <div class="rounded-full bg-blue-50 px-4 py-2 text-sm text-blue-700">
+                            内部单号：<span class="font-semibold" id="sales-order-no">XS000000000000</span>
                         </div>
                     </div>
 
-                    <!-- Customer & Dates Form -->
-                    <div class="bg-white rounded-lg shadow-card p-6 mb-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                            <!-- Left Column -->
-                            <div class="space-y-4">
-                                <div class="flex items-center">
-                                    <label class="w-24 text-sm text-gray-600">客户名称</label>
-                                    <div class="flex-1 relative">
-                                        <input type="text" value="陈老板(13654897562)" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-primary">
+                    <div class="mb-6 rounded-2xl border border-gray-200 bg-white px-4 py-3 md:px-5">
+                        <div class="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">
+                            <div class="flex min-h-[40px] items-center gap-3">
+                                <div id="sales-order-step-1-badge" class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-base font-bold text-white shadow-sm">1</div>
+                                <div class="flex min-h-[40px] min-w-0 flex-col justify-center">
+                                    <div id="sales-order-step-1-text" class="text-[20px] font-semibold text-primary">资料信息</div>
+                                    <div class="text-xs text-gray-500 md:text-sm">填写公司、客户与商品明细</div>
+                                </div>
+                            </div>
+                            <div class="hidden self-center h-px bg-primary/40 lg:block"></div>
+                            <div class="flex min-h-[40px] items-center gap-3">
+                                <div id="sales-order-step-2-badge" class="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-primary/40 bg-white text-base font-bold text-primary/70">2</div>
+                                <div class="flex min-h-[40px] min-w-0 flex-col justify-center">
+                                    <div id="sales-order-step-2-text" class="text-[20px] font-semibold text-primary/60">预览</div>
+                                    <div class="text-xs text-gray-500 md:text-sm">确认打印版式与金额</div>
+                                </div>
+                            </div>
+                            <div class="hidden self-center h-px border-t border-dashed border-primary/30 lg:block"></div>
+                            <div class="flex min-h-[40px] items-center gap-3">
+                                <div id="sales-order-step-3-badge" class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-base font-bold text-primary/60">3</div>
+                                <div class="flex min-h-[40px] min-w-0 flex-col justify-center">
+                                    <div id="sales-order-step-3-text" class="text-[20px] font-semibold text-primary/40">打印送货单</div>
+                                    <div class="text-xs text-gray-500 md:text-sm">后续可直接连接打印机输出</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="sales-order-form-panel" class="rounded-xl border border-gray-200 bg-white p-4 shadow-card md:p-6">
+                        <div class="overflow-x-auto">
+                            <div class="mx-auto min-w-[1220px] max-w-[1220px] border border-gray-300 bg-white text-[15px]" id="sales-order-paper">
+                                <div class="border-b border-gray-300 px-6 py-3 text-center">
+                                    <div class="mx-auto max-w-[520px]">
+                                        <div class="mb-2 text-sm text-gray-500">发货公司</div>
+                                        <div id="sales-order-company-container" class="w-full"></div>
+                                        <input type="hidden" id="sales-order-company-input">
                                     </div>
                                 </div>
-                                <div class="flex items-center">
-                                    <label class="w-24 text-sm text-gray-600">销售日期</label>
-                                    <input type="date" value="2025-05-13" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-primary">
-                                </div>
-                                <div class="flex items-center">
-                                    <label class="w-24 text-sm text-gray-600">送货地址</label>
-                                    <input type="text" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-primary">
-                                </div>
-                            </div>
-                            <!-- Right Column -->
-                            <div class="space-y-4">
-                                <div class="flex items-center justify-end">
-                                    <span class="text-sm text-blue-500 bg-blue-50 px-2 py-1 rounded">累计欠款: 19970.00</span>
-                                    <label class="flex items-center ml-4 text-sm text-gray-600">
-                                        <input type="checkbox" class="mr-1"> 非产品费用
-                                    </label>
-                                </div>
-                                <div class="flex items-center">
-                                    <label class="w-24 text-sm text-gray-600 text-right mr-2">送货日期</label>
-                                    <input type="date" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-primary">
-                                </div>
-                                <div class="flex items-center">
-                                    <label class="w-24 text-sm text-gray-600 text-right mr-2">默认仓库</label>
-                                    <div id="sales-order-warehouse-container" class="w-full"></div>
-                                    <input type="hidden" id="sales-order-warehouse-input" value="总仓库">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- Order Details Toolbar -->
-                    <div class="bg-white rounded-t-lg shadow-card p-4 border-b flex flex-wrap items-center justify-between gap-4">
-                        <div class="flex items-center space-x-4">
-                            <h3 class="font-bold text-blue-600">订单信息</h3>
-                            <label class="flex items-center text-sm text-gray-600"><input type="checkbox" class="mr-1" checked> 货品装箱</label>
-                            <label class="flex items-center text-sm text-gray-600"><input type="checkbox" class="mr-1"> 扫码</label>
-                        </div>
-                        <div class="flex items-center space-x-4 text-sm">
-                            <div class="flex items-center">
-                                <span class="text-gray-600 mr-2">税率</span>
-                                <div class="relative w-16">
-                                    <input type="text" value="0%" class="w-full border border-gray-300 rounded px-2 py-1 text-right">
+                                <div class="grid grid-cols-[1fr_320px] border-b border-gray-300">
+                                    <div class="px-6 py-3 text-center">
+                                        <div class="text-[24px] font-semibold tracking-[0.45em] text-gray-900">销售出库单</div>
+                                    </div>
+                                    <div class="border-l border-gray-300 px-4 py-3">
+                                        <div class="flex items-center gap-3 text-[15px] font-semibold text-gray-900">
+                                            <span class="shrink-0">制单日期：</span>
+                                            <div id="sales-order-date-container" class="min-w-0 flex-1"></div>
+                                            <input type="hidden" id="sales-order-date-input">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-[100px_minmax(0,1fr)_100px_220px_100px_180px] border-b border-gray-300 text-[15px]">
+                                    <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">地址</div>
+                                    <div class="border-r border-gray-300 px-3 py-2.5">
+                                        <input id="sales-company-address-input" type="text" class="w-full border-0 bg-transparent px-0 py-0 text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0">
+                                    </div>
+                                    <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">订货电话</div>
+                                    <div class="border-r border-gray-300 px-3 py-2.5">
+                                        <input id="sales-company-phone-input" type="text" class="w-full border-0 bg-transparent px-0 py-0 text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0">
+                                    </div>
+                                    <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">经手人</div>
+                                    <div class="px-3 py-2.5">
+                                        <input id="sales-company-contact-input" type="text" placeholder="请输入经手人" class="w-full border-0 bg-transparent px-0 py-0 text-center text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0">
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-[100px_minmax(0,1fr)_100px_minmax(0,1fr)] border-b border-gray-300 text-[15px]">
+                                    <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">收货单位</div>
+                                    <div class="border-r border-gray-300 px-3 py-2.5">
+                                        <div class="flex min-h-[36px] items-center">
+                                            <div id="sales-order-customer-container" class="w-full"></div>
+                                        </div>
+                                        <input type="hidden" id="sales-order-customer-input">
+                                    </div>
+                                    <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">收货地址</div>
+                                    <div class="px-3 py-2.5">
+                                        <div class="flex min-h-[36px] items-center">
+                                            <input id="sales-customer-address-input" type="text" class="w-full border-0 bg-transparent px-0 py-0 text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-[100px_minmax(0,1fr)_100px_220px_100px_220px_70px_180px] border-b border-gray-300 text-[15px]">
+                                    <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">收货人</div>
+                                    <div class="border-r border-gray-300 px-3 py-2.5">
+                                        <input id="sales-customer-contact-input" type="text" class="w-full border-0 bg-transparent px-0 py-0 text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0">
+                                    </div>
+                                    <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">电话</div>
+                                    <div class="border-r border-gray-300 px-3 py-2.5">
+                                        <input id="sales-customer-phone-input" type="text" class="w-full border-0 bg-transparent px-0 py-0 text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0">
+                                    </div>
+                                    <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">结款方式</div>
+                                    <div class="border-r border-gray-300 px-3 py-2.5">
+                                        <input id="sales-customer-payment-input" type="text" class="w-full border-0 bg-transparent px-0 py-0 text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0">
+                                    </div>
+                                    <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">NO</div>
+                                    <div class="px-3 py-2.5 font-semibold text-gray-900" id="sales-customer-no">--</div>
+                                </div>
+
+                                <div class="overflow-hidden">
+                                    <table class="w-full table-fixed border-collapse text-[15px]" id="sales-order-table">
+                                        <thead>
+                                            <tr class="bg-gray-50 text-gray-900">
+                                                <th class="w-[70px] border-b border-r border-gray-300 px-2 py-3 text-center font-semibold">序号</th>
+                                                <th class="w-[290px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold">产品名称</th>
+                                                <th class="w-[160px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold">规格</th>
+                                                <th class="w-[100px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold">单位</th>
+                                                <th class="w-[140px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold">出库数量</th>
+                                                <th class="w-[170px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold">未税单价(RMB)</th>
+                                                <th class="w-[170px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold">金额(RMB)</th>
+                                                <th class="border-b border-gray-300 px-3 py-3 text-center font-semibold">备注</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="sales-order-table-body"></tbody>
+                                        <tfoot>
+                                            <tr class="bg-gray-50">
+                                                <td colspan="2" class="border-t border-r border-gray-300 px-4 py-3 text-center text-[16px] font-semibold text-gray-900">合计金额：</td>
+                                                <td colspan="2" class="border-t border-r border-gray-300 px-4 py-3 text-center text-[16px] font-semibold text-gray-900" id="sales-order-total-amount-display">¥0.00</td>
+                                                <td class="border-t border-r border-gray-300 px-4 py-3 text-center text-[16px] font-semibold text-gray-900">大写</td>
+                                                <td colspan="3" class="border-t border-gray-300 px-4 py-3 text-center text-[16px] font-semibold text-gray-900" id="sales-order-total-amount-uppercase">人民币零元整</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <div class="border-t border-gray-300 px-4 py-3">
+                                    <button type="button" class="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800" onclick="addSalesOrderRow()">
+                                        <i class="fa fa-plus mr-2"></i> 添加产品
+                                    </button>
+                                </div>
+
+                                <div class="grid grid-cols-[100px_minmax(0,1fr)] border-t border-gray-300">
+                                    <div class="flex items-center justify-center border-r border-gray-300 px-4 py-3 text-center text-[18px] font-semibold text-gray-900">协议</div>
+                                    <div class="px-4 py-3 text-[15px] leading-7 text-gray-900" id="sales-order-agreement-text"></div>
+                                </div>
+
+                                <div class="border-t border-gray-300 px-4 py-2.5 text-[15px] leading-7 text-gray-900" id="sales-order-note-text"></div>
+
+                                <div class="grid grid-cols-2 border-t border-gray-300">
+                                    <div class="flex min-h-[120px] items-end border-r border-gray-300 px-8 py-4 text-[24px] leading-[1.65] text-gray-900">
+                                        <div>
+                                            发货单位<br>
+                                            及经手人（签章）
+                                        </div>
+                                    </div>
+                                    <div class="flex min-h-[120px] items-end px-8 py-4 text-[24px] leading-[1.65] text-gray-900">
+                                        <div>
+                                            收货单位<br>
+                                            及经手人（签章）
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="flex items-center">
-                                <span class="text-gray-600 mr-2">订单金额:</span>
-                                <span class="font-bold text-gray-800" id="order-total-amount">0.00</span>
-                            </div>
-                            <div class="flex items-center">
-                                <span class="text-gray-600 mr-2">优惠金额</span>
-                                <input type="text" value="0.00" class="w-20 border border-gray-300 rounded px-2 py-1 text-right">
-                            </div>
-                            <div class="text-lg font-bold text-gray-800">合同金额: <span id="contract-amount">0.00</span></div>
                         </div>
-                    </div>
 
-                    <!-- Product Table -->
-                    <div class="bg-white shadow-card overflow-x-auto min-h-[400px]">
-                        <table class="min-w-full divide-y divide-gray-200" id="sales-order-table">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 tracking-wider w-10">#</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 tracking-wider w-[20%]">产品</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 tracking-wider">条形码</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 tracking-wider">规格型号</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 tracking-wider">库存数量</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 tracking-wider">单价</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 tracking-wider">金额</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 tracking-wider">送货数量 <span class="text-red-500">*</span></th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 tracking-wider">仓库</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 tracking-wider w-[20%]">备注</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 tracking-wider">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200 text-sm" id="sales-order-table-body">
-                                <!-- Dynamic Rows -->
-                            </tbody>
-                            <tfoot class="bg-gray-50 font-medium">
-                                <tr>
-                                    <td colspan="5" class="px-3 py-2 text-right">合计</td>
-                                    <td class="px-3 py-2" id="total-qty">0</td>
-                                    <td></td>
-                                    <td class="px-3 py-2" id="total-amount">0.00</td>
-                                    <td class="px-3 py-2" id="total-delivery-qty">0</td>
-                                    <td colspan="3"></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                        <div class="p-4 border-t">
-                            <button type="button" class="text-blue-600 hover:text-blue-800 flex items-center" onclick="addSalesOrderRow()">
-                                <i class="fa fa-plus mr-1"></i> 添加产品
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Footer Action Bar -->
-                    <div class="bg-white rounded-b-lg shadow-card p-4 mt-4 flex justify-between items-center border-t">
-                        <div class="flex items-center space-x-6 text-sm">
-                            <div>
-                                <span class="text-gray-600">收款信息</span>
-                            </div>
-                            <div>
-                                <span class="text-gray-500">已送货:</span>
-                                <span class="text-gray-800" id="delivered-amount">0.00</span>
-                            </div>
-                            <div>
-                                <span class="text-gray-500">已收款:</span>
-                                <span class="text-gray-800">0.00</span>
-                            </div>
-                            <div>
-                                <span class="text-gray-500">未收款:</span>
-                                <span class="text-blue-600 border-b border-blue-600" id="unreceived-amount">0.00</span>
-                            </div>
-                        </div>
-                        <div class="flex items-center space-x-4">
-                            <label class="flex items-center text-sm text-gray-600"><input type="checkbox" class="mr-1"> 使用预收款冲销!</label>
-                            <button class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded shadow transition-colors" onclick="cancelSalesOrder()">
+                        <div class="mt-5 flex items-center justify-end gap-3">
+                            <button type="button" class="rounded-lg bg-gray-200 px-4 py-2 text-gray-800 transition-all-300 hover:bg-gray-300" onclick="cancelSalesOrder()">
                                 取消
                             </button>
-                            <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded shadow transition-colors" onclick="submitSalesOrder()">
-                                收款
+                            <button type="button" class="rounded-lg bg-primary px-5 py-2 text-white transition-all-300 hover:bg-primary-dark" onclick="goToSalesOrderPreview()">
+                                下一步
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="sales-order-preview-panel" class="hidden rounded-xl border border-gray-200 bg-white p-4 shadow-card md:p-6">
+                        <div class="mb-4 flex items-center justify-between gap-4">
+                            <div>
+                                <h3 class="text-xl font-semibold text-gray-900">送货单预览</h3>
+                                <p class="text-sm text-gray-500">当前预览内容将作为后续打印输出的基础版式。</p>
+                            </div>
+                            <div class="rounded-full bg-blue-50 px-3 py-1.5 text-sm text-blue-700">
+                                打印预览准备中
+                            </div>
+                        </div>
+
+                        <div class="border-y border-gray-100 py-5">
+                            <div class="overflow-x-auto">
+                                <div id="sales-order-preview-content" class="mx-auto min-w-[1220px] max-w-[1220px]"></div>
+                            </div>
+                        </div>
+
+                        <div class="mt-5 flex items-center justify-between gap-3">
+                            <button type="button" class="rounded-lg bg-gray-200 px-4 py-2 text-gray-800 transition-all-300 hover:bg-gray-300" onclick="goToSalesOrderForm()">
+                                上一步
+                            </button>
+                            <button type="button" class="rounded-lg bg-primary px-5 py-2 text-white transition-all-300 hover:bg-primary-dark" onclick="submitSalesOrder()">
+                                提交出库
                             </button>
                         </div>
                     </div>
@@ -1835,7 +1891,7 @@
 
     <!-- 模态框 -->
     <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
-        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
+        <div id="modal-panel" class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
             <div class="flex items-center justify-between p-4 border-b border-gray-200">
                 <h3 class="text-lg font-semibold text-gray-800" id="modal-title">模态框标题</h3>
                 <button id="close-modal" class="text-gray-400 hover:text-gray-500">
@@ -1856,6 +1912,14 @@
         </div>
     </div>
 
+    <script src="js/modules/app-utils.js"></script>
+    <script src="js/modules/app-state.js"></script>
+    <script src="js/modules/data-store.js"></script>
+    <script src="js/modules/master-data-module.js"></script>
+    <script src="js/modules/stock-module.js"></script>
+    <script src="js/modules/logs-module.js"></script>
+    <script src="js/modules/settings-module.js"></script>
     <script src="js/script.js"></script>
     <script src="js/sales-order.js"></script>
+</body>
 </html>
