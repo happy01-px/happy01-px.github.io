@@ -394,6 +394,97 @@
         }));
     }
 
+    function getProductStockText(product) {
+        if (!product) return '';
+        const stockQuantity = parseNumber(product.stockQuantity);
+        const unit = product.unit || '个';
+        return `当前库存：${stockQuantity} ${unit}`;
+    }
+
+    function getProductStockClassName(product) {
+        if (!product) return 'text-gray-500';
+
+        const stockQuantity = parseNumber(product.stockQuantity);
+        const minStock = parseNumber(product.minStock);
+
+        if (stockQuantity <= 0) return 'text-red-600';
+        if (stockQuantity <= minStock) return 'text-orange-500';
+        return 'text-green-600';
+    }
+
+    function normalizeQuantityInput(value) {
+        const raw = String(value ?? '').trim();
+        if (!raw) return '';
+
+        const cleaned = raw.replace(/[^\d.]/g, '');
+        if (!cleaned) return '';
+
+        const [integerPartRaw = '', decimalPartRaw = ''] = cleaned.split('.');
+        const integerPart = integerPartRaw.replace(/^0+(?=\d)/, '') || (decimalPartRaw ? '0' : integerPartRaw);
+        const decimalPart = decimalPartRaw.slice(0, 2);
+
+        return decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
+    }
+
+    function renderSalesOrderQuantityInput(rowId) {
+        const container = document.getElementById(`sales-order-item-qty-container-${rowId}`);
+        const hiddenInput = document.getElementById(`sales-order-item-qty-${rowId}`);
+        const item = currentSalesOrder.items.find(entry => entry.id === rowId);
+        if (!container || !hiddenInput || !item) return;
+
+        if (!global.React || !global.ReactDOM || !global.antd) {
+            container.innerHTML = `
+                <input
+                    type="text"
+                    class="w-full border-0 bg-transparent px-0 py-0 text-center text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0"
+                    value="${escapeHTML(item.quantity)}"
+                >
+            `;
+            return;
+        }
+
+        const React = global.React;
+        const ReactDOM = global.ReactDOM;
+        const InputNumber = global.antd.InputNumber;
+
+        const App = () => {
+            const [value, setValue] = React.useState(item.quantity === '' ? null : String(item.quantity));
+
+            React.useEffect(() => {
+                setValue(item.quantity === '' ? null : String(item.quantity));
+            }, [item.quantity]);
+
+            const handleChange = nextValue => {
+                const normalizedValue = normalizeQuantityInput(nextValue);
+                const displayValue = normalizedValue === '' ? null : normalizedValue;
+
+                setValue(displayValue);
+                hiddenInput.value = normalizedValue;
+                updateRowField(rowId, 'quantity', normalizedValue);
+            };
+
+            return React.createElement(InputNumber, {
+                controls: false,
+                stringMode: true,
+                min: '0',
+                step: '0.01',
+                placeholder: '请输入',
+                value,
+                parser: input => normalizeQuantityInput(input),
+                formatter: input => (input === null || input === undefined ? '' : String(input)),
+                onChange: handleChange,
+                style: { width: '100%' },
+                className: 'sales-order-qty-input-number'
+            });
+        };
+
+        if (!container._reactRoot) {
+            container._reactRoot = ReactDOM.createRoot(container);
+        }
+
+        container._reactRoot.render(React.createElement(App));
+    }
+
     function syncRowAmount(rowId) {
         const item = currentSalesOrder.items.find(entry => entry.id === rowId);
         const amountNode = document.getElementById(`sales-order-item-amount-${rowId}`);
@@ -416,6 +507,8 @@
             item.spec = '-';
             item.unit = '-';
             item.price = '';
+            item.quantity = '';
+            item.remark = '';
         } else {
             item.productName = product.name || '';
             item.spec = product.category || '-';
@@ -426,10 +519,23 @@
         const specNode = document.getElementById(`sales-order-item-spec-${rowId}`);
         const unitNode = document.getElementById(`sales-order-item-unit-${rowId}`);
         const priceInput = document.getElementById(`sales-order-item-price-${rowId}`);
+        const qtyInput = document.getElementById(`sales-order-item-qty-${rowId}`);
+        const remarkInput = document.getElementById(`sales-order-item-remark-${rowId}`);
+        const stockHintNode = document.getElementById(`sales-order-item-stock-${rowId}`);
 
         if (specNode) specNode.textContent = item.spec || '-';
         if (unitNode) unitNode.textContent = item.unit || '-';
         if (priceInput) priceInput.value = item.price || '';
+        if (qtyInput) qtyInput.value = item.quantity || '';
+        if (remarkInput) remarkInput.value = item.remark || '';
+        if (stockHintNode) {
+            stockHintNode.textContent = product ? getProductStockText(product) : '';
+            stockHintNode.classList.toggle('hidden', !product);
+            stockHintNode.className = product
+                ? `mt-1 text-left text-xs ${getProductStockClassName(product)}`
+                : 'hidden mt-1 text-left text-xs text-gray-500';
+        }
+        renderSalesOrderQuantityInput(rowId);
 
         syncRowAmount(rowId);
     }
@@ -443,15 +549,8 @@
     }
 
     function bindRowInputs(rowId) {
-        const qtyInput = document.getElementById(`sales-order-item-qty-${rowId}`);
         const priceInput = document.getElementById(`sales-order-item-price-${rowId}`);
         const remarkInput = document.getElementById(`sales-order-item-remark-${rowId}`);
-
-        if (qtyInput) {
-            qtyInput.addEventListener('input', event => {
-                updateRowField(rowId, 'quantity', event.target.value);
-            });
-        }
 
         if (priceInput) {
             priceInput.addEventListener('input', event => {
@@ -486,12 +585,14 @@
                 <td class="border-r border-gray-300 px-2 py-3 text-center">${index + 1}</td>
                 <td class="border-r border-gray-300 px-3 py-2">
                     <div id="${productContainerId}" class="w-full"></div>
+                    <div id="sales-order-item-stock-${item.id}" class="${item.productId ? `mt-1 text-left text-xs ${getProductStockClassName(findProductById(item.productId))}` : 'hidden mt-1 text-left text-xs text-gray-500'}">${escapeHTML(getProductStockText(findProductById(item.productId)))}</div>
                     <input type="hidden" id="${productInputId}" value="${escapeHTML(item.productId)}">
                 </td>
                 <td class="border-r border-gray-300 px-3 py-3 text-center" id="sales-order-item-spec-${item.id}">${escapeHTML(item.spec || '-')}</td>
                 <td class="border-r border-gray-300 px-3 py-3 text-center" id="sales-order-item-unit-${item.id}">${escapeHTML(item.unit || '-')}</td>
                 <td class="border-r border-gray-300 px-3 py-2">
-                    <input id="${qtyInputId}" type="number" min="0" step="1" class="w-full border-0 bg-transparent px-0 py-0 text-center text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0" value="${escapeHTML(item.quantity)}">
+                    <div id="sales-order-item-qty-container-${item.id}" class="w-full"></div>
+                    <input type="hidden" id="${qtyInputId}" value="${escapeHTML(item.quantity)}">
                 </td>
                 <td class="border-r border-gray-300 px-3 py-2">
                     <input id="${priceInputId}" type="number" min="0" step="0.01" class="w-full border-0 bg-transparent px-0 py-0 text-center text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0" value="${escapeHTML(item.price)}">
@@ -526,6 +627,7 @@
                 );
             }
 
+            renderSalesOrderQuantityInput(item.id);
             bindRowInputs(item.id);
         });
 
@@ -654,9 +756,9 @@
                     <div class="mt-2 text-[18px] font-semibold text-gray-900">${escapeHTML(safePayload.companyName || '-')}</div>
                 </div>
 
-                <div class="grid grid-cols-[1fr_320px] border-b border-gray-300">
+                <div class="grid grid-cols-[1fr_260px] border-b border-gray-300">
                     <div class="px-6 py-3 text-center">
-                        <div class="text-[24px] font-semibold tracking-[0.45em] text-gray-900">销售出库单</div>
+                        <div class="pr-20 text-[24px] font-semibold tracking-[0.45em] text-gray-900">销售出库单</div>
                     </div>
                     <div class="border-l border-gray-300 px-4 py-3">
                         <div class="flex items-center gap-3 text-[15px] font-semibold text-gray-900">

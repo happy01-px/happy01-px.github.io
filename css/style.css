@@ -98,3 +98,34 @@ body {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+#sales-order .sales-order-qty-input-number.ant-input-number {
+    width: 100% !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    min-height: 36px !important;
+}
+
+#sales-order .sales-order-qty-input-number.ant-input-number-focused {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12) !important;
+}
+
+#sales-order .sales-order-qty-input-number .ant-input-number-input-wrap {
+    height: 100%;
+}
+
+#sales-order .sales-order-qty-input-number .ant-input-number-input {
+    height: 34px !important;
+    padding: 0 10px !important;
+    text-align: center !important;
+    font-size: 15px !important;
+    color: #111827 !important;
+    background: #ffffff !important;
+}
+
+#sales-order .sales-order-qty-input-number .ant-input-number-handler-wrap {
+    display: none !important;
+}
