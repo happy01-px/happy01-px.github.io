@@ -129,3 +129,18 @@ body {
 #sales-order .sales-order-qty-input-number .ant-input-number-handler-wrap {
     display: none !important;
 }
+
+#sales-order .sales-order-company-select .ant-select-selector {
+    min-height: 42px !important;
+}
+
+#sales-order .sales-order-company-select .ant-select-selection-item {
+    font-size: 24px !important;
+    font-weight: 600 !important;
+    line-height: 1.2 !important;
+    text-align: center !important;
+}
+
+#sales-order .sales-order-company-select .ant-select-selection-placeholder {
+    text-align: center !important;
+}

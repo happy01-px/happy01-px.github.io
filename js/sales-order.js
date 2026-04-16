@@ -298,6 +298,7 @@
             {
                 placeholder: '搜索并选择发货公司',
                 value: currentSalesOrder.companyId || undefined,
+                className: 'sales-order-company-select',
                 listHeight: 160,
                 dropdownStyle: { maxHeight: 176 }
             },
@@ -752,8 +753,7 @@
         return `
             <div class="mx-auto min-w-[1220px] max-w-[1220px] border border-gray-300 bg-white text-[15px]">
                 <div class="border-b border-gray-300 px-6 py-3 text-center">
-                    <div class="text-sm text-gray-500">发货公司</div>
-                    <div class="mt-2 text-[18px] font-semibold text-gray-900">${escapeHTML(safePayload.companyName || '-')}</div>
+                    <div class="text-[24px] font-semibold text-gray-900">${escapeHTML(safePayload.companyName || '-')}</div>
                 </div>
 
                 <div class="grid grid-cols-[1fr_260px] border-b border-gray-300">
@@ -762,8 +762,8 @@
                         <span class="inline-block" style="transform: translateX(140px);">销售出库单</span>
                         </div>
                     </div>
-                    <div class="border-l border-gray-300 px-4 py-3">
-                        <div class="flex items-center gap-3 text-[15px] font-semibold text-gray-900">
+                    <div class="border-l border-gray-300 px-4 py-3 flex items-center justify-center">
+                        <div class="flex w-full items-center justify-center gap-3 text-[15px] font-semibold text-gray-900">
                             <span class="shrink-0">制单日期：</span>
                             <span>${escapeHTML(formatCompactDate(safePayload.issueDate))}</span>
                         </div>
