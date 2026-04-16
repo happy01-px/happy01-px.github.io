@@ -669,7 +669,7 @@
     }
 
     function updateInventoryTable() {
-        const tbody = document.querySelector('#inventory tbody');
+        const tbody = document.getElementById('inventory-table-body');
         if (!tbody) return;
 
         const companyFilterEl = document.getElementById('filter-company');
@@ -1505,7 +1505,7 @@
     }
 
     function updateSupplierTable() {
-        const tbody = document.querySelector('#suppliers tbody');
+        const tbody = document.getElementById('suppliers-table-body');
         if (!tbody) return;
 
         tbody.innerHTML = '';

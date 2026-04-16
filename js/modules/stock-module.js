@@ -101,7 +101,7 @@
     }
 
     function renderDashboardActivity() {
-        const tbody = document.querySelector('#dashboard-activity-table tbody');
+        const tbody = document.getElementById('dashboard-activity-table-body');
         if (!tbody) return;
 
         tbody.innerHTML = '';

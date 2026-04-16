@@ -1210,8 +1210,265 @@ function initLogFilters() {
     });
 }
 
+let activeBillsTab = 'customer';
+
+const BILL_TAB_LABELS = {
+    customer: '客户',
+    supplier: '供应商',
+    payment: '付款对象'
+};
+
+function normalizeBillsSectionCopy() {
+    const billsSection = document.getElementById('bills');
+    if (!billsSection) return;
+
+    const headerBlock = billsSection.querySelector('.mb-6.flex.justify-between.items-center');
+    if (headerBlock) {
+        const title = headerBlock.querySelector('h2');
+        const description = headerBlock.querySelector('p');
+        const actionButton = headerBlock.querySelector('button');
+
+        if (title) title.textContent = '对账单系统';
+        if (description) description.textContent = '管理所有客户和供应商对账单';
+        if (actionButton) actionButton.innerHTML = '<i class="fa fa-plus mr-2"></i> 新增对账单';
+    }
+
+    const tabs = billsSection.querySelectorAll('#bills-tabs button');
+    tabs.forEach(tab => {
+        const tabName = tab.getAttribute('data-tab');
+        if (tabName === 'customer') tab.textContent = '客户对账单';
+        if (tabName === 'supplier') tab.textContent = '供应商对账单';
+        if (tabName === 'payment') tab.textContent = '付款计划';
+    });
+
+    const filterLabel = document.getElementById('bills-filter-party-label');
+    const statusLabel = document.querySelector('#bills-filter-status-container')?.previousElementSibling;
+    const dateLabel = document.querySelector('#bills-date-range-picker-container')?.previousElementSibling;
+    const searchLabel = document.querySelector('#bills-filter-search-container')?.previousElementSibling;
+
+    if (filterLabel) filterLabel.textContent = getActiveBillPartyLabel();
+    if (statusLabel) statusLabel.textContent = '对账状态';
+    if (dateLabel) dateLabel.textContent = '日期范围';
+    if (searchLabel) searchLabel.textContent = '搜索';
+
+    const headers = billsSection.querySelectorAll('table thead th');
+    if (headers[0]) headers[0].textContent = '对账单编号';
+    if (headers[1]) headers[1].textContent = getActiveBillPartyLabel();
+    if (headers[2]) headers[2].textContent = '对账期间';
+    if (headers[3]) headers[3].textContent = '账单金额';
+    if (headers[4]) headers[4].textContent = '状态';
+    if (headers[5]) headers[5].textContent = '创建与更新';
+    if (headers[6]) headers[6].textContent = '操作';
+}
+
+function getActiveBillPartyLabel() {
+    return BILL_TAB_LABELS[activeBillsTab] || '客户';
+}
+
+function normalizeBillStatus(status) {
+    if (status === 'paid' || status === 'verified' || status === 'pending') {
+        return status;
+    }
+    if (status === 'created') return 'pending';
+    return 'pending';
+}
+
+function formatBillAmount(amount) {
+    return `¥${parseNumber(amount).toLocaleString('zh-CN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    })}`;
+}
+
+function formatBillPeriod(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const formatted = date.toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).replace(/\//g, '-');
+    return `${formatted} 至 ${formatted}`;
+}
+
+function formatBillDateTime(value) {
+    if (!value) return '-';
+
+    const rawValue = String(value).trim();
+    const normalizedValue = /^\d{4}-\d{2}-\d{2}$/.test(rawValue)
+        ? `${rawValue}T00:00:00`
+        : rawValue;
+
+    const date = new Date(normalizedValue);
+    if (Number.isNaN(date.getTime())) return rawValue;
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function getBillUserInitial(name) {
+    const normalizedName = String(name || '').trim();
+    if (!normalizedName) return '管';
+    return normalizedName.charAt(0).toUpperCase();
+}
+
+function buildSupplierBillsData() {
+    if (!mockData.bills) mockData.bills = [];
+
+    const fallbackBills = [
+        { id: 'BILL-2023-0001', supplierName: '苹果公司', period: '2023-06-01 至 2023-06-30', amount: '¥250,000', status: 'paid', createdAt: '2023-07-05' },
+        { id: 'BILL-2023-0002', supplierName: '三星电子', period: '2023-06-01 至 2023-06-30', amount: '¥180,000', status: 'verified', createdAt: '2023-07-08' },
+        { id: 'BILL-2023-0003', supplierName: '华为技术', period: '2023-06-01 至 2023-06-30', amount: '¥210,000', status: 'pending', createdAt: '2023-07-10' },
+        { id: 'BILL-2023-0004', supplierName: '苹果公司', period: '2023-07-01 至 2023-07-15', amount: '¥150,000', status: 'pending', createdAt: '2023-07-18' }
+    ];
+
+    return (mockData.bills.length > 0 ? mockData.bills : fallbackBills).map(bill => {
+        const amountValue = parseNumber(String(bill.amount || '').replace(/[^\d.-]/g, ''));
+        return {
+            id: bill.id,
+            partyName: bill.supplierName || '-',
+            period: bill.period || formatBillPeriod(bill.createdAt),
+            amount: bill.amount || formatBillAmount(amountValue),
+            status: normalizeBillStatus(bill.status),
+            createdAt: bill.createdAt || new Date(),
+            updatedAt: bill.updatedAt || bill.createdAt || new Date()
+        };
+    });
+}
+
+function buildCustomerBillsData() {
+    const notes = (mockData.deliveryNotes || []).filter(note => note && (note.type === 'sales' || note.customerId || note.customerName));
+
+    if (notes.length === 0) {
+        const fallbackCustomers = [
+            ...((mockData.customers || []).slice(0, 4)),
+            ...(((window.defaultMockData && window.defaultMockData.customers) || []).slice(0, 4))
+        ];
+
+        const uniqueCustomers = fallbackCustomers.filter((customer, index, list) => {
+            const id = customer && customer.id;
+            return !!customer && list.findIndex(item => item && item.id === id) === index;
+        });
+
+        const customerSource = uniqueCustomers.length > 0
+            ? uniqueCustomers
+            : [
+                { id: 'C001', name: '京东商城', createdAt: '2023-01-05', updatedAt: '2023-06-05' },
+                { id: 'C002', name: '天猫商城', createdAt: '2023-02-05', updatedAt: '2023-06-05' },
+                { id: 'C003', name: '苏宁易购', createdAt: '2023-03-05', updatedAt: '2023-06-05' }
+            ];
+
+        return customerSource.map((customer, index) => ({
+            id: `CUS-BILL-${String(index + 1).padStart(4, '0')}`,
+            partyName: customer.name || '-',
+            period: formatBillPeriod(customer.updatedAt || customer.createdAt || new Date()),
+            amount: formatBillAmount(0),
+            status: 'pending',
+            createdAt: customer.createdAt || new Date(),
+            updatedAt: customer.updatedAt || customer.createdAt || new Date()
+        }));
+    }
+
+    return notes.map((note, index) => ({
+        id: note.orderNo || note.id || `CUS-BILL-${String(index + 1).padStart(4, '0')}`,
+        partyName: note.customerName || '-',
+        period: formatBillPeriod(note.issueDate || note.deliveryDate || note.createdAt),
+        amount: formatBillAmount(note.totalAmount || 0),
+        status: normalizeBillStatus(note.status),
+        createdAt: note.createdAt || note.issueDate || new Date(),
+        updatedAt: note.updatedAt || note.createdAt || note.issueDate || new Date()
+    }));
+}
+
+function getBillsDataSource() {
+    if (activeBillsTab === 'supplier') {
+        return buildSupplierBillsData();
+    }
+    if (activeBillsTab === 'payment') {
+        return [];
+    }
+    return buildCustomerBillsData();
+}
+
+function updateBillsSectionLabels() {
+    normalizeBillsSectionCopy();
+
+    const filterLabel = document.getElementById('bills-filter-party-label');
+    const partyColumnTitle = document.getElementById('bills-party-column-title');
+    const label = getActiveBillPartyLabel();
+
+    if (filterLabel) filterLabel.textContent = label;
+    if (partyColumnTitle) partyColumnTitle.textContent = label;
+}
+
+function renderBillPartyFilter() {
+    const container = document.getElementById('bills-filter-supplier-container');
+    const hiddenInput = document.getElementById('bills-filter-supplier');
+    if (!container || !hiddenInput) return;
+
+    if (!window.antd || !window.React || !window.ReactDOM || !window.renderAntdSelect) {
+        return;
+    }
+
+    const options = activeBillsTab === 'supplier'
+        ? (mockData.suppliers || []).map(item => ({ value: item.name, label: item.name }))
+        : activeBillsTab === 'customer'
+            ? (mockData.customers || []).map(item => ({ value: item.name, label: item.name }))
+            : [];
+
+    renderAntdSelect(
+        'bills-filter-supplier-container',
+        'bills-filter-supplier',
+        options,
+        `全部${getActiveBillPartyLabel()}`,
+        () => {
+            paginationState.bills.page = 1;
+            updateBillsTable();
+        }
+    );
+}
+
+function bindBillTabEvents() {
+    const tabs = document.querySelectorAll('#bills-tabs button');
+    if (!tabs.length) return;
+
+    tabs.forEach(tab => {
+        if (tab.dataset.bound === 'true') return;
+        tab.dataset.bound = 'true';
+
+        tab.addEventListener('click', function onBillTabClick() {
+            tabs.forEach(item => {
+                item.classList.remove('border-primary', 'text-primary', 'active');
+                item.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+            });
+
+            this.classList.add('border-primary', 'text-primary', 'active');
+            this.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
+
+            activeBillsTab = this.getAttribute('data-tab') || 'customer';
+            paginationState.bills.page = 1;
+
+            const partyFilter = document.getElementById('bills-filter-supplier');
+            if (partyFilter) partyFilter.value = '';
+
+            updateBillsSectionLabels();
+            renderBillPartyFilter();
+            updateBillsTable();
+        });
+    });
+}
+
 // 初始化对账单筛选器
 function initBillFilters() {
+    normalizeBillsSectionCopy();
+
     const searchFilter = document.getElementById('bills-filter-search');
 
     const statusOptions = [
@@ -1221,17 +1478,13 @@ function initBillFilters() {
     ];
 
     const initSelects = () => {
-        if (!window.antd || !window.React || !window.ReactDOM || !mockData.suppliers) {
+        if (!window.antd || !window.React || !window.ReactDOM) {
             setTimeout(initSelects, 100);
             return;
         }
 
-        const supplierOptions = mockData.suppliers.map(s => ({ value: s.name, label: s.name }));
-
-        renderAntdSelect('bills-filter-supplier-container', 'bills-filter-supplier', supplierOptions, '全部供应商', () => {
-            paginationState.bills.page = 1;
-            updateBillsTable();
-        });
+        updateBillsSectionLabels();
+        renderBillPartyFilter();
 
         renderAntdSelect('bills-filter-status-container', 'bills-filter-status', statusOptions, '全部状态', () => {
             paginationState.bills.page = 1;
@@ -1240,7 +1493,8 @@ function initBillFilters() {
     };
     initSelects();
 
-    if (searchFilter) {
+    if (searchFilter && !searchFilter.dataset.bound) {
+        searchFilter.dataset.bound = 'true';
         const handler = () => {
             paginationState.bills.page = 1;
             updateBillsTable();
@@ -1255,37 +1509,25 @@ function updateBillsTable() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    // 获取筛选条件
-    const supplierFilter = document.getElementById('bills-filter-supplier') ? document.getElementById('bills-filter-supplier').value : '';
+    updateBillsSectionLabels();
+
+    const partyFilter = document.getElementById('bills-filter-supplier') ? document.getElementById('bills-filter-supplier').value : '';
     const statusFilter = document.getElementById('bills-filter-status') ? document.getElementById('bills-filter-status').value : '';
     const dateStartFilter = document.getElementById('bills-filter-date-start') ? document.getElementById('bills-filter-date-start').value : '';
     const dateEndFilter = document.getElementById('bills-filter-date-end') ? document.getElementById('bills-filter-date-end').value : '';
     const searchFilter = document.getElementById('bills-filter-search') ? document.getElementById('bills-filter-search').value.toLowerCase().trim() : '';
 
-    // 确保 mockData.bills 存在
-    if (!mockData.bills) mockData.bills = [];
-    
-    const billsDataSource = mockData.bills.length > 0 ? mockData.bills : [
-        { id: 'BILL-2023-0001', supplierName: '苹果公司', period: '2023-06-01 至 2023-06-30', amount: '¥250,000', status: 'paid', createdAt: '2023-07-05' },
-        { id: 'BILL-2023-0002', supplierName: '三星电子', period: '2023-06-01 至 2023-06-30', amount: '¥180,000', status: 'verified', createdAt: '2023-07-08' },
-        { id: 'BILL-2023-0003', supplierName: '华为技术', period: '2023-06-01 至 2023-06-30', amount: '¥210,000', status: 'pending', createdAt: '2023-07-10' },
-        { id: 'BILL-2023-0004', supplierName: '苹果公司', period: '2023-07-01 至 2023-07-15', amount: '¥150,000', status: 'pending', createdAt: '2023-07-18' }
-    ];
-
-    let filteredBills = billsDataSource.filter(bill => {
-        // 供应商筛选
-        if (supplierFilter && bill.supplierName !== supplierFilter) return false;
-        
-        // 状态筛选
+    let filteredBills = getBillsDataSource().filter(bill => {
+        if (partyFilter && bill.partyName !== partyFilter) return false;
         if (statusFilter && bill.status !== statusFilter) return false;
 
-        // 日期范围筛选
         if (dateStartFilter) {
             const billDate = new Date(bill.createdAt);
             const startDate = new Date(dateStartFilter);
             if (!dateStartFilter.includes(':')) startDate.setHours(0, 0, 0, 0);
             if (billDate < startDate) return false;
         }
+
         if (dateEndFilter) {
             const billDate = new Date(bill.createdAt);
             const endDate = new Date(dateEndFilter);
@@ -1293,24 +1535,19 @@ function updateBillsTable() {
             if (billDate > endDate) return false;
         }
 
-        // 搜索筛选
         if (searchFilter) {
-            const searchStr = searchFilter.toLowerCase();
-            return (bill.id && bill.id.toLowerCase().includes(searchStr)) || 
-                   (bill.supplierName && bill.supplierName.toLowerCase().includes(searchStr));
+            return (bill.id && String(bill.id).toLowerCase().includes(searchFilter)) ||
+                   (bill.partyName && String(bill.partyName).toLowerCase().includes(searchFilter));
         }
 
         return true;
     });
-    
-    // 按创建时间倒序
+
     filteredBills.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     paginationState.bills.total = filteredBills.length;
-
     let { page, pageSize } = paginationState.bills;
 
-    // 如果当前页超出了总页数，且总页数大于0，则重置为最后一页
     const totalPages = Math.ceil(filteredBills.length / pageSize);
     if (page > totalPages && totalPages > 0) {
         paginationState.bills.page = totalPages;
@@ -1322,7 +1559,8 @@ function updateBillsTable() {
     const paginatedBills = filteredBills.slice(startIndex, endIndex);
 
     if (paginatedBills.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">暂无对账单记录</td></tr>';
+        const emptyText = activeBillsTab === 'payment' ? '暂无付款计划记录' : '暂无对账单记录';
+        tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">${emptyText}</td></tr>`;
         renderPaginationControl('bills-pagination-container', 'bills', updateBillsTable);
         return;
     }
@@ -1331,55 +1569,38 @@ function updateBillsTable() {
         const billCreatedAt = bill.createdAt || new Date();
         const billUpdatedAt = bill.updatedAt || bill.createdAt || new Date();
 
-        const formattedCreatedAt = new Date(billCreatedAt).toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        });
-        const formattedUpdatedAt = new Date(billUpdatedAt).toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        });
-        
+        const formattedCreatedAt = formatBillDateTime(billCreatedAt);
+        const formattedUpdatedAt = formatBillDateTime(billUpdatedAt);
+
         let statusClass = '';
         let statusText = '';
-        switch(bill.status) {
-            case 'paid': 
-                statusClass = 'bg-green-100 text-green-800'; 
+        switch (bill.status) {
+            case 'paid':
+                statusClass = 'bg-green-100 text-green-800';
                 statusText = '已付款';
                 break;
-            case 'verified': 
-                statusClass = 'bg-blue-100 text-blue-800'; 
+            case 'verified':
+                statusClass = 'bg-blue-100 text-blue-800';
                 statusText = '已核对';
                 break;
-            case 'pending': 
-                statusClass = 'bg-yellow-100 text-yellow-800'; 
+            case 'pending':
+            default:
+                statusClass = 'bg-yellow-100 text-yellow-800';
                 statusText = '待核对';
                 break;
-            default:
-                statusClass = 'bg-gray-100 text-gray-800';
-                statusText = bill.status;
         }
 
         const safeBillId = escapeHTML(bill.id || '-');
-        const safeSupplierName = escapeHTML(bill.supplierName || '-');
+        const safePartyName = escapeHTML(bill.partyName || '-');
         const safePeriod = escapeHTML(bill.period || '-');
         const safeAmount = escapeHTML(bill.amount || '-');
         const safeStatusText = escapeHTML(statusText || '-');
+        const billUserInitial = escapeHTML(getBillUserInitial(window.currentUser && window.currentUser.name));
 
         const row = document.createElement('tr');
         row.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${safeBillId}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeSupplierName}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safePartyName}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safePeriod}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${safeAmount}</td>
             <td class="px-6 py-4 whitespace-nowrap">
@@ -1390,14 +1611,14 @@ function updateBillsTable() {
                     <div class="flex items-center">
                         <span class="text-xs text-gray-500 mr-2">创建时间:</span>
                         <span class="flex items-center">
-                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
+                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${billUserInitial}</span>
                             <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedCreatedAt}</span>
                         </span>
                     </div>
                     <div class="flex items-center">
                         <span class="text-xs text-gray-500 mr-2">更新时间:</span>
                         <span class="flex items-center">
-                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
+                            <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${billUserInitial}</span>
                             <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedUpdatedAt}</span>
                         </span>
                     </div>
@@ -1414,6 +1635,9 @@ function updateBillsTable() {
     renderPaginationControl('bills-pagination-container', 'bills', updateBillsTable);
 }
 
+window.updateBillsTable = updateBillsTable;
+window.renderBillsTable = updateBillsTable;
+
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', async function() {
 
@@ -1426,6 +1650,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         renderDesktopSidebarMenu();
         bindModalEvents();
         bindActionButtons();
+        bindBillTabEvents();
         bindSettingsEvents();
     } catch (e) {
         console.error('Error binding events:', e);
@@ -1459,10 +1684,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             showSection(target);
         }
 
-        // 渲染仪表盘最近活动
-        renderDashboardActivity();
     } catch (e) {
         console.error('Error loading data:', e);
+    }
+
+    try {
+        if (typeof renderDashboardActivity === 'function') {
+            renderDashboardActivity();
+        }
+    } catch (e) {
+        console.error('Dashboard activity render failed:', e);
     }
     
     // 4. 初始化图表
@@ -1883,8 +2114,15 @@ function showSection(sectionId) {
     if (targetSection) {
         targetSection.classList.remove('hidden');
         
+        if (sectionId === 'dashboard' && typeof renderDashboardActivity === 'function') {
+            renderDashboardActivity();
+        }
+        else if (sectionId === 'bills') {
+            initBillFilters();
+            updateBillsTable();
+        }
         // 如果是日志页面，渲染日志表格
-        if (sectionId === 'logs') {
+        else if (sectionId === 'logs') {
             renderLogsTable();
         }
         // 如果是进出货管理页面，渲染进出货记录表格

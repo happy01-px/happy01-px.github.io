@@ -338,13 +338,10 @@
                                         <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
                                     </tr>
                                 </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
+                                <tbody id="dashboard-activity-table-body" class="bg-white divide-y divide-gray-200">
                                     <!-- Dynamic Content -->
                                 </tbody>
                             </table>
-                        </div>
-                        <div id="dashboard-pagination-container" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
-                            <!-- Pagination will be rendered here by JS -->
                         </div>
                     </div>
                 </section>
@@ -393,233 +390,17 @@
                             <table class="min-w-full divide-y divide-gray-200 table-fixed">
                                 <thead>
                                     <tr>
-                                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5 min-w-[200px]">商品名称</th>
-                                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">出货公司</th>
+                                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4 min-w-[220px]">商品名称</th>
+                                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">分类</th>
                                         <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">当前库存</th>
-                                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">成本价</th>
-                                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">库存价值</th>
                                         <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">状态</th>
                                         <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">供应商</th>
-                                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">创建与更新</th>
-                                        <th class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-32">操作</th>
+                                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-56">创建与更新</th>
+                                        <th class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-40">操作</th>
                                     </tr>
                                 </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-md flex items-center justify-center">
-                                                    <i class="fa fa-mobile text-gray-500 text-xl"></i>
-                                                </div>
-                                                <div class="ml-4">
-                                                    <div class="text-sm font-medium text-gray-900">iPhone 13 Pro</div>
-                                                    <div class="text-sm text-gray-500">SKU: IP13P-256-BK</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">化工</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">125</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥6,999</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">¥874,875</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">正常</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">苹果公司</td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">
-                                            <div class="space-y-1">
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">创建:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">更新:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="#" class="text-primary hover:text-primary-dark mr-3">编辑</a>
-                                            <a href="#" class="text-danger hover:text-danger-dark">删除</a>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-md flex items-center justify-center">
-                                                    <i class="fa fa-laptop text-gray-500 text-xl"></i>
-                                                </div>
-                                                <div class="ml-4">
-                                                    <div class="text-sm font-medium text-gray-900">MacBook Air M2</div>
-                                                    <div class="text-sm text-gray-500">SKU: MBA-M2-512-SV</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">化工</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">35</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥8,499</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">¥297,465</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">库存不足</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">苹果公司</td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">
-                                            <div class="space-y-1">
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">创建:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">更新:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="#" class="text-primary hover:text-primary-dark mr-3">编辑</a>
-                                            <a href="#" class="text-danger hover:text-danger-dark">删除</a>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-md flex items-center justify-center">
-                                                    <i class="fa fa-tablet text-gray-500 text-xl"></i>
-                                                </div>
-                                                <div class="ml-4">
-                                                    <div class="text-sm font-medium text-gray-900">iPad Pro</div>
-                                                    <div class="text-sm text-gray-500">SKU: IPP-129-256-SP</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">化工</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">0</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥6,799</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">¥0</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">缺货</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">苹果公司</td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">
-                                            <div class="space-y-1">
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">创建:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">更新:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="#" class="text-primary hover:text-primary-dark mr-3">编辑</a>
-                                            <a href="#" class="text-danger hover:text-danger-dark">删除</a>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-md flex items-center justify-center">
-                                                    <i class="fa fa-headphones text-gray-500 text-xl"></i>
-                                                </div>
-                                                <div class="ml-4">
-                                                    <div class="text-sm font-medium text-gray-900">AirPods Pro</div>
-                                                    <div class="text-sm text-gray-500">SKU: APP-2-GN</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">化工</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">210</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥1,799</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">¥377,790</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">正常</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">苹果公司</td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">
-                                            <div class="space-y-1">
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">创建:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">更新:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="#" class="text-primary hover:text-primary-dark mr-3">编辑</a>
-                                            <a href="#" class="text-danger hover:text-danger-dark">删除</a>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-md flex items-center justify-center">
-                                                    <i class="fa fa-clock-o text-gray-500 text-xl"></i>
-                                                </div>
-                                                <div class="ml-4">
-                                                    <div class="text-sm font-medium text-gray-900">Apple Watch</div>
-                                                    <div class="text-sm text-gray-500">SKU: AW-S7-45-SB</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">化工</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">75</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥3,199</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">¥239,925</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">正常</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">苹果公司</td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">
-                                            <div class="space-y-1">
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">创建:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">更新:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="#" class="text-primary hover:text-primary-dark mr-3">编辑</a>
-                                            <a href="#" class="text-danger hover:text-danger-dark">删除</a>
-                                        </td>
-                                    </tr>
+                                <tbody id="inventory-table-body" class="bg-white divide-y divide-gray-200">
+                                    <!-- 商品列表将通过 JavaScript 动态生成 -->
                                 </tbody>
                             </table>
                         </div>
@@ -871,109 +652,8 @@
                                         <th class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                                     </tr>
                                 </thead>
-                                <tbody class="bg-white divide-y divide-gray-200" id="bills-table-body">
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">苹果公司</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">张经理</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">13800138000</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">zhang@apple.com</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Net 30</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">活跃</span>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">
-                                            <div class="space-y-1">
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">创建:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">更新:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="#" class="text-primary hover:text-primary-dark mr-3">编辑</a>
-                                            <a href="#" class="text-danger hover:text-danger-dark">删除</a>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">三星电子</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">李经理</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">13900139000</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">li@samsung.com</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Net 45</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">活跃</span>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">
-                                            <div class="space-y-1">
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">创建:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">更新:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="#" class="text-primary hover:text-primary-dark mr-3">编辑</a>
-                                            <a href="#" class="text-danger hover:text-danger-dark">删除</a>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">华为技术</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">王经理</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">13700137000</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">wang@huawei.com</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Net 60</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">活跃</span>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">
-                                            <div class="space-y-1">
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">创建:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">更新:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-15 10:30</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="#" class="text-primary hover:text-primary-dark mr-3">编辑</a>
-                                            <a href="#" class="text-danger hover:text-danger-dark">删除</a>
-                                        </td>
-                                    </tr>
+                                <tbody id="suppliers-table-body" class="bg-white divide-y divide-gray-200">
+                                    <!-- 供应商列表将通过 JavaScript 动态生成 -->
                                 </tbody>
                             </table>
                         </div>
@@ -1355,45 +1035,37 @@
                 </section>
 
                 <!-- 对账单系统 -->
-                <section id="bills" class="page-section hidden">
+                                                <section id="bills" class="page-section hidden">
                     <div class="mb-6 flex justify-between items-center">
                         <div>
                             <h2 class="text-2xl font-bold text-gray-800">对账单系统</h2>
-                            <p class="text-gray-600">管理所有对账单和送货单</p>
+                            <p class="text-gray-600">管理所有客户和供应商对账单</p>
                         </div>
                         <div class="flex space-x-2">
                             <button class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg flex items-center transition-all-300">
                                 <i class="fa fa-plus mr-2"></i> 新增对账单
                             </button>
-                            <button class="bg-success hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center transition-all-300">
-                                <i class="fa fa-truck mr-2"></i> 新增送货单
-                            </button>
                         </div>
                     </div>
 
-                    <!-- 标签页 -->
                     <div class="mb-6 border-b border-gray-200">
-                        <ul class="flex flex-wrap -mb-px">
+                        <ul id="bills-tabs" class="flex flex-wrap -mb-px">
                             <li class="mr-2">
-                                <a href="#" class="inline-block p-4 border-b-2 border-primary text-primary rounded-t-lg active">供应商对账单</a>
+                                <button type="button" data-tab="customer" class="inline-block bg-transparent p-4 border-b-2 border-primary text-primary rounded-t-lg active focus:outline-none">客户对账单</button>
                             </li>
                             <li class="mr-2">
-                                <a href="#" class="inline-block p-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 rounded-t-lg">客户对账单</a>
+                                <button type="button" data-tab="supplier" class="inline-block bg-transparent p-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 rounded-t-lg focus:outline-none">供应商对账单</button>
                             </li>
                             <li class="mr-2">
-                                <a href="#" class="inline-block p-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 rounded-t-lg">送货单管理</a>
-                            </li>
-                            <li class="mr-2">
-                                <a href="#" class="inline-block p-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 rounded-t-lg">付款计划</a>
+                                <button type="button" data-tab="payment" class="inline-block bg-transparent p-4 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300 rounded-t-lg focus:outline-none">付款计划</button>
                             </li>
                         </ul>
                     </div>
 
-                    <!-- 筛选工具栏 -->
                     <div class="bg-white rounded-lg shadow-card p-4 mb-6">
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">供应商</label>
+                                <label id="bills-filter-party-label" class="block text-sm font-medium text-gray-700 mb-1">客户</label>
                                 <div id="bills-filter-supplier-container" class="w-full"></div>
                                 <input type="hidden" id="bills-filter-supplier">
                             </div>
@@ -1416,14 +1088,13 @@
                         </div>
                     </div>
 
-                    <!-- 对账单列表 -->
                     <div class="bg-white rounded-lg shadow-card overflow-hidden">
-                        <div class="overflow-x-auto">
+                        <div class="overflow-x-auto scrollbar-hide">
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead>
                                     <tr>
                                         <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">对账单编号</th>
-                                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">供应商</th>
+                                        <th id="bills-party-column-title" class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">客户</th>
                                         <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">对账期间</th>
                                         <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">账单金额</th>
                                         <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
@@ -1431,131 +1102,8 @@
                                         <th class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                                     </tr>
                                 </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">BILL-2023-0001</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">苹果公司</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-06-01 至 2023-06-30</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">¥250,000</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">已付款</span>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">
-                                            <div class="space-y-1">
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">创建:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-05</span>
-                                                    </span>
-                                                </div>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">更新:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-05</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="#" class="text-primary hover:text-primary-dark mr-3">查看</a>
-                                            <a href="#" class="text-danger hover:text-danger-dark">删除</a>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">BILL-2023-0002</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">三星电子</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-06-01 至 2023-06-30</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">¥180,000</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">已核对</span>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">
-                                            <div class="space-y-1">
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">创建:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-08</span>
-                                                    </span>
-                                                </div>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">更新:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-08</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="#" class="text-primary hover:text-primary-dark mr-3">查看</a>
-                                            <a href="#" class="text-danger hover:text-danger-dark">删除</a>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">BILL-2023-0003</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">华为技术</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-06-01 至 2023-06-30</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">¥210,000</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">待核对</span>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">
-                                            <div class="space-y-1">
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">创建:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-10</span>
-                                                    </span>
-                                                </div>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">更新:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-10</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="#" class="text-primary hover:text-primary-dark mr-3">查看</a>
-                                            <a href="#" class="text-danger hover:text-danger-dark">删除</a>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">BILL-2023-0004</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">苹果公司</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2023-07-01 至 2023-07-15</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">¥150,000</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">待核对</span>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">
-                                            <div class="space-y-1">
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">创建:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-18</span>
-                                                    </span>
-                                                </div>
-                                                <div class="flex items-center">
-                                                    <span class="text-xs text-gray-500 mr-2">更新:</span>
-                                                    <span class="flex items-center">
-                                                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">张</span>
-                                                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">2023-07-18</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="#" class="text-primary hover:text-primary-dark mr-3">查看</a>
-                                            <a href="#" class="text-danger hover:text-danger-dark">删除</a>
-                                        </td>
-                                    </tr>
+                                <tbody id="bills-table-body" class="bg-white divide-y divide-gray-200">
+                                    <!-- 对账单列表将通过 JavaScript 动态生成 -->
                                 </tbody>
                             </table>
                         </div>
@@ -1565,7 +1113,6 @@
                     </div>
                 </section>
 
-                <!-- 报表分析 -->
                 <section id="reports" class="page-section hidden">
                     <div class="mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">报表分析</h2>
