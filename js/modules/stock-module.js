@@ -220,11 +220,13 @@
         const modalContent = document.getElementById('modal-content');
 
         if (modalPanel) {
-            modalPanel.className = 'bg-white rounded-lg shadow-xl max-w-6xl w-full mx-4';
+            modalPanel.className = 'bg-white rounded-lg shadow-xl w-full mx-4';
+            modalPanel.style.maxWidth = '1600px';
+            modalPanel.style.width = 'calc(100vw - 1.5rem)';
         }
 
         if (modalContent) {
-            modalContent.className = 'p-3 md:p-4 max-h-[82vh] overflow-auto';
+            modalContent.className = 'p-2 md:p-3 max-h-[82vh] overflow-y-auto overflow-x-hidden';
         }
 
         if (confirmBtn) {
@@ -266,10 +268,15 @@
             remark: detail.notes || ''
         }));
 
-        const content = typeof window.buildSalesOrderPreviewMarkup === 'function'
+        const previewMarkup = typeof window.buildSalesOrderPreviewMarkup === 'function'
+            ? window.buildSalesOrderPreviewMarkup(previewPayload, previewItems, Number(note.totalAmount) || 0)
+                .replace(/mx-auto min-w-\[1220px\] max-w-\[1220px\]/, 'mx-auto w-full max-w-[1480px]')
+            : '';
+
+        const content = previewMarkup
             ? `
-                <div class="bg-gray-50 rounded-xl border border-gray-100 p-3">
-                    ${window.buildSalesOrderPreviewMarkup(previewPayload, previewItems, Number(note.totalAmount) || 0)}
+                <div class="bg-gray-50 rounded-xl border border-gray-100 p-2 md:p-3">
+                    ${previewMarkup}
                 </div>
             `
             : `
@@ -534,11 +541,13 @@
         const modalContent = document.getElementById('modal-content');
 
         if (modalPanel) {
-            modalPanel.className = 'bg-white rounded-lg shadow-xl max-w-6xl w-full mx-4';
+            modalPanel.className = 'bg-white rounded-lg shadow-xl w-full mx-4';
+            modalPanel.style.maxWidth = '1600px';
+            modalPanel.style.width = 'calc(100vw - 1.5rem)';
         }
 
         if (modalContent) {
-            modalContent.className = 'p-3 md:p-4 max-h-[82vh] overflow-auto';
+            modalContent.className = 'p-2 md:p-3 max-h-[82vh] overflow-y-auto overflow-x-hidden';
         }
 
         if (confirmBtn) {
@@ -580,10 +589,15 @@
             remark: detail.notes || ''
         }));
 
-        const content = typeof window.buildSalesOrderPreviewMarkup === 'function'
+        const previewMarkup = typeof window.buildSalesOrderPreviewMarkup === 'function'
+            ? window.buildSalesOrderPreviewMarkup(previewPayload, previewItems, Number(note.totalAmount) || 0)
+                .replace(/mx-auto min-w-\[1220px\] max-w-\[1220px\]/, 'mx-auto w-full max-w-[1480px]')
+            : '';
+
+        const content = previewMarkup
             ? `
-                <div class="bg-gray-50 rounded-xl border border-gray-100 p-3">
-                    ${window.buildSalesOrderPreviewMarkup(previewPayload, previewItems, Number(note.totalAmount) || 0)}
+                <div class="bg-gray-50 rounded-xl border border-gray-100 p-2 md:p-3">
+                    ${previewMarkup}
                 </div>
             `
             : `

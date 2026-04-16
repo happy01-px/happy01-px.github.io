@@ -566,6 +566,48 @@
         }
     }
 
+    function renderSalesOrderAddRowButton() {
+        const container = document.getElementById('sales-order-add-row-button');
+        if (!container) return;
+
+        const onClick = () => addSalesOrderRow();
+
+        if (!global.React || !global.ReactDOM || !global.antd || !global.antd.Button || !global.antd.Flex) {
+            container.innerHTML = `
+                <button type="button" class="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800" onclick="addSalesOrderRow()">
+                    <i class="fa fa-plus mr-2"></i> 添加产品
+                </button>
+            `;
+            return;
+        }
+
+        const React = global.React;
+        const ReactDOM = global.ReactDOM;
+        const { Button, Flex } = global.antd;
+
+        if (!container._reactRoot) {
+            container._reactRoot = ReactDOM.createRoot(container);
+        }
+
+        container._reactRoot.render(
+            React.createElement(
+                Flex,
+                { gap: 'small', wrap: true },
+                React.createElement(
+                    Button,
+                    {
+                        type: 'primary',
+                        onClick,
+                        size: 'middle',
+                        icon: React.createElement('i', { className: 'fa fa-plus' }),
+                        className: '!inline-flex !items-center !rounded-md !font-medium'
+                    },
+                    '添加产品'
+                )
+            )
+        );
+    }
+
     function renderSalesOrderTable() {
         const tbody = document.getElementById('sales-order-table-body');
         if (!tbody) return;
@@ -770,7 +812,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-[100px_minmax(0,1fr)_100px_220px_100px_180px] border-b border-gray-300 text-[15px]">
+                <div class="grid grid-cols-[100px_520px_140px_170px_100px_190px] border-b border-gray-300 text-[15px]">
                     <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">地址</div>
                     <div class="border-r border-gray-300 px-3 py-2.5">${escapeHTML(safePayload.companyAddress || '')}</div>
                     <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">订货电话</div>
@@ -779,14 +821,14 @@
                     <div class="px-3 py-2.5 text-center">${escapeHTML(safePayload.companyContact || '')}</div>
                 </div>
 
-                <div class="grid grid-cols-[100px_minmax(0,1fr)_100px_minmax(0,1fr)] border-b border-gray-300 text-[15px]">
+                <div class="grid grid-cols-[100px_520px_140px_460px] border-b border-gray-300 text-[15px]">
                     <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">收货单位</div>
                     <div class="border-r border-gray-300 px-3 py-2.5">${escapeHTML(safePayload.customerName || '')}</div>
                     <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">收货地址</div>
                     <div class="px-3 py-2.5">${escapeHTML(safePayload.customerAddress || '')}</div>
                 </div>
 
-                <div class="grid grid-cols-[100px_minmax(0,1fr)_100px_220px_100px_220px_70px_180px] border-b border-gray-300 text-[15px]">
+                <div class="grid grid-cols-[100px_230px_100px_190px_100px_210px_70px_220px] border-b border-gray-300 text-[15px]">
                     <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">收货人</div>
                     <div class="border-r border-gray-300 px-3 py-2.5">${escapeHTML(safePayload.customerContact || '')}</div>
                     <div class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900">电话</div>
@@ -889,6 +931,7 @@
         applyCompanyToForm(null);
         applyCustomerToForm(null);
         updateCustomerNoDisplay();
+        renderSalesOrderAddRowButton();
         renderSalesOrderTable();
         showSalesOrderForm();
 
