@@ -1624,7 +1624,7 @@ function updateBillsTable() {
                     </div>
                 </div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
                 <a href="#" class="text-primary hover:text-primary-dark mr-3">查看</a>
                 <a href="#" class="text-danger hover:text-danger-dark">删除</a>
             </td>

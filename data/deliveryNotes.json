@@ -1,5 +1,57 @@
 [
     {
+        "id": "SD1776410589665132",
+        "type": "sales",
+        "orderNo": "XS202604170001",
+        "issueDate": "20260417",
+        "deliveryDate": "20260417",
+        "status": "created",
+        "totalAmount": 7497,
+        "notes": "AirPods Pro x 2；Apple Watch x 1",
+        "companyId": "CO001",
+        "companyName": "化工",
+        "companyAddress": "上海市浦东新区张江高科技园区",
+        "companyPhone": "13800138001",
+        "companyContact": "张经理",
+        "customerId": "C001",
+        "customerName": "京东商城",
+        "customerAddress": "北京市朝阳区京东总部",
+        "customerContact": "赵经理",
+        "customerPhone": "13600136000",
+        "paymentTerms": "Net 30",
+        "customerNo": "JD26-004",
+        "createdAt": "2026-04-17T07:23:09.665Z",
+        "updatedAt": "2026-04-17T07:23:09.665Z",
+        "details": [
+            {
+                "id": "SDD1776410589665021",
+                "deliveryId": "SD1776410589665132",
+                "productId": "P004",
+                "productName": "AirPods Pro",
+                "quantity": 2,
+                "unit": "个",
+                "spec": "电子产品",
+                "unitPrice": 1999,
+                "totalAmount": 3998,
+                "notes": "",
+                "status": "created"
+            },
+            {
+                "id": "SDD1776410589665538",
+                "deliveryId": "SD1776410589665132",
+                "productId": "P005",
+                "productName": "Apple Watch",
+                "quantity": 1,
+                "unit": "个",
+                "spec": "电子产品",
+                "unitPrice": 3499,
+                "totalAmount": 3499,
+                "notes": "",
+                "status": "created"
+            }
+        ]
+    },
+    {
         "id": "SD1776244075705563",
         "type": "sales",
         "orderNo": "XS202604150003",

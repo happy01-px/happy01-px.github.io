@@ -784,8 +784,8 @@
                         </div>
                     </div>
                 </td>
-                <td class="px-6 py-4 text-sm font-medium text-center align-middle min-w-[190px]">
-                    <div class="flex items-center justify-center gap-4 whitespace-nowrap">
+                <td class="px-6 py-4 text-sm font-medium text-left align-middle min-w-[190px]">
+                    <div class="flex items-center justify-start gap-4 whitespace-nowrap">
                         <button type="button" class="inline-flex items-center justify-center text-blue-600 hover:text-blue-900" data-action="view">查看</button>
                         <a href="#" class="inline-flex items-center justify-center text-primary hover:text-primary-dark">编辑</a>
                         <a href="#" class="inline-flex items-center justify-center text-danger hover:text-danger-dark">删除</a>

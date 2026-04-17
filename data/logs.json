@@ -1,5 +1,16 @@
 [
     {
+        "id": "LOG1776410589666318",
+        "timestamp": "2026-04-17T07:23:09.666Z",
+        "userId": "U001",
+        "userName": "张三",
+        "actionType": "add",
+        "objectType": "delivery-note",
+        "objectName": "XS202604170001",
+        "details": "新增销售出库单：京东商城 / XS202604170001",
+        "ipAddress": "192.168.1.100"
+    },
+    {
         "id": "LOG1776244075705182",
         "timestamp": "2026-04-15T09:07:55.705Z",
         "userId": "U001",
