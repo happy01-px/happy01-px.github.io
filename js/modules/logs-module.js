@@ -112,6 +112,10 @@
                     actionTypeText = '删除';
                     actionTypeClass = 'bg-red-100 text-red-800';
                     break;
+                case 'cancel':
+                    actionTypeText = '作废';
+                    actionTypeClass = 'bg-rose-100 text-rose-700';
+                    break;
                 case 'import':
                     actionTypeText = '导入';
                     actionTypeClass = 'bg-yellow-100 text-yellow-800';

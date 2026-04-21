@@ -1044,6 +1044,7 @@ const paginationState = {
     customers: { page: 1, pageSize: 10, total: 0 },
     bills: { page: 1, pageSize: 10, total: 0 }
 };
+window.paginationState = paginationState;
 
 // 存储 React Roots 以支持多次渲染
 window.paginationRoots = {};
@@ -1179,6 +1180,7 @@ function initLogFilters() {
         { value: 'add', label: '新增' },
         { value: 'edit', label: '编辑' },
         { value: 'delete', label: '删除' },
+        { value: 'cancel', label: '作废' },
         { value: 'import', label: '导入' },
         { value: 'export', label: '导出' }
     ];
@@ -1273,8 +1275,16 @@ function normalizeBillStatus(status) {
     return 'pending';
 }
 
+function parseBillNumber(value) {
+    const normalized = String(value ?? '')
+        .replace(/[^\d.-]/g, '')
+        .trim();
+    const numericValue = Number(normalized);
+    return Number.isFinite(numericValue) ? numericValue : 0;
+}
+
 function formatBillAmount(amount) {
-    return `¥${parseNumber(amount).toLocaleString('zh-CN', {
+    return `¥${parseBillNumber(amount).toLocaleString('zh-CN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     })}`;
@@ -1330,7 +1340,7 @@ function buildSupplierBillsData() {
     ];
 
     return (mockData.bills.length > 0 ? mockData.bills : fallbackBills).map(bill => {
-        const amountValue = parseNumber(String(bill.amount || '').replace(/[^\d.-]/g, ''));
+        const amountValue = parseBillNumber(bill.amount || '');
         return {
             id: bill.id,
             partyName: bill.supplierName || '-',
@@ -1436,6 +1446,10 @@ function renderBillPartyFilter() {
 }
 
 function bindBillTabEvents() {
+    if (window.BillsModuleState && window.bindBillTabEvents && window.bindBillTabEvents !== bindBillTabEvents) {
+        return;
+    }
+
     const tabs = document.querySelectorAll('#bills-tabs button');
     if (!tabs.length) return;
 
@@ -1467,6 +1481,11 @@ function bindBillTabEvents() {
 
 // 初始化对账单筛选器
 function initBillFilters() {
+    if (window.BillsModuleState && window.initBillFilters && window.initBillFilters !== initBillFilters) {
+        window.initBillFilters();
+        return;
+    }
+
     normalizeBillsSectionCopy();
 
     const searchFilter = document.getElementById('bills-filter-search');
@@ -1505,6 +1524,11 @@ function initBillFilters() {
 
 // 更新对账单列表
 function updateBillsTable() {
+    if (window.BillsModuleState && window.updateBillsTable && window.updateBillsTable !== updateBillsTable) {
+        window.updateBillsTable();
+        return;
+    }
+
     const tbody = document.getElementById('bills-table-body');
     if (!tbody) return;
     tbody.innerHTML = '';
@@ -1678,10 +1702,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         updateBillsTable(); // 渲染对账单表格
         
         // 初始显示仪表盘或当前选中的部分
-        const activeLink = document.querySelector('.nav-link.active');
-        if (activeLink) {
-            const target = activeLink.getAttribute('data-target');
-            showSection(target);
+        if (!applyHashDrivenSectionRoute()) {
+            const activeLink = document.querySelector('.nav-link.active');
+            if (activeLink) {
+                const target = activeLink.getAttribute('data-target');
+                showSection(target);
+            }
         }
 
     } catch (e) {
@@ -1711,7 +1737,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 const DESKTOP_SIDEBAR_SUBMENU_KEY = 'management-center';
 const DESKTOP_SIDEBAR_CHILD_KEYS = new Set(['suppliers', 'customers', 'companies']);
 const DESKTOP_SIDEBAR_SECTION_MAP = {
-    'sales-order': 'stock-movement'
+    'sales-order': 'stock-movement',
+    'bills-create': 'bills',
+    'bills-view': 'bills'
 };
 
 let desktopSidebarMenuSelectedKey = 'dashboard';
@@ -2097,8 +2125,9 @@ function bindActionButtons() {
 }
 
 // 显示指定部分
-function showSection(sectionId) {
+function showSection(sectionId, options = {}) {
     console.log('Showing section:', sectionId);
+    const config = options || {};
     const normalizedSection = normalizeDesktopSidebarSection(sectionId);
 
     setLegacyDesktopNavState(normalizedSection);
@@ -2113,6 +2142,11 @@ function showSection(sectionId) {
     const targetSection = document.getElementById(sectionId);
     if (targetSection) {
         targetSection.classList.remove('hidden');
+
+        const nextHash = config.routeHash || `#${sectionId}`;
+        if (!config.skipHashSync && window.location.hash !== nextHash) {
+            window.location.hash = nextHash;
+        }
         
         if (sectionId === 'dashboard' && typeof renderDashboardActivity === 'function') {
             renderDashboardActivity();
@@ -2133,6 +2167,37 @@ function showSection(sectionId) {
         console.error('Target section not found:', sectionId);
     }
 }
+
+function getSectionIdFromHash(hashValue = window.location.hash) {
+    const rawHash = String(hashValue || '').trim();
+    if (!rawHash || !rawHash.startsWith('#') || rawHash.startsWith('#/')) {
+        return '';
+    }
+
+    return rawHash.slice(1);
+}
+
+function applyHashDrivenSectionRoute(hashValue = window.location.hash) {
+    const sectionId = getSectionIdFromHash(hashValue);
+    if (!sectionId) {
+        return false;
+    }
+
+    if (!document.getElementById(sectionId)) {
+        return false;
+    }
+
+    showSection(sectionId, { skipHashSync: true });
+    return true;
+}
+
+window.addEventListener('hashchange', function() {
+    if (String(window.location.hash || '').startsWith('#/')) {
+        return;
+    }
+
+    applyHashDrivenSectionRoute();
+});
 
 // 初始化图表
 function initCharts() {

@@ -41,6 +41,7 @@ function main() {
         'js/modules/stock-module.js',
         'js/modules/logs-module.js',
         'js/modules/settings-module.js',
+        'js/modules/bills-module.js',
         'js/script.js',
         'js/sales-order.js',
         'preview_server.js'
