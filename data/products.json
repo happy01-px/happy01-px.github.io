@@ -6,11 +6,25 @@
         "unit": "个",
         "costPrice": 1799,
         "retailPrice": 1999,
-        "stockQuantity": 206,
+        "stockQuantity": 209,
         "minStock": 50,
         "maxStock": 200,
         "supplierId": "S001",
         "createdAt": "2023-04-20",
+        "updatedAt": "2026-04-22T15:37:42"
+    },
+    {
+        "id": "P005",
+        "name": "Apple Watch",
+        "category": "电子产品",
+        "unit": "个",
+        "costPrice": 3199,
+        "retailPrice": 3499,
+        "stockQuantity": 72,
+        "minStock": 30,
+        "maxStock": 100,
+        "supplierId": "S001",
+        "createdAt": "2023-05-15",
         "updatedAt": "2026-04-17T15:23:09"
     },
     {
@@ -26,20 +40,6 @@
         "supplierId": "S001",
         "createdAt": "2023-01-15",
         "updatedAt": "2026-04-15T17:07:55"
-    },
-    {
-        "id": "P005",
-        "name": "Apple Watch",
-        "category": "电子产品",
-        "unit": "个",
-        "costPrice": 3199,
-        "retailPrice": 3499,
-        "stockQuantity": 72,
-        "minStock": 30,
-        "maxStock": 100,
-        "supplierId": "S001",
-        "createdAt": "2023-05-15",
-        "updatedAt": "2026-04-17T15:23:09"
     },
     {
         "id": "P002",

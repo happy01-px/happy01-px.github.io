@@ -15,4 +15,3 @@
 - `js/sales-order.js`: 销售单逻辑
 - `data/`: 默认数据文件
 - `preview_server.js`: 本地预览与数据保存服务
-

@@ -1,0 +1,9 @@
+assets
+coverage
+data
+lib
+node_modules
+.codex-temp
+.npm-cache
+package-lock.json
+temp_dom*.html

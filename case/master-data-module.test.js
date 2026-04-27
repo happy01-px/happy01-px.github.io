@@ -1,0 +1,613 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const {
+  applyFixtureState,
+  clickModalConfirm,
+  createWindow,
+  flushAsyncTasks,
+  loadScripts,
+} = require("./helpers/browser-harness");
+const { createFixtureData } = require("./helpers/fixtures");
+
+function createMasterDataMarkup() {
+  return `
+        <section id="inventory" class="page-section">
+            <input id="filter-company" value="">
+            <input id="filter-status" value="">
+            <select id="filter-supplier"></select>
+            <input id="filter-search" value="">
+            <table><tbody id="inventory-table-body"></tbody></table>
+            <div id="inventory-pagination-container"></div>
+        </section>
+        <section id="companies" class="page-section">
+            <table><tbody></tbody></table>
+        </section>
+        <div id="company-pagination-container"></div>
+        <section id="suppliers" class="page-section">
+            <table><tbody id="suppliers-table-body"></tbody></table>
+        </section>
+        <div id="suppliers-pagination-container"></div>
+        <section id="customers" class="page-section">
+            <table><tbody></tbody></table>
+        </section>
+        <div id="customer-pagination-container"></div>
+    `;
+}
+
+test("addProduct creates a new product and renders the inventory table", () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  const logCalls = [];
+  let saveCalls = 0;
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.addLog = (...args) => {
+    logCalls.push(args);
+  };
+  harness.window.saveMockData = () => {
+    saveCalls += 1;
+  };
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.addProduct({
+    name: "Fresh Product",
+    category: "家具",
+    quantity: 4,
+    costPrice: 20,
+    retailPrice: 30,
+    supplierId: "S001",
+    notes: "new",
+  });
+
+  assert.equal(harness.window.mockData.products.length, 3);
+  assert.equal(
+    harness.window.mockData.products.some((product) => product.id === "P003"),
+    true,
+  );
+  assert.equal(saveCalls, 1);
+  assert.equal(logCalls[0][0], "add");
+  assert.match(harness.alerts.at(-1), /已成功添加/);
+  assert.equal(
+    harness.window.document.querySelectorAll("#inventory-table-body tr").length,
+    3,
+  );
+
+  harness.close();
+});
+
+test("addProduct merges inventory when the same product already exists", () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  const logCalls = [];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.addLog = (...args) => {
+    logCalls.push(args);
+  };
+  harness.window.saveMockData = () => {};
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.addProduct({
+    name: "Widget",
+    category: "电子产品",
+    quantity: 6,
+    costPrice: 100,
+    retailPrice: 150,
+    supplierId: "S001",
+    notes: "",
+  });
+
+  assert.equal(harness.window.mockData.products.length, 2);
+  assert.equal(harness.window.mockData.products[0].stockQuantity, 26);
+  assert.equal(logCalls[0][0], "edit");
+  assert.match(harness.alerts.at(-1), /已存在/);
+
+  harness.close();
+});
+
+test("showAddCompanyModal blocks invalid phone numbers", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {};
+  harness.window.addLog = () => {};
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showAddCompanyModal();
+  harness.window.document.querySelector(
+    '#add-company-form [name="name"]',
+  ).value = "New Company";
+  harness.window.document.querySelector(
+    '#add-company-form [name="contactPerson"]',
+  ).value = "Neo";
+  harness.window.document.querySelector(
+    '#add-company-form [name="contactPhone"]',
+  ).value = "abc";
+  harness.window.document.querySelector(
+    '#add-company-form [name="address"]',
+  ).value = "Shenzhen";
+
+  const result = await clickModalConfirm(harness.window);
+
+  assert.equal(result, false);
+  assert.equal(harness.window.mockData.companies.length, 2);
+  assert.match(harness.alerts.at(-1), /有效的国内联系电话/);
+
+  harness.close();
+});
+
+test("showAddCompanyModal saves a valid company through the modal flow", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  let saveCalls = 0;
+  const logCalls = [];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {
+    saveCalls += 1;
+  };
+  harness.window.addLog = (...args) => {
+    logCalls.push(args);
+  };
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showAddCompanyModal();
+  harness.window.document.querySelector(
+    '#add-company-form [name="name"]',
+  ).value = "New Company";
+  harness.window.document.querySelector(
+    '#add-company-form [name="contactPerson"]',
+  ).value = "Neo";
+  harness.window.document.querySelector(
+    '#add-company-form [name="contactPhone"]',
+  ).value = "13800138000";
+  harness.window.document.querySelector(
+    '#add-company-form [name="address"]',
+  ).value = "Shenzhen";
+  harness.window.document.querySelector(
+    '#add-company-form [name="email"]',
+  ).value = "neo@example.com";
+
+  const result = await clickModalConfirm(harness.window);
+
+  assert.equal(result, true);
+  assert.equal(harness.window.mockData.companies.length, 3);
+  assert.equal(harness.window.mockData.companies.at(-1).id, "CO003");
+  assert.equal(saveCalls, 1);
+  assert.equal(logCalls[0][0], "add");
+  assert.match(
+    harness.window.document.querySelector("#companies tbody").textContent,
+    /New Company/,
+  );
+
+  harness.close();
+});
+
+test("showEditCompanyModal blocks duplicate company names", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {};
+  harness.window.addLog = () => {};
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showEditCompanyModal("CO001");
+  harness.window.document.querySelector(
+    '#edit-company-form [name="name"]',
+  ).value = "Backup Warehouse";
+  harness.window.document.querySelector(
+    '#edit-company-form [name="contactPerson"]',
+  ).value = "Carol";
+  harness.window.document.querySelector(
+    '#edit-company-form [name="contactPhone"]',
+  ).value = "13500135000";
+  harness.window.document.querySelector(
+    '#edit-company-form [name="address"]',
+  ).value = "Guangzhou";
+
+  const result = await clickModalConfirm(harness.window);
+
+  assert.equal(result, false);
+  assert.match(harness.alerts.at(-1), /名称已存在/);
+
+  harness.close();
+});
+
+test("showAddSupplierModal saves a valid supplier", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  let saveCalls = 0;
+  const logCalls = [];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {
+    saveCalls += 1;
+  };
+  harness.window.addLog = (...args) => {
+    logCalls.push(args);
+  };
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showAddSupplierModal();
+  harness.window.document.querySelector(
+    '#add-supplier-form [name="name"]',
+  ).value = "New Supplier";
+  harness.window.document.querySelector(
+    '#add-supplier-form [name="contactPerson"]',
+  ).value = "Nora";
+  harness.window.document.querySelector(
+    '#add-supplier-form [name="contactPhone"]',
+  ).value = "13800138001";
+  harness.window.document.querySelector(
+    '#add-supplier-form [name="email"]',
+  ).value = "nora@example.com";
+  harness.window.document.getElementById("add-supplier-payment-input").value =
+    "Net 45";
+
+  const result = await clickModalConfirm(harness.window);
+
+  assert.equal(result, true);
+  assert.equal(harness.window.mockData.suppliers.length, 3);
+  assert.equal(
+    harness.window.mockData.suppliers.some(
+      (supplier) => supplier.id === "S003",
+    ),
+    true,
+  );
+  assert.equal(harness.window.mockData.suppliers.at(-1).address, "-");
+  assert.equal(harness.window.mockData.suppliers.at(-1).creditLimit, 0);
+  assert.equal(saveCalls, 1);
+  assert.equal(logCalls[0][0], "add");
+  assert.match(
+    harness.window.document.getElementById("suppliers-table-body").textContent,
+    /New Supplier/,
+  );
+
+  harness.close();
+});
+
+test("showEditSupplierModal validates duplicate names before saving", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {};
+  harness.window.addLog = () => {};
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showEditSupplierModal("S001");
+  harness.window.document.querySelector(
+    '#edit-supplier-form [name="name"]',
+  ).value = "Bravo Parts";
+  harness.window.document.querySelector(
+    '#edit-supplier-form [name="contactPerson"]',
+  ).value = "Alice";
+  harness.window.document.querySelector(
+    '#edit-supplier-form [name="contactPhone"]',
+  ).value = "13800138000";
+
+  const result = await clickModalConfirm(harness.window);
+
+  assert.equal(result, false);
+  assert.match(harness.alerts.at(-1), /名称已存在/);
+
+  harness.close();
+});
+
+test("showAddCustomerModal saves a valid customer", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  let saveCalls = 0;
+  const logCalls = [];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {
+    saveCalls += 1;
+  };
+  harness.window.addLog = (...args) => {
+    logCalls.push(args);
+  };
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showAddCustomerModal();
+  harness.window.document.querySelector(
+    '#add-customer-form [name="name"]',
+  ).value = "New Customer";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="contactPerson"]',
+  ).value = "Cora";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="contactPhone"]',
+  ).value = "13800138002";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="address"]',
+  ).value = "Beijing";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="email"]',
+  ).value = "cora@example.com";
+  harness.window.document.getElementById("add-customer-payment-input").value =
+    "Net 30";
+
+  const result = await clickModalConfirm(harness.window);
+
+  assert.equal(result, true);
+  assert.equal(harness.window.mockData.customers.length, 3);
+  assert.equal(
+    harness.window.mockData.customers.some(
+      (customer) => customer.id === "C003",
+    ),
+    true,
+  );
+  assert.equal(saveCalls, 1);
+  assert.equal(logCalls[0][0], "add");
+  assert.match(
+    harness.window.document.querySelector("#customers tbody").textContent,
+    /New Customer/,
+  );
+
+  harness.close();
+});
+
+test("showEditCustomerModal updates an existing customer", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  let saveCalls = 0;
+  const logCalls = [];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {
+    saveCalls += 1;
+  };
+  harness.window.addLog = (...args) => {
+    logCalls.push(args);
+  };
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showEditCustomerModal("C001");
+  harness.window.document.querySelector(
+    '#edit-customer-form [name="name"]',
+  ).value = "Northwind Prime";
+  harness.window.document.querySelector(
+    '#edit-customer-form [name="contactPerson"]',
+  ).value = "Nina";
+  harness.window.document.querySelector(
+    '#edit-customer-form [name="contactPhone"]',
+  ).value = "13700137000";
+  harness.window.document.querySelector(
+    '#edit-customer-form [name="address"]',
+  ).value = "Shanghai Pudong";
+  harness.window.document.querySelector(
+    '#edit-customer-form [name="email"]',
+  ).value = "prime@example.com";
+  harness.window.document.getElementById("edit-customer-payment-input").value =
+    "COD";
+  harness.window.document.getElementById("edit-customer-status-input").value =
+    "inactive";
+
+  const result = await clickModalConfirm(harness.window);
+
+  assert.equal(result, true);
+  assert.equal(harness.window.mockData.customers[0].name, "Northwind Prime");
+  assert.equal(harness.window.mockData.customers[0].paymentTerms, "COD");
+  assert.equal(harness.window.mockData.customers[0].status, "inactive");
+  assert.equal(saveCalls, 1);
+  assert.equal(logCalls[0][0], "edit");
+  assert.match(
+    harness.window.document.querySelector("#customers tbody").textContent,
+    /Northwind Prime/,
+  );
+
+  harness.close();
+});
+
+test("supplier delete button waits for confirmation before removing data", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  let saveCalls = 0;
+  const logCalls = [];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {
+    saveCalls += 1;
+    return true;
+  };
+  harness.window.addLog = (...args) => {
+    logCalls.push(args);
+  };
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.updateSupplierTable();
+
+  harness.window.queueConfirmResult(false);
+  harness.window.document
+    .querySelector("#suppliers-table-body [data-action='delete']")
+    .click();
+  await flushAsyncTasks();
+
+  assert.deepEqual(
+    String(harness.confirmCalls.at(-1)?.content || "")
+      .split("\n")
+      .filter(Boolean),
+    [
+      "确定要删除“Acme Supply”吗？删除后无法撤销。",
+      "删除后，1 个商品会显示为“未知供应商”。",
+      "已有 1 张对账单会保留这家供应商的历史快照。",
+      "已有 1 条库存流水会保留这家供应商的历史快照。",
+    ],
+  );
+  assert.equal(harness.window.mockData.suppliers.length, 2);
+  assert.equal(saveCalls, 0);
+  assert.equal(logCalls.length, 0);
+
+  harness.window.queueConfirmResult(true);
+  harness.window.document
+    .querySelector("#suppliers-table-body [data-action='delete']")
+    .click();
+  await flushAsyncTasks();
+
+  assert.equal(harness.window.mockData.suppliers.length, 1);
+  assert.equal(saveCalls, 1);
+  assert.equal(logCalls[0][0], "delete");
+  assert.equal(
+    harness.window.document
+      .getElementById("suppliers-table-body")
+      .textContent.includes("Acme Supply"),
+    false,
+  );
+  assert.match(harness.alerts.at(-1), /已删除/);
+
+  harness.close();
+});
+
+[
+  {
+    name: "product",
+    setup(window) {
+      window.updateInventoryTable();
+    },
+    selector: "#inventory-table-body [data-action='delete']",
+    collectionName: "products",
+    deletedName: "Widget",
+  },
+  {
+    name: "company",
+    setup(window) {
+      window.updateCompanyTable();
+    },
+    selector: "#companies tbody [data-action='delete']",
+    collectionName: "companies",
+    deletedName: "Happy Warehouse",
+  },
+  {
+    name: "customer",
+    setup(window) {
+      window.updateCustomerTable();
+    },
+    selector: "#customers tbody [data-action='delete']",
+    collectionName: "customers",
+    deletedName: "Northwind",
+  },
+].forEach((scenario) => {
+  test(`${scenario.name} delete button removes the record after confirmation`, async () => {
+    const harness = createWindow({ markup: createMasterDataMarkup() });
+    const fixture = createFixtureData();
+    let saveCalls = 0;
+    const logCalls = [];
+
+    loadScripts(harness.window, [
+      "js/modules/app-utils.js",
+      "js/modules/app-state.js",
+      "js/modules/master-data-module.js",
+    ]);
+    applyFixtureState(harness.window, fixture);
+    harness.window.saveMockData = () => {
+      saveCalls += 1;
+      return true;
+    };
+    harness.window.addLog = (...args) => {
+      logCalls.push(args);
+    };
+    harness.window.getInitial = (name) =>
+      String(name || "?")
+        .charAt(0)
+        .toUpperCase();
+
+    scenario.setup(harness.window);
+    harness.window.queueConfirmResult(true);
+    harness.window.document.querySelector(scenario.selector).click();
+    await flushAsyncTasks();
+
+    assert.equal(harness.window.mockData[scenario.collectionName].length, 1);
+    assert.equal(saveCalls, 1);
+    assert.equal(logCalls[0][0], "delete");
+    assert.equal(
+      harness.window.document.body.textContent.includes(scenario.deletedName),
+      false,
+    );
+    assert.match(harness.alerts.at(-1), /已删除/);
+
+    harness.close();
+  });
+});

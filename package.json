@@ -6,7 +6,16 @@
   "bin": "preview_server.js",
   "scripts": {
     "start": "node preview_server.js",
-    "test": "node scripts/smoke-check.js",
+    "sync:data": "node scripts/sync-data-json.js",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "test": "node scripts/smoke-check.js && node --test",
+    "test:smoke": "node scripts/smoke-check.js",
+    "test:cases": "node --test",
+    "coverage": "c8 --reporter=text --reporter=html node --test",
+    "ci:check": "npm run lint && npm run typecheck && npm test && npm run coverage",
     "build": "pkg ."
   },
   "pkg": {
@@ -21,5 +30,15 @@
     "targets": [
       "node16-win-x64"
     ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.6.0",
+    "c8": "^11.0.0",
+    "eslint": "^10.2.1",
+    "globals": "^17.5.0",
+    "jsdom": "^29.0.2",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3"
   }
 }
