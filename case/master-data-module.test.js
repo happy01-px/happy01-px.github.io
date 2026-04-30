@@ -34,6 +34,21 @@ function createMasterDataMarkup() {
     `;
 }
 
+function createStockMovementMarkup() {
+  return `
+        <section id="stock" class="page-section">
+            <div id="stock-tabs">
+                <button class="active" data-tab="all" type="button">all</button>
+            </div>
+            <table>
+                <thead id="stock-movement-table-head"></thead>
+                <tbody id="stock-movement-table-body"></tbody>
+            </table>
+            <div id="stock-pagination-container"></div>
+        </section>
+    `;
+}
+
 test("addProduct creates a new product and renders the inventory table", () => {
   const harness = createWindow({ markup: createMasterDataMarkup() });
   const fixture = createFixtureData();
@@ -72,12 +87,70 @@ test("addProduct creates a new product and renders the inventory table", () => {
     harness.window.mockData.products.some((product) => product.id === "P003"),
     true,
   );
+  assert.equal(harness.window.stockMovementData.length, 3);
+  assert.equal(harness.window.stockMovementData[0].type, "inbound");
+  assert.equal(harness.window.stockMovementData[0].productId, "P003");
+  assert.equal(harness.window.stockMovementData[0].productName, "Fresh Product");
+  assert.equal(harness.window.stockMovementData[0].quantity, 4);
+  assert.equal(harness.window.stockMovementData[0].supplierName, "Acme Supply");
+  assert.equal(harness.window.stockMovementData[0].price, 20);
   assert.equal(saveCalls, 1);
   assert.equal(logCalls[0][0], "add");
   assert.match(harness.alerts.at(-1), /已成功添加/);
   assert.equal(
     harness.window.document.querySelectorAll("#inventory-table-body tr").length,
     3,
+  );
+
+  harness.close();
+});
+
+test("addProduct syncs new inventory to all and inbound stock tables", () => {
+  const harness = createWindow({
+    markup: `${createMasterDataMarkup()}${createStockMovementMarkup()}`,
+  });
+  const fixture = createFixtureData();
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+    "js/modules/stock-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.addLog = () => {};
+  harness.window.saveMockData = () => {};
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.addProduct({
+    name: "Synced Product",
+    category: "瀹跺叿",
+    quantity: 7,
+    costPrice: 25,
+    retailPrice: 40,
+    supplierId: "S001",
+    notes: "stock sync",
+  });
+
+  assert.match(
+    harness.window.document.querySelector("#stock-movement-table-body")
+      .textContent,
+    /Synced Product/,
+  );
+
+  harness.window.renderStockMovementTable("inbound");
+  assert.match(
+    harness.window.document.querySelector("#stock-movement-table-body")
+      .textContent,
+    /Synced Product/,
+  );
+  assert.doesNotMatch(
+    harness.window.document.querySelector("#stock-movement-table-body")
+      .textContent,
+    /Gadget/,
   );
 
   harness.close();
@@ -115,6 +188,12 @@ test("addProduct merges inventory when the same product already exists", () => {
 
   assert.equal(harness.window.mockData.products.length, 2);
   assert.equal(harness.window.mockData.products[0].stockQuantity, 26);
+  assert.equal(harness.window.stockMovementData.length, 3);
+  assert.equal(harness.window.stockMovementData[0].type, "inbound");
+  assert.equal(harness.window.stockMovementData[0].productId, "P001");
+  assert.equal(harness.window.stockMovementData[0].quantity, 6);
+  assert.equal(harness.window.stockMovementData[0].supplierName, "Acme Supply");
+  assert.equal(harness.window.stockMovementData[0].price, 100);
   assert.equal(logCalls[0][0], "edit");
   assert.match(harness.alerts.at(-1), /已存在/);
 

@@ -580,12 +580,37 @@
     renderSupplierSelect();
   }
 
+  function createProductInboundStockMovement(product, productData) {
+    const supplier = mockData.suppliers.find(
+      (item) => item.id === product.supplierId,
+    );
+    const now = new Date();
+
+    return {
+      id: createRuntimeId("SM"),
+      type: "inbound",
+      productId: product.id,
+      productName: product.name,
+      quantity: productData.quantity,
+      unit: product.unit || "",
+      supplierId: product.supplierId,
+      supplierName: supplier ? supplier.name : "-",
+      price: productData.costPrice,
+      priceType: "custom",
+      operator: currentUser.name,
+      remark: String(productData.notes || "").trim() || "-",
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
   function addProduct(productData) {
     const existingProduct = mockData.products.find(
       (product) =>
         product.name === productData.name &&
         product.supplierId === productData.supplierId,
     );
+    let movementProduct = existingProduct;
 
     if (existingProduct) {
       const oldQuantity = existingProduct.stockQuantity;
@@ -618,6 +643,7 @@
       };
 
       mockData.products.push(newProduct);
+      movementProduct = newProduct;
 
       alert(
         `商品 "${productData.name}" 已成功添加，库存数量：${productData.quantity}`,
@@ -630,8 +656,16 @@
       );
     }
 
+    if (!Array.isArray(stockMovementData)) {
+      stockMovementData = [];
+    }
+    stockMovementData.unshift(
+      createProductInboundStockMovement(movementProduct, productData),
+    );
+
     saveMockData();
     updateInventoryTable();
+    refreshStockDependencies();
   }
 
   function showViewProductModal(productId) {
