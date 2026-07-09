@@ -176,7 +176,10 @@ test("index.html reroutes alert messages into Ant Design message prompts", async
 
   assert.equal(harness.alerts.length, 0);
   assert.equal(harness.antdMessages.at(-1)?.type, "success");
-  assert.match(String(harness.antdMessages.at(-1)?.content || ""), /进货记录添加成功/);
+  assert.match(
+    String(harness.antdMessages.at(-1)?.content || ""),
+    /进货记录添加成功/,
+  );
   assert.ok(harness.window.document.getElementById("antd-message-host"));
 
   harness.close();
@@ -191,7 +194,8 @@ test("index.html uses the Ant Design modal host for secondary confirmations", as
 
   await flushAsyncTasks(4);
 
-  const confirmHost = harness.window.document.getElementById("antd-confirm-host");
+  const confirmHost =
+    harness.window.document.getElementById("antd-confirm-host");
   assert.ok(confirmHost);
   assert.match(confirmHost.textContent, /Basic Modal/);
   assert.match(confirmHost.textContent, /Some contents/);

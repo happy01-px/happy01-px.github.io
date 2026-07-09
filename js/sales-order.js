@@ -605,10 +605,9 @@
     if (remarkInput) remarkInput.value = item.remark || "";
     if (stockHintNode) {
       stockHintNode.textContent = product ? getProductStockText(product) : "";
-      stockHintNode.classList.toggle("hidden", !product);
       stockHintNode.className = product
-        ? `mt-1 text-left text-xs ${getProductStockClassName(product)}`
-        : "hidden mt-1 text-left text-xs text-gray-500";
+        ? `mt-1 min-h-4 text-left text-xs ${getProductStockClassName(product)}`
+        : "invisible pointer-events-none mt-1 min-h-4 text-left text-xs text-gray-500";
     }
     renderSalesOrderQuantityInput(rowId);
 
@@ -713,7 +712,7 @@
                 <td class="border-r border-gray-300 px-2 py-3 text-center">${index + 1}</td>
                 <td class="border-r border-gray-300 px-3 py-2">
                     <div id="${productContainerId}" class="w-full"></div>
-                    <div id="sales-order-item-stock-${item.id}" class="${item.productId ? `mt-1 text-left text-xs ${getProductStockClassName(findProductById(item.productId))}` : "hidden mt-1 text-left text-xs text-gray-500"}">${escapeHTML(getProductStockText(findProductById(item.productId)))}</div>
+                    <div id="sales-order-item-stock-${item.id}" class="${item.productId ? `mt-1 min-h-4 text-left text-xs ${getProductStockClassName(findProductById(item.productId))}` : "invisible pointer-events-none mt-1 min-h-4 text-left text-xs text-gray-500"}">${escapeHTML(getProductStockText(findProductById(item.productId)))}</div>
                     <input type="hidden" id="${productInputId}" value="${escapeHTML(item.productId)}">
                 </td>
                 <td class="border-r border-gray-300 px-3 py-3 text-center" id="sales-order-item-spec-${item.id}">${escapeHTML(item.spec || "-")}</td>

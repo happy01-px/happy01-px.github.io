@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { pathToFileURL } = require("url");
 const { JSDOM, VirtualConsole } = require("jsdom");
 const { clone, createPaginationState } = require("./fixtures");
 
@@ -22,6 +23,7 @@ const MODAL_MARKUP = `
 `;
 
 const APP_SHELL_SCRIPT_PATHS = Object.freeze([
+  "js/modules/app-utils.js",
   "js/script.js",
   "js/ui/antd-bridge.js",
   "js/app/navigation.js",
@@ -35,7 +37,9 @@ function readProjectFile(relativePath) {
 
 function loadScripts(window, relativePaths) {
   relativePaths.forEach((relativePath) => {
-    window.eval(readProjectFile(relativePath));
+    const absolutePath = path.join(projectRoot, relativePath);
+    const sourceUrl = pathToFileURL(absolutePath).href;
+    window.eval(`${readProjectFile(relativePath)}\n//# sourceURL=${sourceUrl}`);
   });
 }
 
@@ -75,6 +79,7 @@ function createWindow(options = {}) {
     confirmQueue: [],
     renderSelects: new Map(),
     renderInputs: new Map(),
+    renderRadioGroups: new Map(),
     paginationCalls: [],
     showSectionCalls: [],
     modalConfirmHandler: null,
@@ -83,6 +88,7 @@ function createWindow(options = {}) {
   window.__testHarness = {
     renderSelects: harnessState.renderSelects,
     renderInputs: harnessState.renderInputs,
+    renderRadioGroups: harnessState.renderRadioGroups,
     antdMessages: harnessState.antdMessages,
     confirmCalls: harnessState.confirmCalls,
   };
@@ -175,6 +181,66 @@ function createWindow(options = {}) {
       config: clone(config),
       onChange,
       control,
+      input,
+    });
+
+    return true;
+  };
+  window.renderAntdRadioGroup = (
+    containerId,
+    inputId,
+    optionsList,
+    configOrDefaultValue,
+    onChange,
+  ) => {
+    const container = window.document.getElementById(containerId);
+    const input = window.document.getElementById(inputId);
+    const config =
+      configOrDefaultValue && typeof configOrDefaultValue === "object"
+        ? configOrDefaultValue
+        : { defaultValue: configOrDefaultValue };
+
+    if (input && config.value !== undefined) {
+      input.value = config.value ?? "";
+    }
+
+    const group = window.document.createElement("div");
+    group.dataset.role = "antd-radio-group";
+    group.dataset.inputId = inputId;
+    const radioName = config.name || inputId;
+
+    (optionsList || []).forEach((option) => {
+      const label = window.document.createElement("label");
+      const radio = window.document.createElement("input");
+      radio.type = "radio";
+      radio.name = radioName;
+      radio.value = String(option.value);
+      radio.checked = input ? input.value === radio.value : false;
+      radio.addEventListener("change", () => {
+        if (!radio.checked) return;
+        if (input) {
+          input.value = radio.value;
+        }
+        if (typeof onChange === "function") {
+          onChange(radio.value);
+        }
+      });
+      label.appendChild(radio);
+      label.append(String(option.label ?? option.value));
+      group.appendChild(label);
+    });
+
+    if (container) {
+      container.replaceChildren(group);
+    }
+
+    harnessState.renderRadioGroups.set(inputId, {
+      containerId,
+      inputId,
+      optionsList: clone(optionsList || []),
+      config: clone(config),
+      onChange,
+      group,
       input,
     });
 
@@ -687,6 +753,24 @@ function setRenderedInputValue(window, inputId, value) {
   }
 }
 
+function setRenderedRadioGroupValue(window, inputId, value) {
+  const entry = window.__testHarness?.renderRadioGroups?.get(inputId);
+  if (!entry) {
+    throw new Error(`No rendered radio group found for ${inputId}`);
+  }
+  if (entry.input) {
+    entry.input.value = value;
+  }
+  if (entry.group) {
+    entry.group.querySelectorAll('input[type="radio"]').forEach((radio) => {
+      radio.checked = radio.value === String(value);
+    });
+  }
+  if (typeof entry.onChange === "function") {
+    entry.onChange(value);
+  }
+}
+
 async function clickModalConfirm(window) {
   const confirmHandler = window.__testModalConfirmHandler;
   if (typeof confirmHandler === "function") {
@@ -747,6 +831,7 @@ module.exports = {
   loadScripts,
   projectRoot,
   setRenderedInputValue,
+  setRenderedRadioGroupValue,
   setRenderedSelectValue,
   wireModalHelper,
 };

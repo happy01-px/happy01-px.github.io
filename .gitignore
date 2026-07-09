@@ -2,3 +2,4 @@ node_modules/
 .codex-temp/
 .npm-cache/
 coverage/
+data/.backups/

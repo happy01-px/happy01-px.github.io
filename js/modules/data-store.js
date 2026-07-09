@@ -22,104 +22,6 @@
 
   global.AppDataStoreState = storeState;
 
-  function createFallbackStockMovementData() {
-    const now = new Date();
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    return [
-      {
-        id: "SM001",
-        type: "inbound",
-        productId: "P001",
-        productName: "iPhone 13 Pro",
-        quantity: 50,
-        unit: "个",
-        operator: "张三",
-        remark: "采购入库",
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: "SM002",
-        type: "outbound",
-        productId: "P002",
-        productName: "MacBook Pro",
-        quantity: 15,
-        unit: "个",
-        operator: "张三",
-        remark: "客户订单#20240721-001",
-        createdAt: yesterday,
-        updatedAt: yesterday,
-      },
-      {
-        id: "SM003",
-        type: "inbound",
-        productId: "P003",
-        productName: "AirPods Pro",
-        quantity: 100,
-        unit: "个",
-        operator: "李四",
-        remark: "采购入库",
-        createdAt: yesterday,
-        updatedAt: yesterday,
-      },
-    ];
-  }
-
-  function createFallbackLogsData() {
-    const now = new Date();
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    return [
-      {
-        id: "LOG1",
-        timestamp: now,
-        userId: "U001",
-        userName: "张三",
-        actionType: "add",
-        objectType: "product",
-        objectName: "iPhone 13 Pro",
-        details: "新增商品，数量：50，成本价：5999",
-        ipAddress: "192.168.1.100",
-      },
-      {
-        id: "LOG2",
-        timestamp: yesterday,
-        userId: "U002",
-        userName: "李四",
-        actionType: "edit",
-        objectType: "supplier",
-        objectName: "苹果公司",
-        details: "更新供应商联系方式",
-        ipAddress: "192.168.1.101",
-      },
-      {
-        id: "LOG3",
-        timestamp: yesterday,
-        userId: "U001",
-        userName: "张三",
-        actionType: "edit",
-        objectType: "inventory",
-        objectName: "MacBook Pro",
-        details: "入库操作，原数量：20，新数量：35",
-        ipAddress: "192.168.1.100",
-      },
-      {
-        id: "LOG4",
-        timestamp: yesterday,
-        userId: "U003",
-        userName: "王五",
-        actionType: "delete",
-        objectType: "product",
-        objectName: "旧款iPad",
-        details: "删除商品",
-        ipAddress: "192.168.1.102",
-      },
-    ];
-  }
-
   function createEmptyDataset() {
     return {
       products: [],
@@ -202,7 +104,10 @@
       setStorageState(STORAGE_MODES.remote, "split-files");
       return splitDataset;
     } catch (error) {
-      console.warn("Failed to load split data files, using in-memory fallback.", error);
+      console.warn(
+        "Failed to load split data files, using in-memory fallback.",
+        error,
+      );
       setStorageState(STORAGE_MODES.memory, "fallback");
       return createEmptyDataset();
     }
@@ -225,14 +130,18 @@
   }
 
   async function persistDataset(options = {}) {
-    const dataset = normalizeDataset(options.dataset || createRuntimeDatasetSnapshot());
+    const dataset = normalizeDataset(
+      options.dataset || createRuntimeDatasetSnapshot(),
+    );
     const tables =
       Array.isArray(options.tables) && options.tables.length > 0
         ? options.tables
         : REMOTE_TABLES;
 
     if (storeState.mode !== STORAGE_MODES.remote) {
-      console.warn("Data persistence backend is unavailable; changes remain in memory only.");
+      console.warn(
+        "Data persistence backend is unavailable; changes remain in memory only.",
+      );
       return false;
     }
 
@@ -257,7 +166,9 @@
     mockData = normalizeMockData(mockData);
 
     if (!mockData || !Array.isArray(mockData.products)) {
-      console.error("Security check failed: mockData is incomplete, aborting save.");
+      console.error(
+        "Security check failed: mockData is incomplete, aborting save.",
+      );
       return false;
     }
 
@@ -270,22 +181,55 @@
     }
   }
 
-  function loadStockMovementData() {
-    if (defaultStockMovementData.length > 0) {
-      stockMovementData = restoreStockMovementDates(deepClone(defaultStockMovementData));
-      return;
-    }
+  async function clearAllSystemData() {
+    const previousDataset = createRuntimeDatasetSnapshot();
+    const emptyDataset = createEmptyDataset();
 
-    stockMovementData = createFallbackStockMovementData();
+    mockData = normalizeMockData(emptyDataset);
+    stockMovementData = [];
+    logsData = [];
+
+    try {
+      const persisted = await persistDataset({
+        dataset: emptyDataset,
+      });
+
+      applyDefaultDataset(emptyDataset);
+      return persisted;
+    } catch (error) {
+      console.error("Failed to clear all system data.", error);
+
+      if (storeState.mode === STORAGE_MODES.remote) {
+        try {
+          await saveRemoteTables(previousDataset);
+        } catch (rollbackError) {
+          console.error(
+            "Failed to restore dataset after clear failure.",
+            rollbackError,
+          );
+        }
+      }
+
+      mockData = normalizeMockData(previousDataset);
+      stockMovementData = restoreStockMovementDates(
+        previousDataset.stockMovements,
+      );
+      logsData = restoreLogDates(previousDataset.logs);
+      applyDefaultDataset(previousDataset);
+
+      alert("清空失败：无法写入数据目录，已保留原数据。");
+      return false;
+    }
+  }
+
+  function loadStockMovementData() {
+    stockMovementData = restoreStockMovementDates(
+      deepClone(defaultStockMovementData),
+    );
   }
 
   function loadLogsData() {
-    if (defaultLogsData.length > 0) {
-      logsData = restoreLogDates(deepClone(defaultLogsData));
-      return;
-    }
-
-    logsData = createFallbackLogsData();
+    logsData = restoreLogDates(deepClone(defaultLogsData));
   }
 
   async function persistStockMovementData() {
@@ -385,6 +329,7 @@
   global.loadLogsData = loadLogsData;
   global.persistStockMovementData = persistStockMovementData;
   global.persistLogsData = persistLogsData;
+  global.clearAllSystemData = clearAllSystemData;
   global.exportAllData = exportAllData;
   global.importData = importData;
   global.getDataPersistenceMode = getDataPersistenceMode;
@@ -393,6 +338,7 @@
   global.AppDataStore = Object.freeze({
     loadMockData,
     saveMockData,
+    clearAllSystemData,
     loadStockMovementData,
     loadLogsData,
     persistStockMovementData,

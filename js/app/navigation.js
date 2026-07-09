@@ -418,6 +418,134 @@
     );
   }
 
+  function resetPaginationAfterClearAllData() {
+    Object.values(global.paginationState || {}).forEach((state) => {
+      if (!state || typeof state !== "object") return;
+      state.page = 1;
+      state.total = 0;
+    });
+  }
+
+  function refreshViewsAfterClearAllData() {
+    resetPaginationAfterClearAllData();
+
+    if (typeof global.updateInventoryTable === "function") {
+      global.updateInventoryTable();
+    }
+    if (typeof global.updateCompanyTable === "function") {
+      global.updateCompanyTable();
+    }
+    if (typeof global.updateSupplierTable === "function") {
+      global.updateSupplierTable();
+    }
+    if (typeof global.updateCustomerTable === "function") {
+      global.updateCustomerTable();
+    }
+    if (typeof global.renderStockMovementTable === "function") {
+      global.renderStockMovementTable("all");
+    }
+    if (typeof global.renderLogsTable === "function") {
+      global.renderLogsTable();
+    }
+    if (typeof global.initBillFilters === "function") {
+      global.initBillFilters();
+    }
+    if (typeof global.updateBillsTable === "function") {
+      global.updateBillsTable();
+    }
+    if (typeof global.renderDashboardActivity === "function") {
+      global.renderDashboardActivity();
+    }
+    if (typeof global.initSalesOrder === "function") {
+      global.initSalesOrder();
+    }
+  }
+
+  async function requestClearAllDataConfirmation() {
+    const firstConfirmed =
+      typeof global.showAntdConfirm === "function"
+        ? await global.showAntdConfirm({
+            title: "确认清除所有数据？",
+            content: [
+              "此操作会清空商品、供应商、客户、公司、进出货记录、送货单、对账单和日志。",
+              "建议先在系统设置里导出备份；清空后无法从页面恢复。",
+            ],
+            okText: "继续",
+            cancelText: "取消",
+            okType: "primary",
+            width: 520,
+          })
+        : global.confirm("确认清除所有数据？");
+
+    if (!firstConfirmed) return false;
+
+    return typeof global.showAntdConfirm === "function"
+      ? global.showAntdConfirm({
+          title: "二次确认：清空后不可恢复",
+          content: [
+            "这是危险操作，会把所有数据文件写成空表。",
+            "请确认你确实要清空当前系统内全部业务数据。",
+          ],
+          okText: "确认清空",
+          cancelText: "取消",
+          okType: "danger",
+          okButtonProps: {
+            danger: true,
+            style: {
+              backgroundColor: "#ef4444",
+              borderColor: "#ef4444",
+              color: "#ffffff",
+            },
+          },
+          width: 520,
+        })
+      : global.confirm("二次确认：确定清空全部数据？");
+  }
+
+  async function handleClearAllDataClick(event) {
+    event.preventDefault();
+    const button = event.currentTarget;
+
+    const confirmed = await requestClearAllDataConfirmation();
+    if (!confirmed) return;
+
+    if (typeof global.clearAllSystemData !== "function") {
+      alert("清空失败：系统尚未加载数据服务。");
+      return;
+    }
+
+    const previousHtml = button.innerHTML;
+    button.disabled = true;
+    button.classList.add("opacity-70", "cursor-not-allowed");
+    button.innerHTML =
+      '<i class="fa fa-spinner fa-spin"></i><span>清空中...</span>';
+
+    try {
+      const persisted = await global.clearAllSystemData();
+      refreshViewsAfterClearAllData();
+
+      const mobileSidebar = document.getElementById("mobile-sidebar");
+      if (mobileSidebar) {
+        mobileSidebar.classList.add("hidden");
+      }
+
+      if (persisted) {
+        global.showAntdMessage?.("success", "所有数据已清空并保存。");
+      } else if (global.getDataPersistenceMode?.() === "memory") {
+        global.showAntdMessage?.(
+          "warning",
+          "所有数据已在当前页面清空，但当前未连接数据目录，无法持久保存。",
+        );
+      } else {
+        global.showAntdMessage?.("error", "清空失败，原数据已保留。");
+      }
+    } finally {
+      button.disabled = false;
+      button.classList.remove("opacity-70", "cursor-not-allowed");
+      button.innerHTML = previousHtml;
+    }
+  }
+
   function bindModalEvents() {
     const modal = document.getElementById("modal");
     const closeModal = document.getElementById("close-modal");
@@ -526,6 +654,19 @@
         },
       );
     }
+
+    [
+      document.getElementById("clear-all-data-button"),
+      document.getElementById("mobile-clear-all-data-button"),
+    ].forEach((button) => {
+      if (!button) return;
+      bindElementEventOnce(
+        button,
+        "clearAllDataClickBound",
+        "click",
+        handleClearAllDataClick,
+      );
+    });
   }
 
   global.normalizeDesktopSidebarSection = normalizeDesktopSidebarSection;

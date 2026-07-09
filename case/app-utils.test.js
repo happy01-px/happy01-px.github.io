@@ -64,9 +64,30 @@ test("AppUtils restores dates and creates sequential ids from existing records",
   harness.close();
 });
 
+test("AppUtils sanitizes html fragments before insertion", () => {
+  const harness = createWindow({ markup: '<div id="host"></div>' });
+  loadScripts(harness.window, ["js/modules/app-utils.js"]);
+
+  const host = harness.window.document.getElementById("host");
+  harness.window.setSafeInnerHTML(
+    host,
+    '<div onclick="bad()" style="color:red"><a href="javascript:bad()">Link</a><script>bad()</script><img src="data:text/html,bad" onerror="bad()"></div>',
+  );
+
+  assert.equal(host.querySelector("script"), null);
+  assert.equal(host.querySelector("[onclick]"), null);
+  assert.equal(host.querySelector("[style]"), null);
+  assert.equal(host.querySelector("a").hasAttribute("href"), false);
+  assert.equal(host.querySelector("img").hasAttribute("src"), false);
+  assert.match(host.textContent, /Link/);
+
+  harness.close();
+});
+
 test("AppUtils renders Ant Design Empty for shared empty states when runtime is available", async () => {
   const harness = createWindow({
-    markup: '<div id="empty-host"></div><table><tbody id="empty-table"></tbody></table>',
+    markup:
+      '<div id="empty-host"></div><table><tbody id="empty-table"></tbody></table>',
     loadReactRuntime: true,
   });
   loadScripts(harness.window, ["js/modules/app-utils.js"]);

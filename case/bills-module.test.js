@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const {
   applyFixtureState,
   createWindow,
+  dispatchDomContentLoaded,
   flushAsyncTasks,
   loadScripts,
 } = require("./helpers/browser-harness");
@@ -60,6 +61,7 @@ test("updateBillsTable renders the active customer statements and empty states",
   loadScripts(harness.window, [
     "js/modules/app-utils.js",
     "js/modules/app-state.js",
+    "js/modules/bills-core.js",
     "js/modules/bills-module.js",
   ]);
   applyFixtureState(harness.window, fixture);
@@ -101,6 +103,7 @@ test("bindBillTabEvents switches tabs, clears filters and re-renders supplier da
   loadScripts(harness.window, [
     "js/modules/app-utils.js",
     "js/modules/app-state.js",
+    "js/modules/bills-core.js",
     "js/modules/bills-module.js",
   ]);
   applyFixtureState(harness.window, fixture);
@@ -135,6 +138,49 @@ test("bindBillTabEvents switches tabs, clears filters and re-renders supplier da
     harness.window.document
       .querySelector('#bills-tabs button[data-tab="supplier"]')
       .classList.contains("active"),
+  );
+
+  harness.close();
+});
+
+test("create bill flow blocks invalid tax rate values", async () => {
+  const harness = createWindow({
+    markup: createBillsMarkup(),
+    loadReactRuntime: true,
+  });
+  const fixture = createFixtureData();
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/bills-core.js",
+    "js/modules/bills-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {};
+  harness.window.addLog = () => {};
+
+  dispatchDomContentLoaded(harness.window);
+  await flushAsyncTasks();
+  harness.window.document.getElementById("add-bill-btn").click();
+
+  harness.window.document.getElementById("bill-create-type").value = "customer";
+  harness.window.document.getElementById("bill-create-company").value = "CO001";
+  harness.window.document.getElementById("bill-create-party").value = "C001";
+  harness.window.document.getElementById("bill-create-date").value =
+    "2026-01-31";
+  harness.window.document.getElementById("bill-create-period-start").value =
+    "2026-01-01";
+  harness.window.document.getElementById("bill-create-period-end").value =
+    "2026-01-31";
+  harness.window.document.getElementById("bill-create-tax-rate").value = "0";
+
+  harness.window.document.getElementById("bill-create-submit-btn").click();
+
+  assert.match(harness.alerts.at(-1), /请输入有效的税率系数/);
+  assert.equal(
+    harness.window.mockData.bills.length,
+    fixture.mockData.bills.length,
   );
 
   harness.close();

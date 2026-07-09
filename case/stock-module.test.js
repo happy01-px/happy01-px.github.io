@@ -5,6 +5,7 @@ const {
   clickModalConfirm,
   createWindow,
   loadScripts,
+  setRenderedSelectValue,
 } = require("./helpers/browser-harness");
 const { createFixtureData } = require("./helpers/fixtures");
 
@@ -112,6 +113,77 @@ test("showAddOutboundModal blocks outbound records that exceed current stock", a
 
   assert.equal(result, false);
   assert.match(harness.alerts.at(-1), /库存不足/);
+
+  harness.close();
+});
+
+test("showAddInboundModal creates products with custom category and unit", async () => {
+  const harness = createWindow({ markup: createStockMarkup() });
+  const fixture = createFixtureData();
+  let saveCalls = 0;
+  const logCalls = [];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/stock-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {
+    saveCalls += 1;
+  };
+  harness.window.updateInventoryTable = () => {};
+  harness.window.updateSupplierTable = () => {};
+  harness.window.addLog = (...args) => {
+    logCalls.push(args);
+  };
+
+  harness.window.showAddInboundModal();
+
+  assert.equal(
+    harness.window.__testHarness.renderSelects.get("inbound-category-input")
+      .config.mode,
+    "tags",
+  );
+  assert.equal(
+    harness.window.__testHarness.renderSelects.get("inbound-category-input")
+      .config.enableCreateOption,
+    true,
+  );
+
+  setRenderedSelectValue(
+    harness.window,
+    "inbound-product-choice-input",
+    "Inbound Custom Product",
+  );
+  setRenderedSelectValue(harness.window, "inbound-category-input", "临时分类");
+  setRenderedSelectValue(harness.window, "inbound-supplier-id", "S001");
+  harness.window.document.querySelector(
+    '#add-inbound-form [name="unit"]',
+  ).value = "包";
+  harness.window.document.querySelector(
+    '#add-inbound-form [name="quantity"]',
+  ).value = "9";
+  harness.window.document.querySelector(
+    '#add-inbound-form [name="costPrice"]',
+  ).value = "11";
+  harness.window.document.querySelector(
+    '#add-inbound-form [name="retailPrice"]',
+  ).value = "22";
+
+  const result = await clickModalConfirm(harness.window);
+
+  const createdProduct = harness.window.mockData.products.find(
+    (product) => product.name === "Inbound Custom Product",
+  );
+  assert.equal(result, true);
+  assert.ok(createdProduct);
+  assert.equal(createdProduct.category, "临时分类");
+  assert.equal(createdProduct.unit, "包");
+  assert.equal(harness.window.stockMovementData[0].unit, "包");
+  assert.equal(harness.window.stockMovementData[0].quantity, 9);
+  assert.equal(saveCalls, 1);
+  assert.equal(logCalls.at(-1)[0], "add");
 
   harness.close();
 });

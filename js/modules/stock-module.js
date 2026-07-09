@@ -743,7 +743,11 @@
                     ${buildEditableFieldCard(
                       '供应商 <span class="text-danger">*</span>',
                       '<div id="inbound-supplier-select-container" class="w-full"></div><input type="hidden" name="supplierId" id="inbound-supplier-id" required>',
-                      "xl:col-span-3",
+                      "xl:col-span-2",
+                    )}
+                    ${buildEditableFieldCard(
+                      '单位 <span class="text-danger">*</span>',
+                      '<input type="text" name="unit" required placeholder="如：个、件、箱" class="w-full border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
                     )}
                     ${buildEditableFieldCard(
                       "备注",
@@ -751,7 +755,7 @@
                       "md:col-span-2 xl:col-span-3",
                     )}
                 </div>
-                <p class="text-xs text-gray-500">搜索到已有商品后，会自动带出分类、供应商、成本单价和销售单价；新商品则按你当前填写的数据创建并记录本次进货。</p>
+                <p class="text-xs text-gray-500">搜索到已有商品后，会自动带出分类、供应商、单位、成本单价和销售单价；新商品则按你当前填写的数据创建并记录本次进货。</p>
             </form>
         `;
 
@@ -787,6 +791,7 @@
       const productName = String(formData.get("name") || "").trim();
       const category = String(formData.get("category") || "").trim();
       const supplierId = String(formData.get("supplierId") || "").trim();
+      const unit = String(formData.get("unit") || "").trim();
       const quantityStr = String(formData.get("quantity") || "").trim();
       const costPriceStr = String(formData.get("costPrice") || "").trim();
       const retailPriceStr = String(formData.get("retailPrice") || "").trim();
@@ -813,6 +818,10 @@
       }
       if (!supplierId) {
         alert("请选择供应商");
+        return false;
+      }
+      if (!unit) {
+        alert("请输入单位");
         return false;
       }
 
@@ -852,7 +861,7 @@
           id: createSequentialId(mockData.products, "P"),
           name: productName,
           category,
-          unit: "个",
+          unit,
           costPrice,
           retailPrice,
           stockQuantity: 0,
@@ -867,6 +876,7 @@
       } else {
         finalProduct.name = productName;
         finalProduct.category = category;
+        finalProduct.unit = unit;
         finalProduct.costPrice = costPrice;
         finalProduct.retailPrice = retailPrice;
         finalProduct.supplierId = supplierId;
@@ -885,7 +895,7 @@
         productId: finalProduct.id,
         productName: finalProduct.name,
         quantity,
-        unit: finalProduct.unit || "个",
+        unit: finalProduct.unit,
         supplierId: supplier.id,
         supplierName: supplier.name,
         price: costPrice,
@@ -901,7 +911,7 @@
         "add",
         "stock_movement",
         finalProduct.name,
-        `进货 ${quantity} ${finalProduct.unit || "个"}`,
+        `进货 ${quantity} ${finalProduct.unit}`,
       );
       refreshActiveStockTable();
       updateInventoryTable();
@@ -955,8 +965,19 @@
         "inbound-category-input",
         categoryOptions,
         {
-          placeholder: "请选择分类",
+          placeholder: "请输入或搜索分类...",
+          mode: "tags",
+          controlSearchValue: true,
+          keepSearchTextOnBlur: true,
+          enableCreateOption: true,
+          createOptionLabel: (text) => `添加 ${text}`,
           value: value || undefined,
+        },
+        (selectedValue) => {
+          setHiddenValue(
+            "inbound-category-input",
+            String(selectedValue ?? "").trim(),
+          );
         },
       );
       setHiddenValue("inbound-category-input", value);
@@ -978,6 +999,7 @@
     const clearAutofillFields = () => {
       renderCategorySelect();
       renderSupplierSelect();
+      setInputValue('#add-inbound-form input[name="unit"]', "");
       setInputValue('#add-inbound-form input[name="costPrice"]', "");
       setInputValue('#add-inbound-form input[name="retailPrice"]', "");
     };
@@ -986,6 +1008,7 @@
       if (!product) return;
       renderCategorySelect(product.category || "");
       renderSupplierSelect(product.supplierId || "");
+      setInputValue('#add-inbound-form input[name="unit"]', product.unit || "");
       setInputValue(
         '#add-inbound-form input[name="costPrice"]',
         product.costPrice ?? "",

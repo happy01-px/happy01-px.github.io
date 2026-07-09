@@ -101,6 +101,22 @@
     return true;
   }
 
+  function ensureUniqueRecordId(items, currentId, nextId, entityLabel) {
+    const normalizedNextId = normalizeTextValue(nextId).toLowerCase();
+    const exists = items.some(
+      (item) =>
+        item.id !== currentId &&
+        normalizeTextValue(item.id).toLowerCase() === normalizedNextId,
+    );
+
+    if (exists) {
+      alert(`${entityLabel}编号已存在，请使用其他编号`);
+      return false;
+    }
+
+    return true;
+  }
+
   function renderStatusSelect(containerId, inputId, value) {
     renderAntdSelect(containerId, inputId, STATUS_OPTIONS, {
       placeholder: "请选择状态",
@@ -161,13 +177,14 @@
 
   function countMatchingItems(list, predicate) {
     if (!Array.isArray(list)) return 0;
-    return list.reduce(
-      (total, item) => total + (predicate(item) ? 1 : 0),
-      0,
-    );
+    return list.reduce((total, item) => total + (predicate(item) ? 1 : 0), 0);
   }
 
-  async function requestDeleteConfirmation(entityLabel, recordName, hints = []) {
+  async function requestDeleteConfirmation(
+    entityLabel,
+    recordName,
+    hints = [],
+  ) {
     const content = [
       `确定要删除“${recordName || "-"}”吗？删除后无法撤销。`,
       ...hints.filter(Boolean),
@@ -230,6 +247,29 @@
     if (typeof updateBillsTable === "function") {
       updateBillsTable();
     }
+  }
+
+  function updateCustomerReferenceIds(previousId, nextId) {
+    normalizeList(mockData.bills).forEach((record) => {
+      if (
+        record.statementType === "customer" &&
+        record.partyId === previousId
+      ) {
+        record.partyId = nextId;
+      }
+    });
+
+    normalizeList(mockData.deliveryNotes).forEach((note) => {
+      if (note.customerId === previousId) {
+        note.customerId = nextId;
+      }
+    });
+
+    normalizeList(stockMovementData).forEach((record) => {
+      if (record.customerId === previousId) {
+        record.customerId = nextId;
+      }
+    });
   }
 
   function configureReadonlyModal() {
@@ -394,7 +434,11 @@
                     ${buildEditableFieldCard(
                       '供应商 <span class="text-danger">*</span>',
                       '<div id="modal-supplier-container" class="w-full"></div><input type="hidden" name="supplierId" id="modal-supplier-input" required>',
-                      "xl:col-span-3",
+                      "xl:col-span-2",
+                    )}
+                    ${buildEditableFieldCard(
+                      '单位 <span class="text-danger">*</span>',
+                      '<input type="text" name="unit" required placeholder="如：个、件、箱" class="w-full border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
                     )}
                     ${buildEditableFieldCard(
                       "备注",
@@ -402,7 +446,7 @@
                       "md:col-span-2 xl:col-span-3",
                     )}
                 </div>
-                <p class="text-xs text-gray-500">搜索到已有商品后，会自动带出分类、供应商、成本单价和销售单价；新商品则按你当前填写的数据创建。</p>
+                <p class="text-xs text-gray-500">搜索到已有商品后，会自动带出分类、供应商、单位、成本单价和销售单价；新商品则按你当前填写的数据创建。</p>
             </form>
         `;
 
@@ -412,7 +456,15 @@
         value: product.id,
         label: product.name,
       }));
-    const categoryOptions = PRODUCT_CATEGORIES.map((category) => ({
+    const categoryOptions = [
+      ...new Set(
+        PRODUCT_CATEGORIES.concat(
+          normalizeList(mockData.products)
+            .map((product) => String(product?.category || "").trim())
+            .filter(Boolean),
+        ),
+      ),
+    ].map((category) => ({
       value: category,
       label: category,
     }));
@@ -450,14 +502,37 @@
         alert("请选择供应商");
         return false;
       }
+      if (!formData.get("unit")) {
+        alert("请输入单位");
+        return false;
+      }
+
+      const quantity = Number(formData.get("quantity"));
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        alert("请输入有效的数量");
+        return false;
+      }
+
+      const costPrice = Number(formData.get("costPrice"));
+      if (!Number.isFinite(costPrice) || costPrice < 0) {
+        alert("请输入有效的成本单价");
+        return false;
+      }
+
+      const retailPrice = Number(formData.get("retailPrice"));
+      if (!Number.isFinite(retailPrice) || retailPrice < 0) {
+        alert("请输入有效的销售单价");
+        return false;
+      }
 
       const productData = {
-        name: formData.get("name"),
-        category: formData.get("category"),
-        quantity: parseInt(formData.get("quantity"), 10),
-        costPrice: parseFloat(formData.get("costPrice")),
-        retailPrice: parseFloat(formData.get("retailPrice")),
-        supplierId: formData.get("supplierId"),
+        name: normalizeTextValue(formData.get("name")),
+        category: normalizeTextValue(formData.get("category")),
+        unit: String(formData.get("unit") || "").trim(),
+        quantity,
+        costPrice,
+        retailPrice,
+        supplierId: normalizeTextValue(formData.get("supplierId")),
         notes: formData.get("notes"),
       };
 
@@ -486,8 +561,19 @@
         "modal-category-input",
         categoryOptions,
         {
-          placeholder: "请选择分类",
+          placeholder: "请输入或搜索分类...",
+          mode: "tags",
+          controlSearchValue: true,
+          keepSearchTextOnBlur: true,
+          enableCreateOption: true,
+          createOptionLabel: (text) => `添加 ${text}`,
           value: value || undefined,
+        },
+        (selectedValue) => {
+          setHiddenValue(
+            "modal-category-input",
+            String(selectedValue ?? "").trim(),
+          );
         },
       );
       setHiddenValue("modal-category-input", value);
@@ -509,6 +595,7 @@
     const clearAutofillFields = () => {
       renderCategorySelect();
       renderSupplierSelect();
+      setInputValue('#add-product-form input[name="unit"]', "");
       setInputValue('#add-product-form input[name="costPrice"]', "");
       setInputValue('#add-product-form input[name="retailPrice"]', "");
     };
@@ -517,6 +604,7 @@
       if (!product) return;
       renderCategorySelect(product.category || "");
       renderSupplierSelect(product.supplierId || "");
+      setInputValue('#add-product-form input[name="unit"]', product.unit || "");
       setInputValue(
         '#add-product-form input[name="costPrice"]',
         product.costPrice ?? "",
@@ -631,7 +719,7 @@
         id: createSequentialId(mockData.products, "P"),
         name: productData.name,
         category: productData.category,
-        unit: "个",
+        unit: productData.unit,
         costPrice: productData.costPrice,
         retailPrice: productData.retailPrice,
         stockQuantity: productData.quantity,
@@ -838,12 +926,20 @@
       return;
     }
 
+    const customerIdValue = escapeHTML(getEditableFieldValue(customer.id));
     const statusMeta = getStatusMeta(customer.status);
     const statusBadge = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusMeta.className}">${escapeHTML(statusMeta.label)}</span>`;
 
     const content = `
             <div class="space-y-3">
                 ${buildReadonlySummaryCard("users", customer.name, `编号: ${customer.id || "-"}`, statusMeta)}
+                ${buildEditableFieldCard(
+                  '客户编号 <span class="text-danger">*</span>',
+                  `<div class="flex flex-col sm:flex-row gap-2">
+                      <input type="text" id="view-customer-id-input" value="${customerIdValue}" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                      <button type="button" id="view-customer-id-save" class="sm:w-24 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-md transition-all-300">保存</button>
+                  </div>`,
+                )}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     ${buildReadonlyFieldCard("客户名称", getSafeDisplayValue(customer.name))}
                     ${buildReadonlyFieldCard("联系人", getSafeDisplayValue(customer.contactPerson))}
@@ -860,6 +956,72 @@
 
     showModal("查看客户详情", content);
     configureReadonlyModal();
+    bindViewCustomerIdEditor(customer.id);
+  }
+
+  function bindViewCustomerIdEditor(customerId) {
+    const input = document.getElementById("view-customer-id-input");
+    const button = document.getElementById("view-customer-id-save");
+    if (!input || !button) return;
+
+    const saveCustomerId = async () => {
+      const nextId = normalizeTextValue(input.value);
+      const customer = mockData.customers.find(
+        (item) => item.id === customerId,
+      );
+
+      if (!customer) {
+        alert("未找到对应的客户记录");
+        return;
+      }
+
+      if (!nextId) {
+        alert("请输入客户编号");
+        return;
+      }
+
+      if (nextId === customer.id) {
+        alert("客户编号未变化");
+        return;
+      }
+
+      if (
+        !ensureUniqueRecordId(mockData.customers, customer.id, nextId, "客户")
+      ) {
+        return;
+      }
+
+      const previousId = customer.id;
+      customer.id = nextId;
+      customer.updatedAt = getLocalISOString();
+      updateCustomerReferenceIds(previousId, nextId);
+
+      await persistMasterDataChanges();
+      if (typeof addLog === "function") {
+        addLog(
+          "edit",
+          "customer",
+          customer.name,
+          `修改客户编号：${previousId} -> ${nextId}`,
+        );
+      }
+
+      updateCustomerTable();
+      refreshBillDependencies();
+      refreshStockDependencies();
+      alert("客户编号已更新");
+      showViewCustomerModal(nextId);
+    };
+
+    button.addEventListener("click", () => {
+      saveCustomerId();
+    });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        saveCustomerId();
+      }
+    });
   }
 
   function updateInventoryTable() {
@@ -1137,7 +1299,8 @@
     );
     const relatedBillCount = countMatchingItems(
       mockData.bills,
-      (item) => item.partyId === supplierId && item.statementType === "supplier",
+      (item) =>
+        item.partyId === supplierId && item.statementType === "supplier",
     );
     const relatedDeliveryCount = countMatchingItems(
       mockData.deliveryNotes,
@@ -1191,7 +1354,8 @@
     const customer = mockData.customers[customerIndex];
     const relatedBillCount = countMatchingItems(
       mockData.bills,
-      (item) => item.partyId === customerId && item.statementType === "customer",
+      (item) =>
+        item.partyId === customerId && item.statementType === "customer",
     );
     const relatedDeliveryCount = countMatchingItems(
       mockData.deliveryNotes,
@@ -1768,6 +1932,64 @@
     );
   }
 
+  function bindAddCustomerTaxRateControls() {
+    const form = document.getElementById("add-customer-form");
+    const choiceContainer = document.getElementById(
+      "add-customer-tax-rate-choice-container",
+    );
+    const choiceInput = document.getElementById(
+      "add-customer-tax-rate-choice-input",
+    );
+    const wrap = document.getElementById("add-customer-tax-rate-wrap");
+    const input = document.getElementById("add-customer-tax-rate-input");
+    if (!form || !choiceContainer || !choiceInput || !wrap || !input) return;
+
+    const syncVisibility = () => {
+      const selectedValue = choiceInput.value || "";
+      const shouldShow = selectedValue === "yes";
+      wrap.classList.toggle("invisible", !shouldShow);
+      wrap.classList.toggle("pointer-events-none", !shouldShow);
+      wrap.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+      input.required = shouldShow;
+
+      if (!shouldShow) {
+        input.value = "";
+      }
+    };
+
+    if (typeof renderAntdRadioGroup === "function") {
+      renderAntdRadioGroup(
+        "add-customer-tax-rate-choice-container",
+        "add-customer-tax-rate-choice-input",
+        [
+          { value: "no", label: "否" },
+          { value: "yes", label: "是" },
+        ],
+        {
+          name: "hasTaxRate",
+        },
+        (value) => {
+          choiceInput.value = value || "";
+          syncVisibility();
+        },
+      );
+    }
+
+    if (typeof renderAntdInput === "function") {
+      renderAntdInput(
+        "add-customer-tax-rate-input-container",
+        "add-customer-tax-rate-input",
+        {
+          placeholder: "请输入税率系数",
+          inputMode: "decimal",
+        },
+      );
+    }
+
+    choiceInput.addEventListener("change", syncVisibility);
+    syncVisibility();
+  }
+
   function showAddCustomerModal() {
     const content = `
             <form id="add-customer-form" class="space-y-3">
@@ -1778,6 +2000,10 @@
                       '<input type="text" name="name" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
                     )}
                     ${buildEditableFieldCard(
+                      '客户编号 <span class="text-danger">*</span>',
+                      '<input type="text" name="id" required placeholder="请输入客户编号" class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
+                    )}
+                    ${buildEditableFieldCard(
                       '联系人 <span class="text-danger">*</span>',
                       '<input type="text" name="contactPerson" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
                     )}
@@ -1786,16 +2012,27 @@
                       '<input type="tel" name="contactPhone" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入国内手机号或座机号">',
                     )}
                     ${buildEditableFieldCard(
-                      "电子邮箱",
-                      '<input type="email" name="email" class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
-                    )}
-                    ${buildEditableFieldCard(
                       '付款条件 <span class="text-danger">*</span>',
                       '<div id="add-customer-payment-container" class="w-full"></div><input type="hidden" name="paymentTerms" id="add-customer-payment-input" required>',
                     )}
                     ${buildEditableFieldCard(
+                      "电子邮箱",
+                      '<input type="email" name="email" class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
+                    )}
+                    ${buildEditableFieldCard(
                       '客户地址 <span class="text-danger">*</span>',
                       '<input type="text" name="address" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
+                    )}
+                    ${buildEditableFieldCard(
+                      '税率系数 <span class="text-danger">*</span>',
+                      `<div class="flex min-h-[40px] flex-col gap-2 sm:flex-row sm:items-center">
+                          <div id="add-customer-tax-rate-choice-container" class="shrink-0"></div>
+                          <input type="hidden" name="hasTaxRate" id="add-customer-tax-rate-choice-input" required>
+                          <div id="add-customer-tax-rate-wrap" class="invisible pointer-events-none min-w-0 flex-1" aria-hidden="true">
+                              <div id="add-customer-tax-rate-input-container" class="w-full"></div>
+                              <input type="hidden" name="taxRateCoefficient" id="add-customer-tax-rate-input">
+                          </div>
+                      </div>`,
                     )}
                 </div>
                 <p class="text-xs text-gray-500">建议把付款条件和地址一起补全，后续销售单和送货单会直接引用这些数据。</p>
@@ -1806,15 +2043,25 @@
       const form = document.getElementById("add-customer-form");
       const formData = new FormData(form);
 
+      const id = normalizeTextValue(formData.get("id"));
       const name = formData.get("name").trim();
       const contactPerson = formData.get("contactPerson").trim();
       const contactPhone = formData.get("contactPhone").trim();
       const address = formData.get("address").trim();
       const email = formData.get("email").trim();
+      const hasTaxRate = normalizeTextValue(formData.get("hasTaxRate"));
+      const taxRateCoefficientText = normalizeTextValue(
+        formData.get("taxRateCoefficient"),
+      );
       const paymentTerms = document.getElementById(
         "add-customer-payment-input",
       ).value;
+      let taxRateCoefficient = null;
 
+      if (!id) {
+        alert("请输入客户编号");
+        return false;
+      }
       if (!name) {
         alert("请输入客户名称");
         return false;
@@ -1831,19 +2078,44 @@
         alert("请输入客户地址");
         return false;
       }
+      if (!paymentTerms) {
+        alert("请选择付款条件");
+        return false;
+      }
+      if (!hasTaxRate) {
+        alert("请选择是否有税率系数");
+        return false;
+      }
+      if (hasTaxRate === "yes") {
+        if (!taxRateCoefficientText) {
+          alert("请输入税率系数");
+          return false;
+        }
+
+        taxRateCoefficient = Number(taxRateCoefficientText);
+        if (!Number.isFinite(taxRateCoefficient) || taxRateCoefficient <= 0) {
+          alert("请输入有效的税率系数");
+          return false;
+        }
+      }
       if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
         alert("请输入有效的国内联系电话（手机号或座机号）");
         return false;
       }
+      if (!ensureUniqueRecordId(mockData.customers, null, id, "客户")) {
+        return false;
+      }
 
       const newCustomer = {
-        id: createSequentialId(mockData.customers, "C"),
+        id,
         name,
         contactPerson,
         contactPhone,
         address,
         email: email || "-",
         paymentTerms,
+        hasTaxRate: hasTaxRate === "yes",
+        taxRateCoefficient,
         creditLimit: 0,
         status: "active",
         createdAt: getLocalISOString(),
@@ -1864,8 +2136,9 @@
       "add-customer-payment-container",
       "add-customer-payment-input",
       PAYMENT_OPTIONS,
-      "Net 30",
+      "请选择付款条件",
     );
+    bindAddCustomerTaxRateControls();
   }
 
   function showEditCustomerModal(customerId) {
@@ -2036,7 +2309,7 @@
     const paginatedCustomers = sortedCustomers.slice(startIndex, endIndex);
 
     if (paginatedCustomers.length === 0) {
-      renderAntdEmptyTableRow(tbody, 9, "暂无客户记录");
+      renderAntdEmptyTableRow(tbody, 10, "暂无客户记录");
       renderPaginationControl(
         "customer-pagination-container",
         "customers",
@@ -2048,6 +2321,7 @@
     paginatedCustomers.forEach((customer) => {
       const formattedCreatedAt = formatDateTime(customer.createdAt);
       const formattedUpdatedAt = formatDateTime(customer.updatedAt);
+      const safeCustomerId = escapeHTML(customer.id || "-");
       const safeCustomerName = escapeHTML(customer.name || "-");
       const safeContactPerson = escapeHTML(customer.contactPerson || "-");
       const safeContactPhone = escapeHTML(customer.contactPhone || "-");
@@ -2059,6 +2333,7 @@
 
       const row = document.createElement("tr");
       row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${safeCustomerId}</td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm font-medium text-gray-900">${safeCustomerName}</div>
                 </td>

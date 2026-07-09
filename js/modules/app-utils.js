@@ -63,6 +63,48 @@
       .replace(/'/g, "&#39;");
   }
 
+  function sanitizeHTMLFragment(html) {
+    const template = document.createElement("template");
+    template.innerHTML = String(html ?? "");
+
+    template.content
+      .querySelectorAll("script, iframe, object, embed, link, meta")
+      .forEach((element) => element.remove());
+
+    template.content.querySelectorAll("*").forEach((element) => {
+      [...element.attributes].forEach((attribute) => {
+        const name = attribute.name.toLowerCase();
+        const value = String(attribute.value || "")
+          .trim()
+          .toLowerCase();
+        const isUrlAttribute = [
+          "href",
+          "src",
+          "xlink:href",
+          "formaction",
+          "action",
+        ].includes(name);
+        const hasUnsafeUrl =
+          isUrlAttribute &&
+          (value.startsWith("javascript:") ||
+            value.startsWith("data:text/html"));
+
+        if (name.startsWith("on") || name === "style" || hasUnsafeUrl) {
+          element.removeAttribute(attribute.name);
+        }
+      });
+    });
+
+    return template.content;
+  }
+
+  function setSafeInnerHTML(target, html) {
+    if (!target) return false;
+    const fragment = sanitizeHTMLFragment(html);
+    target.replaceChildren(fragment.cloneNode(true));
+    return true;
+  }
+
   function createSequentialId(items, prefix, padLength = 3) {
     const maxId = normalizeList(items).reduce((max, item) => {
       const rawId = String(item?.id ?? "");
@@ -199,6 +241,8 @@
   global.restoreStockMovementDates = restoreStockMovementDates;
   global.restoreLogDates = restoreLogDates;
   global.escapeHTML = escapeHTML;
+  global.sanitizeHTMLFragment = sanitizeHTMLFragment;
+  global.setSafeInnerHTML = setSafeInnerHTML;
   global.createSequentialId = createSequentialId;
   global.createRuntimeId = createRuntimeId;
   global.createAntdEmptyNode = createAntdEmptyNode;
@@ -213,6 +257,8 @@
     restoreStockMovementDates,
     restoreLogDates,
     escapeHTML,
+    sanitizeHTMLFragment,
+    setSafeInnerHTML,
     createSequentialId,
     createRuntimeId,
     createAntdEmptyNode,

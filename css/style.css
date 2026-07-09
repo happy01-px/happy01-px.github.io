@@ -181,6 +181,140 @@ body {
   background: #4096ff !important;
 }
 
+body
+  :is(
+    input:not([type]),
+    input[type="text"],
+    input[type="tel"],
+    input[type="email"],
+    input[type="number"],
+    input[type="password"],
+    input[type="search"],
+    input[type="date"],
+    textarea
+  ):not(.border-0):not(.ant-input):not(.ant-input-number-input):not(
+    .ant-select *
+  ):not(.ant-picker *):not(.ant-input-affix-wrapper *) {
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 11px !important;
+  color: rgba(0, 0, 0, 0.88) !important;
+  background-color: #ffffff !important;
+  border: 1px solid #d9d9d9 !important;
+  border-radius: 6px !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background 0.2s;
+}
+
+body
+  textarea:not(.border-0):not(.ant-input):not(.ant-input-number-input):not(
+    .ant-select *
+  ):not(.ant-picker *):not(.ant-input-affix-wrapper *) {
+  min-height: 72px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+body
+  :is(
+    input:not([type]),
+    input[type="text"],
+    input[type="tel"],
+    input[type="email"],
+    input[type="number"],
+    input[type="password"],
+    input[type="search"],
+    input[type="date"],
+    textarea
+  ):not(.border-0):not(.ant-input):not(.ant-input-number-input):not(
+    .ant-select *
+  ):not(.ant-picker *):not(.ant-input-affix-wrapper *):hover {
+  border-color: #4096ff !important;
+}
+
+body
+  :is(
+    input:not([type]),
+    input[type="text"],
+    input[type="tel"],
+    input[type="email"],
+    input[type="number"],
+    input[type="password"],
+    input[type="search"],
+    input[type="date"],
+    textarea
+  ):not(.border-0):not(.ant-input):not(.ant-input-number-input):not(
+    .ant-select *
+  ):not(.ant-picker *):not(.ant-input-affix-wrapper *):focus {
+  border-color: #1677ff !important;
+  box-shadow: 0 0 0 2px rgba(5, 145, 255, 0.1) !important;
+}
+
+body
+  :is(
+    input:not([type]),
+    input[type="text"],
+    input[type="tel"],
+    input[type="email"],
+    input[type="number"],
+    input[type="password"],
+    input[type="search"],
+    input[type="date"],
+    textarea
+  ):not(.border-0):not(.ant-input):not(.ant-input-number-input):not(
+    .ant-select *
+  ):not(.ant-picker *):not(.ant-input-affix-wrapper *)::placeholder {
+  color: #bfbfbf !important;
+}
+
+body
+  :is(
+    input:not([type]),
+    input[type="text"],
+    input[type="tel"],
+    input[type="email"],
+    input[type="number"],
+    input[type="password"],
+    input[type="search"],
+    input[type="date"],
+    textarea
+  ):not(.border-0):not(.ant-input):not(.ant-input-number-input):not(
+    .ant-select *
+  ):not(.ant-picker *):not(.ant-input-affix-wrapper *):disabled {
+  color: rgba(0, 0, 0, 0.25) !important;
+  cursor: not-allowed;
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  border-color: #d9d9d9 !important;
+  box-shadow: none !important;
+}
+
+body
+  input[type="number"]:not(.border-0):not(.ant-input):not(
+    .ant-input-number-input
+  ):not(.ant-select *):not(.ant-picker *):not(
+    .ant-input-affix-wrapper *
+  )::-webkit-outer-spin-button,
+body
+  input[type="number"]:not(.border-0):not(.ant-input):not(
+    .ant-input-number-input
+  ):not(.ant-select *):not(.ant-picker *):not(
+    .ant-input-affix-wrapper *
+  )::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+body
+  input[type="number"]:not(.border-0):not(.ant-input):not(
+    .ant-input-number-input
+  ):not(.ant-select *):not(.ant-picker *):not(.ant-input-affix-wrapper *) {
+  appearance: textfield;
+}
+
 #sales-order .sales-order-qty-input-number.ant-input-number {
   width: 100% !important;
   border: 1px solid #d1d5db !important;

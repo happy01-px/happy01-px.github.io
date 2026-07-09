@@ -38,7 +38,10 @@ function assertSplitDataFilesExist() {
     "logs",
   ].forEach((tableName) => {
     const tableData = readJson(`data/${tableName}.json`);
-    assert(Array.isArray(tableData), `data/${tableName}.json should be an array.`);
+    assert(
+      Array.isArray(tableData),
+      `data/${tableName}.json should be an array.`,
+    );
   });
 }
 
@@ -61,6 +64,7 @@ function main() {
     "js/modules/stock-module.js",
     "js/modules/logs-module.js",
     "js/modules/settings-module.js",
+    "js/modules/bills-core.js",
     "js/modules/bills-module.js",
     "js/script.js",
     "js/ui/antd-bridge.js",

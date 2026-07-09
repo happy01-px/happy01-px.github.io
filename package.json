@@ -14,7 +14,7 @@
     "test": "node scripts/smoke-check.js && node --test",
     "test:smoke": "node scripts/smoke-check.js",
     "test:cases": "node --test",
-    "coverage": "c8 --reporter=text --reporter=html node --test",
+    "coverage": "c8 --exclude=case/** --exclude=lib/** --reporter=text --reporter=html node --test",
     "ci:check": "npm run lint && npm run typecheck && npm test && npm run coverage",
     "build": "pkg ."
   },

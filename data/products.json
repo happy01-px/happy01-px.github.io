@@ -6,12 +6,12 @@
         "unit": "个",
         "costPrice": 1799,
         "retailPrice": 1999,
-        "stockQuantity": 212,
+        "stockQuantity": 215,
         "minStock": 50,
         "maxStock": 200,
         "supplierId": "S001",
         "createdAt": "2023-04-20",
-        "updatedAt": "2026-04-29T11:01:47"
+        "updatedAt": "2026-04-30T15:28:45"
     },
     {
         "id": "P005",

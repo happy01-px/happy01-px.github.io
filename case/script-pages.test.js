@@ -46,6 +46,8 @@ function createScriptPageMarkup() {
         <button id="add-company-btn" type="button">add company</button>
         <button id="add-inbound-btn" type="button">add inbound</button>
         <button id="add-outbound-btn" type="button">add outbound</button>
+        <button id="clear-all-data-button" type="button">clear all</button>
+        <button id="mobile-clear-all-data-button" type="button">mobile clear all</button>
         <section id="dashboard" class="page-section"></section>
         <section id="inventory" class="page-section hidden"></section>
         <section id="stock-movement" class="page-section hidden">
@@ -249,12 +251,23 @@ test("bindModalEvents closes the modal from close, cancel and overlay actions", 
   loadScripts(harness.window, getAppShellScriptPaths());
   harness.window.bindModalEvents();
 
-  harness.window.showModal("Demo", "<div>Body</div>");
+  harness.window.showModal(
+    "Demo",
+    '<div onclick="bad()">Body<script>bad()</script></div>',
+  );
   assert.equal(
     harness.window.document
       .getElementById("modal")
       .classList.contains("hidden"),
     false,
+  );
+  assert.equal(
+    harness.window.document.querySelector("#modal-content script"),
+    null,
+  );
+  assert.equal(
+    harness.window.document.querySelector("#modal-content [onclick]"),
+    null,
   );
 
   harness.window.document.getElementById("close-modal").click();
@@ -343,6 +356,55 @@ test("bindActionButtons routes button clicks to the expected handlers", async ()
       .getElementById("sales-order")
       .classList.contains("hidden"),
   );
+
+  harness.close();
+});
+
+test("clear all data buttons require two confirmations before clearing", async () => {
+  const harness = createWindow({ markup: createScriptPageMarkup() });
+  const calls = {
+    clear: 0,
+    inventory: 0,
+    logs: 0,
+  };
+  const confirmCalls = [];
+  const confirmQueue = [];
+
+  loadScripts(harness.window, getAppShellScriptPaths());
+  harness.window.showAntdConfirm = async (options) => {
+    confirmCalls.push(options);
+    return confirmQueue.shift() ?? true;
+  };
+  harness.window.clearAllSystemData = async () => {
+    calls.clear += 1;
+    return true;
+  };
+  harness.window.updateInventoryTable = () => {
+    calls.inventory += 1;
+  };
+  harness.window.renderLogsTable = () => {
+    calls.logs += 1;
+  };
+
+  confirmQueue.push(true, false);
+  harness.window.bindActionButtons();
+  harness.window.document.getElementById("clear-all-data-button").click();
+  await flushAsyncTasks(3);
+
+  assert.equal(calls.clear, 0);
+  assert.equal(confirmCalls.length, 2);
+  assert.equal(confirmCalls[1].okText, "确认清空");
+  assert.equal(confirmCalls[1].okType, "danger");
+
+  confirmQueue.push(true, true);
+  harness.window.document
+    .getElementById("mobile-clear-all-data-button")
+    .click();
+  await flushAsyncTasks(4);
+
+  assert.equal(calls.clear, 1);
+  assert.equal(calls.inventory, 1);
+  assert.equal(calls.logs, 1);
 
   harness.close();
 });

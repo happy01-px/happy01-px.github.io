@@ -37,14 +37,14 @@ function installSplitDataFetch(window, fixture, apiHandler) {
     "data/logs.json": fixture.logsData,
   };
 
-  window.fetch = async (url) => {
+  window.fetch = async (url, options) => {
     if (Object.prototype.hasOwnProperty.call(tableMap, url)) {
       return createResponse(true, tableMap[url]);
     }
 
     if (String(url).startsWith("/api/save/")) {
       if (typeof apiHandler === "function") {
-        return apiHandler(url);
+        return apiHandler(url, options);
       }
 
       return {
@@ -100,8 +100,8 @@ test("loadMockData falls back to in-memory defaults when split files are unavail
 
   assert.equal(harness.window.mockData.products.length, 0);
   assert.equal(harness.window.mockData.suppliers.length, 0);
-  assert.equal(harness.window.stockMovementData.length, 3);
-  assert.equal(harness.window.logsData.length, 4);
+  assert.equal(harness.window.stockMovementData.length, 0);
+  assert.equal(harness.window.logsData.length, 0);
   assert.equal(harness.window.getDataPersistenceMode(), "memory");
   assert.equal(harness.window.getDataPersistenceSource(), "fallback");
 
@@ -164,6 +164,53 @@ test("saveMockData returns false and alerts when the remote save fails", async (
   assert.equal(harness.window.getDataPersistenceMode(), "remote");
   assert.equal(harness.window.getDataPersistenceSource(), "split-files");
   assert.ok(harness.alerts.length > 0);
+
+  harness.close();
+});
+
+test("clearAllSystemData empties every persisted table", async () => {
+  const harness = createWindow();
+  const fixture = createFixtureData();
+  const savedTables = new Map();
+
+  loadDataStoreScripts(harness.window);
+  installSplitDataFetch(harness.window, fixture, async (url, options) => {
+    savedTables.set(url, JSON.parse(options.body));
+    return {
+      ok: true,
+      status: 200,
+      statusText: "OK",
+    };
+  });
+
+  await harness.window.loadMockData();
+  harness.window.loadStockMovementData();
+  harness.window.loadLogsData();
+
+  const cleared = await harness.window.clearAllSystemData();
+
+  assert.equal(cleared, true);
+  assert.equal(harness.window.mockData.products.length, 0);
+  assert.equal(harness.window.mockData.suppliers.length, 0);
+  assert.equal(harness.window.mockData.customers.length, 0);
+  assert.equal(harness.window.mockData.companies.length, 0);
+  assert.equal(harness.window.mockData.bills.length, 0);
+  assert.equal(harness.window.mockData.deliveryNotes.length, 0);
+  assert.equal(harness.window.stockMovementData.length, 0);
+  assert.equal(harness.window.logsData.length, 0);
+  assert.deepEqual(Array.from(savedTables.keys()), [
+    "/api/save/products",
+    "/api/save/suppliers",
+    "/api/save/customers",
+    "/api/save/companies",
+    "/api/save/bills",
+    "/api/save/deliveryNotes",
+    "/api/save/stockMovements",
+    "/api/save/logs",
+  ]);
+  savedTables.forEach((records) => {
+    assert.deepEqual(records, []);
+  });
 
   harness.close();
 });

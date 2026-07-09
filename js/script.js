@@ -886,9 +886,68 @@ const renderAntdInput = (
   return true;
 };
 
+const renderAntdRadioGroup = (
+  containerId,
+  inputId,
+  options,
+  configOrDefaultValue,
+  onChangeCallback,
+) => {
+  if (!window.React || !window.ReactDOM || !window.antd?.Radio) return false;
+
+  const { Radio } = window.antd;
+  const React = window.React;
+  const ReactDOM = window.ReactDOM;
+  const { useState } = React;
+  const container = document.getElementById(containerId);
+  if (!container) return false;
+
+  const config =
+    configOrDefaultValue && typeof configOrDefaultValue === "object"
+      ? configOrDefaultValue
+      : { defaultValue: configOrDefaultValue };
+  const initialValue =
+    config.value ??
+    config.defaultValue ??
+    document.getElementById(inputId)?.value ??
+    "";
+
+  const App = () => {
+    const [value, setValue] = useState(initialValue);
+
+    const handleChange = (event) => {
+      const nextValue = event.target.value;
+      setValue(nextValue);
+
+      const input = document.getElementById(inputId);
+      if (input) {
+        input.value = nextValue;
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+
+      if (onChangeCallback) onChangeCallback(nextValue);
+    };
+
+    return React.createElement(Radio.Group, {
+      name: config.name || inputId,
+      options,
+      value: value || undefined,
+      onChange: handleChange,
+      ...config,
+    });
+  };
+
+  if (!container._reactRoot) {
+    container._reactRoot = ReactDOM.createRoot(container);
+  }
+  container._reactRoot.render(React.createElement(App));
+  return true;
+};
+
 // Expose to global scope for other scripts
 window.renderAntdSelect = renderAntdSelect;
 window.renderAntdInput = renderAntdInput;
+window.renderAntdRadioGroup = renderAntdRadioGroup;
 
 const initAntdComponents = () => {
   // 检查依赖是否加载
@@ -1021,8 +1080,7 @@ const initAntdComponents = () => {
                       !Array.isArray(next.closable)
                     ? next.closable
                     : {
-                        "aria-label":
-                          next.closeAriaLabel || "关闭确认弹窗",
+                        "aria-label": next.closeAriaLabel || "关闭确认弹窗",
                       },
               resolve,
             });
@@ -2109,7 +2167,9 @@ function updateBillsTable() {
         `;
     const deleteButton = row.querySelector('[data-action="delete"]');
     if (deleteButton) {
-      deleteButton.addEventListener("click", () => deleteLegacyBillRecord(bill));
+      deleteButton.addEventListener("click", () =>
+        deleteLegacyBillRecord(bill),
+      );
     }
     tbody.appendChild(row);
   });
@@ -2140,7 +2200,13 @@ function showModal(title, content, confirmCallback) {
   }
 
   document.getElementById("modal-title").textContent = title;
-  document.getElementById("modal-content").innerHTML = content;
+  if (content instanceof Node) {
+    modalContent.replaceChildren(content);
+  } else if (typeof window.setSafeInnerHTML === "function") {
+    window.setSafeInnerHTML(modalContent, content);
+  } else {
+    modalContent.textContent = String(content ?? "");
+  }
   document.getElementById("modal").classList.remove("hidden");
 
   // 设置确认按钮回调

@@ -6,6 +6,9 @@ const {
   createWindow,
   flushAsyncTasks,
   loadScripts,
+  setRenderedInputValue,
+  setRenderedRadioGroupValue,
+  setRenderedSelectValue,
 } = require("./helpers/browser-harness");
 const { createFixtureData } = require("./helpers/fixtures");
 
@@ -75,6 +78,7 @@ test("addProduct creates a new product and renders the inventory table", () => {
   harness.window.addProduct({
     name: "Fresh Product",
     category: "家具",
+    unit: "盒",
     quantity: 4,
     costPrice: 20,
     retailPrice: 30,
@@ -90,8 +94,18 @@ test("addProduct creates a new product and renders the inventory table", () => {
   assert.equal(harness.window.stockMovementData.length, 3);
   assert.equal(harness.window.stockMovementData[0].type, "inbound");
   assert.equal(harness.window.stockMovementData[0].productId, "P003");
-  assert.equal(harness.window.stockMovementData[0].productName, "Fresh Product");
+  assert.equal(
+    harness.window.stockMovementData[0].productName,
+    "Fresh Product",
+  );
+  assert.equal(
+    harness.window.mockData.products.find(
+      (product) => product.name === "Fresh Product",
+    ).unit,
+    "盒",
+  );
   assert.equal(harness.window.stockMovementData[0].quantity, 4);
+  assert.equal(harness.window.stockMovementData[0].unit, "盒");
   assert.equal(harness.window.stockMovementData[0].supplierName, "Acme Supply");
   assert.equal(harness.window.stockMovementData[0].price, 20);
   assert.equal(saveCalls, 1);
@@ -100,6 +114,142 @@ test("addProduct creates a new product and renders the inventory table", () => {
   assert.equal(
     harness.window.document.querySelectorAll("#inventory-table-body tr").length,
     3,
+  );
+
+  harness.close();
+});
+
+test("showAddProductModal allows creating a product with a new category", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.addLog = () => {};
+  harness.window.saveMockData = () => {};
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showAddProductModal();
+
+  assert.equal(
+    harness.window.__testHarness.renderSelects.get("modal-category-input")
+      .config.mode,
+    "tags",
+  );
+  assert.equal(
+    harness.window.__testHarness.renderSelects.get("modal-category-input")
+      .config.enableCreateOption,
+    true,
+  );
+
+  setRenderedSelectValue(
+    harness.window,
+    "modal-product-choice-input",
+    "Flexible Stand",
+  );
+  setRenderedSelectValue(harness.window, "modal-category-input", "办公耗材");
+  setRenderedSelectValue(harness.window, "modal-supplier-input", "S001");
+  harness.window.document.querySelector(
+    '#add-product-form [name="unit"]',
+  ).value = "套";
+  harness.window.document.querySelector(
+    '#add-product-form [name="quantity"]',
+  ).value = "7";
+  harness.window.document.querySelector(
+    '#add-product-form [name="costPrice"]',
+  ).value = "12.5";
+  harness.window.document.querySelector(
+    '#add-product-form [name="retailPrice"]',
+  ).value = "25";
+
+  await clickModalConfirm(harness.window);
+
+  const createdProduct = harness.window.mockData.products.find(
+    (product) => product.name === "Flexible Stand",
+  );
+  assert.ok(createdProduct);
+  assert.equal(createdProduct.category, "办公耗材");
+  assert.equal(createdProduct.unit, "套");
+
+  harness.close();
+});
+
+test("showAddProductModal blocks invalid required number fields", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  let saveCalls = 0;
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.addLog = () => {};
+  harness.window.saveMockData = () => {
+    saveCalls += 1;
+  };
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showAddProductModal();
+  setRenderedSelectValue(
+    harness.window,
+    "modal-product-choice-input",
+    "Invalid Required Product",
+  );
+  setRenderedSelectValue(harness.window, "modal-category-input", "临时分类");
+  setRenderedSelectValue(harness.window, "modal-supplier-input", "S001");
+  harness.window.document.querySelector(
+    '#add-product-form [name="unit"]',
+  ).value = "件";
+  harness.window.document.querySelector(
+    '#add-product-form [name="quantity"]',
+  ).value = "0";
+  harness.window.document.querySelector(
+    '#add-product-form [name="costPrice"]',
+  ).value = "12.5";
+  harness.window.document.querySelector(
+    '#add-product-form [name="retailPrice"]',
+  ).value = "25";
+
+  assert.equal(await clickModalConfirm(harness.window), false);
+  assert.match(harness.alerts.at(-1), /请输入有效的数量/);
+
+  harness.window.document.querySelector(
+    '#add-product-form [name="quantity"]',
+  ).value = "3";
+  harness.window.document.querySelector(
+    '#add-product-form [name="costPrice"]',
+  ).value = "-1";
+
+  assert.equal(await clickModalConfirm(harness.window), false);
+  assert.match(harness.alerts.at(-1), /请输入有效的成本单价/);
+
+  harness.window.document.querySelector(
+    '#add-product-form [name="costPrice"]',
+  ).value = "12.5";
+  harness.window.document.querySelector(
+    '#add-product-form [name="retailPrice"]',
+  ).value = "-1";
+
+  assert.equal(await clickModalConfirm(harness.window), false);
+  assert.match(harness.alerts.at(-1), /请输入有效的销售单价/);
+  assert.equal(saveCalls, 0);
+  assert.equal(
+    harness.window.mockData.products.some(
+      (product) => product.name === "Invalid Required Product",
+    ),
+    false,
   );
 
   harness.close();
@@ -128,6 +278,7 @@ test("addProduct syncs new inventory to all and inbound stock tables", () => {
   harness.window.addProduct({
     name: "Synced Product",
     category: "瀹跺叿",
+    unit: "箱",
     quantity: 7,
     costPrice: 25,
     retailPrice: 40,
@@ -456,6 +607,9 @@ test("showAddCustomerModal saves a valid customer", async () => {
 
   harness.window.showAddCustomerModal();
   harness.window.document.querySelector(
+    '#add-customer-form [name="id"]',
+  ).value = "VIP-001";
+  harness.window.document.querySelector(
     '#add-customer-form [name="name"]',
   ).value = "New Customer";
   harness.window.document.querySelector(
@@ -470,6 +624,11 @@ test("showAddCustomerModal saves a valid customer", async () => {
   harness.window.document.querySelector(
     '#add-customer-form [name="email"]',
   ).value = "cora@example.com";
+  setRenderedRadioGroupValue(
+    harness.window,
+    "add-customer-tax-rate-choice-input",
+    "no",
+  );
   harness.window.document.getElementById("add-customer-payment-input").value =
     "Net 30";
 
@@ -479,15 +638,262 @@ test("showAddCustomerModal saves a valid customer", async () => {
   assert.equal(harness.window.mockData.customers.length, 3);
   assert.equal(
     harness.window.mockData.customers.some(
-      (customer) => customer.id === "C003",
+      (customer) => customer.id === "VIP-001",
     ),
     true,
+  );
+  assert.equal(harness.window.mockData.customers.at(-1).hasTaxRate, false);
+  assert.equal(
+    harness.window.mockData.customers.at(-1).taxRateCoefficient,
+    null,
   );
   assert.equal(saveCalls, 1);
   assert.equal(logCalls[0][0], "add");
   assert.match(
     harness.window.document.querySelector("#customers tbody").textContent,
     /New Customer/,
+  );
+
+  harness.close();
+});
+
+test("showAddCustomerModal requires unique customer id before saving", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  let saveCalls = 0;
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {
+    saveCalls += 1;
+  };
+  harness.window.addLog = () => {};
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showAddCustomerModal();
+
+  assert.equal(await clickModalConfirm(harness.window), false);
+  assert.match(harness.alerts.at(-1), /请输入客户编号/);
+
+  harness.window.document.querySelector(
+    '#add-customer-form [name="id"]',
+  ).value = "C001";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="name"]',
+  ).value = "Duplicate Id Customer";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="contactPerson"]',
+  ).value = "Cora";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="contactPhone"]',
+  ).value = "13800138002";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="address"]',
+  ).value = "Beijing";
+  setRenderedRadioGroupValue(
+    harness.window,
+    "add-customer-tax-rate-choice-input",
+    "no",
+  );
+  harness.window.document.getElementById("add-customer-payment-input").value =
+    "Net 30";
+
+  assert.equal(await clickModalConfirm(harness.window), false);
+  assert.match(harness.alerts.at(-1), /客户编号已存在/);
+  assert.equal(saveCalls, 0);
+  assert.equal(harness.window.mockData.customers.length, 2);
+
+  harness.close();
+});
+
+test("showAddCustomerModal requires payment terms before saving", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  let saveCalls = 0;
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {
+    saveCalls += 1;
+  };
+  harness.window.addLog = () => {};
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showAddCustomerModal();
+
+  assert.equal(
+    harness.window.document.getElementById("add-customer-payment-input").value,
+    "",
+  );
+
+  harness.window.document.querySelector(
+    '#add-customer-form [name="id"]',
+  ).value = "VIP-002";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="name"]',
+  ).value = "Missing Payment Customer";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="contactPerson"]',
+  ).value = "Cora";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="contactPhone"]',
+  ).value = "13800138002";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="address"]',
+  ).value = "Beijing";
+
+  const result = await clickModalConfirm(harness.window);
+
+  assert.equal(result, false);
+  assert.match(harness.alerts.at(-1), /请选择付款条件/);
+  assert.equal(saveCalls, 0);
+  assert.equal(harness.window.mockData.customers.length, 2);
+
+  harness.close();
+});
+
+test("showAddCustomerModal validates conditional tax rate coefficient", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  let saveCalls = 0;
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {
+    saveCalls += 1;
+  };
+  harness.window.addLog = () => {};
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showAddCustomerModal();
+  harness.window.document.querySelector(
+    '#add-customer-form [name="id"]',
+  ).value = "VIP-TAX";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="name"]',
+  ).value = "Tax Customer";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="contactPerson"]',
+  ).value = "Tina";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="contactPhone"]',
+  ).value = "13800138003";
+  harness.window.document.querySelector(
+    '#add-customer-form [name="address"]',
+  ).value = "Shenzhen";
+  harness.window.document.getElementById("add-customer-payment-input").value =
+    "Net 30";
+
+  assert.equal(await clickModalConfirm(harness.window), false);
+  assert.match(harness.alerts.at(-1), /请选择是否有税率系数/);
+
+  setRenderedRadioGroupValue(
+    harness.window,
+    "add-customer-tax-rate-choice-input",
+    "yes",
+  );
+
+  assert.equal(
+    harness.window.document
+      .getElementById("add-customer-tax-rate-wrap")
+      .classList.contains("hidden"),
+    false,
+  );
+  assert.equal(await clickModalConfirm(harness.window), false);
+  assert.match(harness.alerts.at(-1), /请输入税率系数/);
+
+  setRenderedInputValue(harness.window, "add-customer-tax-rate-input", "-1");
+  assert.equal(await clickModalConfirm(harness.window), false);
+  assert.match(harness.alerts.at(-1), /请输入有效的税率系数/);
+
+  setRenderedInputValue(harness.window, "add-customer-tax-rate-input", "1.13");
+  assert.equal(await clickModalConfirm(harness.window), true);
+
+  const createdCustomer = harness.window.mockData.customers.find(
+    (customer) => customer.id === "VIP-TAX",
+  );
+  assert.ok(createdCustomer);
+  assert.equal(createdCustomer.hasTaxRate, true);
+  assert.equal(createdCustomer.taxRateCoefficient, 1.13);
+  assert.equal(saveCalls, 1);
+
+  harness.close();
+});
+
+test("showViewCustomerModal updates customer id and related records", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  fixture.mockData.deliveryNotes.push({
+    id: "DN-C-001",
+    customerId: "C001",
+    customerName: "Northwind",
+  });
+  fixture.stockMovementData[1].customerId = "C001";
+  let saveCalls = 0;
+  const logCalls = [];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = () => {
+    saveCalls += 1;
+    return true;
+  };
+  harness.window.addLog = (...args) => {
+    logCalls.push(args);
+  };
+  harness.window.renderBillPartyFilter = () => {};
+  harness.window.updateBillsTable = () => {};
+  harness.window.renderStockMovementTable = () => {};
+  harness.window.renderDashboardActivity = () => {};
+  harness.window.getInitial = (name) =>
+    String(name || "?")
+      .charAt(0)
+      .toUpperCase();
+
+  harness.window.showViewCustomerModal("C001");
+  harness.window.document.getElementById("view-customer-id-input").value =
+    "VIP-009";
+  harness.window.document.getElementById("view-customer-id-save").click();
+  await flushAsyncTasks();
+
+  assert.equal(harness.window.mockData.customers[0].id, "VIP-009");
+  assert.equal(
+    harness.window.mockData.bills.find((bill) => bill.id === "BILL-C-001")
+      .partyId,
+    "VIP-009",
+  );
+  assert.equal(harness.window.mockData.deliveryNotes[0].customerId, "VIP-009");
+  assert.equal(harness.window.stockMovementData[1].customerId, "VIP-009");
+  assert.equal(saveCalls, 1);
+  assert.equal(logCalls[0][0], "edit");
+  assert.match(
+    harness.window.document.querySelector("#customers tbody").textContent,
+    /VIP-009/,
   );
 
   harness.close();

@@ -15,34 +15,23 @@
   };
   global.BillsModuleState = state;
 
-  const BILL_TYPE_META = Object.freeze({
-    customer: {
-      label: "客户对账单",
-      partyLabel: "客户",
-      emptyText: "当前没有客户对账单",
-    },
-    supplier: {
-      label: "供应商对账单",
-      partyLabel: "供应商",
-      emptyText: "当前没有供应商对账单",
-    },
-    payment: {
-      label: "付款计划",
-      partyLabel: "对象",
-      emptyText: "当前没有待付款或部分付款对账单",
-    },
-  });
+  if (!global.BillsCore) {
+    throw new Error("BillsCore must be loaded before bills-module.js");
+  }
 
-  const BILL_STATUS_META = Object.freeze({
-    pending_check: { label: "待核对", badgeClass: "bg-blue-100 text-blue-700" },
-    pending_payment: { label: "待付款", badgeClass: "bg-red-100 text-red-700" },
-    partial_paid: {
-      label: "部分付款",
-      badgeClass: "bg-yellow-100 text-yellow-700",
-    },
-    paid: { label: "已结清", badgeClass: "bg-green-100 text-green-700" },
-    cancelled: { label: "已作废", badgeClass: "bg-gray-100 text-gray-600" },
-  });
+  const {
+    BILL_STATUS_META,
+    formatBillCurrency,
+    formatBillDateOnly,
+    formatBillDateTime,
+    formatStatementPeriod,
+    getBillsMeta,
+    getStatusBadgeHtml,
+    normalizeBillDate,
+    normalizeBillStatus,
+    roundCurrency,
+    convertAmountToChineseUpperForBills,
+  } = global.BillsCore;
 
   function injectBillsModuleStyles() {
     if (document.getElementById("bills-module-style")) return;
@@ -388,10 +377,6 @@
     document.head.appendChild(style);
   }
 
-  function getBillsMeta(tabKey) {
-    return BILL_TYPE_META[tabKey] || BILL_TYPE_META.customer;
-  }
-
   function buildBillsEmptyHostMarkup(description, options = {}) {
     const safeDescription = global.escapeHTML(description || "暂无数据");
     const safeWrapperClass = global.escapeHTML(
@@ -437,18 +422,16 @@
       return;
     }
 
-    root
-      .querySelectorAll("[data-bills-empty-description]")
-      .forEach((host) => {
-        if (!host || host.dataset.rendered === "true") {
-          return;
-        }
+    root.querySelectorAll("[data-bills-empty-description]").forEach((host) => {
+      if (!host || host.dataset.rendered === "true") {
+        return;
+      }
 
-        global.renderAntdEmptyState(host, host.dataset.billsEmptyDescription, {
-          wrapperClassName:
-            host.getAttribute("data-bills-empty-wrapper-class") || "py-4",
-        });
+      global.renderAntdEmptyState(host, host.dataset.billsEmptyDescription, {
+        wrapperClassName:
+          host.getAttribute("data-bills-empty-wrapper-class") || "py-4",
       });
+    });
   }
 
   function ensureBillsPaginationState() {
@@ -467,145 +450,11 @@
     return global.paginationState.bills;
   }
 
-  function normalizeBillStatus(status) {
-    const map = {
-      pending: "pending_check",
-      created: "pending_check",
-      draft: "pending_check",
-      verified: "pending_payment",
-      sent: "pending_payment",
-      pending_payment: "pending_payment",
-      partial_paid: "partial_paid",
-      partial: "partial_paid",
-      paid: "paid",
-      confirmed: "paid",
-      cancelled: "cancelled",
-      canceled: "cancelled",
-    };
-    return map[String(status || "").trim()] || "pending_check";
-  }
-
-  function normalizeBillDate(value) {
-    if (!value) return null;
-    if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
-
-    const raw = String(value).trim();
-    if (/^\d{8}$/.test(raw)) {
-      return new Date(
-        `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}T00:00:00`,
-      );
-    }
-
-    const normalized = raw.includes("T") ? raw : raw.replace(/\//g, "-");
-    const date = new Date(normalized);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  function formatBillDateOnly(value) {
-    const date = normalizeBillDate(value);
-    if (!date) return "-";
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-
-  function formatBillDateTime(value) {
-    const date = normalizeBillDate(value);
-    if (!date) return "-";
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    const seconds = String(date.getSeconds()).padStart(2, "0");
-    return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
-  }
-
-  function formatStatementPeriod(start, end) {
-    return `${formatBillDateOnly(start)} 至 ${formatBillDateOnly(end)}`;
-  }
-
-  function roundCurrency(value) {
-    return Math.round((Number(value) || 0) * 100) / 100;
-  }
-
-  function formatBillCurrency(value) {
-    return `¥${roundCurrency(value).toFixed(2)}`;
-  }
-
   function getCurrentUserInitialForBills() {
     const name = String(global.currentUser?.name || "张三").trim();
     return global.escapeHTML
       ? global.escapeHTML(name.charAt(0) || "张")
       : name.charAt(0) || "张";
-  }
-
-  function getStatusBadgeHtml(status) {
-    const meta =
-      BILL_STATUS_META[normalizeBillStatus(status)] ||
-      BILL_STATUS_META.pending_check;
-    return `<span class="bills-status-badge ${meta.badgeClass}">${meta.label}</span>`;
-  }
-
-  function convertAmountToChineseUpperForBills(amount) {
-    const number = roundCurrency(amount);
-    if (!number) return "人民币零元整";
-
-    const digits = ["零", "壹", "贰", "叁", "肆", "伍", "陆", "柒", "捌", "玖"];
-    const units = ["", "拾", "佰", "仟"];
-    const groups = ["", "万", "亿", "兆"];
-    const fractionUnits = ["角", "分"];
-
-    const integerPart = Math.floor(number);
-    const decimalPart = Math.round((number - integerPart) * 100);
-
-    function convertInteger(num) {
-      const raw = String(num);
-      const result = [];
-      const groupCount = Math.ceil(raw.length / 4);
-
-      for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
-        const start = Math.max(raw.length - (groupIndex + 1) * 4, 0);
-        const end = raw.length - groupIndex * 4;
-        const chunk = raw.slice(start, end).padStart(4, "0");
-        let chunkText = "";
-
-        for (let i = 0; i < chunk.length; i += 1) {
-          const digit = Number(chunk[i]);
-          if (!digit) {
-            if (chunkText && !chunkText.endsWith("零")) {
-              chunkText += "零";
-            }
-            continue;
-          }
-          chunkText += digits[digit] + units[chunk.length - i - 1];
-        }
-
-        chunkText = chunkText.replace(/零+$/g, "");
-        if (chunkText) {
-          result.unshift(chunkText + groups[groupIndex]);
-        }
-      }
-
-      return result
-        .join("")
-        .replace(/零+/g, "零")
-        .replace(/零(万|亿|兆)/g, "$1");
-    }
-
-    const integerText = convertInteger(integerPart) || "零";
-    let fractionText = "";
-    if (decimalPart > 0) {
-      const jiao = Math.floor(decimalPart / 10);
-      const fen = decimalPart % 10;
-      if (jiao) fractionText += digits[jiao] + fractionUnits[0];
-      if (fen) fractionText += digits[fen] + fractionUnits[1];
-    }
-
-    return `人民币${integerText}元${fractionText || "整"}`
-      .replace(/零角零分$/, "整")
-      .replace(/零分$/, "");
   }
 
   function getStatementRecords() {
@@ -1234,8 +1083,6 @@
 
     if (!global.mockData) return;
 
-    await ensureBillsDemoSourceData();
-
     const currentBills = global.normalizeList
       ? global.normalizeList(global.mockData.bills)
       : [];
@@ -1245,16 +1092,6 @@
       (record) => record?.recordType === "statement-v1",
     );
     let changed = migrated.changed || nextBills.length !== currentBills.length;
-
-    if (!structured.some((record) => record.statementType === "customer")) {
-      global
-        .normalizeList(global.mockData.deliveryNotes)
-        .filter(isSalesDeliveryNote)
-        .forEach((note, index) => {
-          nextBills.push(mapDeliveryNoteToStructured(note, index));
-        });
-      changed = true;
-    }
 
     if (changed) {
       global.mockData.bills = nextBills;
@@ -3622,10 +3459,14 @@
                     </div>
                     <div class="bills-route-card">
                         <div class="bills-route-card-body">
-                            ${buildBillsEmptyHostMarkup(`未找到编号为 ${statementId} 的对账单。`, {
-                              wrapperClassName: "py-8",
-                              fallbackClassName: "text-center text-sm text-gray-500",
-                            })}
+                            ${buildBillsEmptyHostMarkup(
+                              `未找到编号为 ${statementId} 的对账单。`,
+                              {
+                                wrapperClassName: "py-8",
+                                fallbackClassName:
+                                  "text-center text-sm text-gray-500",
+                              },
+                            )}
                         </div>
                     </div>
                 </div>
@@ -3918,6 +3759,12 @@
           !formData.taxRate
         ) {
           alert("请先完整选择对账类型、公司、对象、对账日期、账期和税率系数");
+          return;
+        }
+
+        const taxRate = Number(formData.taxRate);
+        if (!Number.isFinite(taxRate) || taxRate < 1) {
+          alert("请输入有效的税率系数");
           return;
         }
 
