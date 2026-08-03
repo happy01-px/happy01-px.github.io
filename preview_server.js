@@ -25,6 +25,9 @@ const SPLIT_DATA_TABLES = Object.freeze([
   "logs",
 ]);
 let currentPort = PORT;
+const shouldOpenBrowser =
+  process.argv.includes("--open") || process.env.INVENTORY_OPEN === "1";
+let browserOpened = false;
 
 // Determine paths for packaged executable vs development
 const isPkg =
@@ -40,10 +43,80 @@ const staticBase = __dirname;
 // In development: current directory
 // In pkg: The directory where the executable is located (external to the exe)
 const dataBase = isPkg ? path.dirname(process.execPath) : __dirname;
+const runtimeDir = path.join(dataBase, ".runtime");
+const serverInfoPath = path.join(runtimeDir, "server-info.json");
 
 console.log(`Server starting...`);
 console.log(`Static Base (App): ${staticBase}`);
 console.log(`Data Base (User): ${dataBase}`);
+
+function writeServerInfo(url) {
+  try {
+    fs.mkdirSync(runtimeDir, { recursive: true });
+    fs.writeFileSync(
+      serverInfoPath,
+      JSON.stringify(
+        {
+          pid: process.pid,
+          host: HOST,
+          port: currentPort,
+          url,
+          startedAt: new Date().toISOString(),
+        },
+        null,
+        2,
+      ),
+    );
+  } catch (error) {
+    console.warn(`Failed to write server info: ${error.message}`);
+  }
+}
+
+function removeServerInfo() {
+  try {
+    if (fs.existsSync(serverInfoPath)) {
+      const currentInfo = JSON.parse(fs.readFileSync(serverInfoPath, "utf8"));
+      if (currentInfo.pid && currentInfo.pid !== process.pid) return;
+      fs.unlinkSync(serverInfoPath);
+    }
+  } catch (error) {
+    console.warn(`Failed to remove server info: ${error.message}`);
+  }
+}
+
+process.on("exit", removeServerInfo);
+["SIGINT", "SIGTERM"].forEach((signal) => {
+  process.on(signal, () => {
+    removeServerInfo();
+    process.exit(0);
+  });
+});
+
+function openBrowser(url) {
+  if (!shouldOpenBrowser || browserOpened) return;
+  browserOpened = true;
+
+  const command =
+    process.platform === "win32"
+      ? "cmd"
+      : process.platform === "darwin"
+        ? "open"
+        : "xdg-open";
+  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
+
+  execFile(command, args, { windowsHide: true }, (error) => {
+    if (error) {
+      console.warn(`Failed to open browser automatically: ${error.message}`);
+    }
+  });
+}
+
+function onServerListening() {
+  const url = `http://${HOST}:${currentPort}/`;
+  console.log(`Server running at ${url}`);
+  writeServerInfo(url);
+  openBrowser(url);
+}
 
 const mimeTypes = {
   ".html": "text/html",
@@ -674,9 +747,7 @@ const server = http.createServer(function (request, response) {
   });
 });
 
-server.listen(currentPort, HOST, () => {
-  console.log(`Server running at http://${HOST}:${currentPort}/`);
-});
+server.listen(currentPort, HOST, onServerListening);
 
 server.on(
   "error",
@@ -686,9 +757,7 @@ server.on(
       console.log(`Port ${currentPort} is in use, retrying on ${nextPort}...`);
       server.close();
       currentPort = nextPort;
-      server.listen(currentPort, HOST, () => {
-        console.log(`Server running at http://${HOST}:${currentPort}/`);
-      });
+      server.listen(currentPort, HOST, onServerListening);
     } else {
       console.error(e);
     }
