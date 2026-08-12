@@ -464,6 +464,20 @@ test("showEditCompanyModal blocks duplicate company names", async () => {
       .toUpperCase();
 
   harness.window.showEditCompanyModal("CO001");
+  assert.equal(
+    harness.window.document.querySelector('#edit-company-form [name="email"]'),
+    null,
+  );
+  assert.ok(
+    harness.window.document
+      .querySelector('#edit-company-form [name="status"]')
+      .closest(".app-modal-third-row"),
+  );
+  assert.ok(
+    harness.window.document
+      .querySelector('#edit-company-form [name="address"]')
+      .closest(".app-modal-two-thirds-row"),
+  );
   harness.window.document.querySelector(
     '#edit-company-form [name="name"]',
   ).value = "Backup Warehouse";
@@ -518,9 +532,6 @@ test("showAddSupplierModal saves a valid supplier", async () => {
   harness.window.document.querySelector(
     '#add-supplier-form [name="contactPhone"]',
   ).value = "13800138001";
-  harness.window.document.querySelector(
-    '#add-supplier-form [name="email"]',
-  ).value = "nora@example.com";
   harness.window.document.getElementById("add-supplier-payment-input").value =
     "Net 45";
 
@@ -535,6 +546,7 @@ test("showAddSupplierModal saves a valid supplier", async () => {
     true,
   );
   assert.equal(harness.window.mockData.suppliers.at(-1).address, "-");
+  assert.equal(harness.window.mockData.suppliers.at(-1).email, "-");
   assert.equal(harness.window.mockData.suppliers.at(-1).creditLimit, 0);
   assert.equal(saveCalls, 1);
   assert.equal(logCalls[0][0], "add");
@@ -621,9 +633,6 @@ test("showAddCustomerModal saves a valid customer", async () => {
   harness.window.document.querySelector(
     '#add-customer-form [name="address"]',
   ).value = "Beijing";
-  harness.window.document.querySelector(
-    '#add-customer-form [name="email"]',
-  ).value = "cora@example.com";
   setRenderedRadioGroupValue(
     harness.window,
     "add-customer-tax-rate-choice-input",
@@ -643,6 +652,7 @@ test("showAddCustomerModal saves a valid customer", async () => {
     true,
   );
   assert.equal(harness.window.mockData.customers.at(-1).hasTaxRate, false);
+  assert.equal(harness.window.mockData.customers.at(-1).email, "-");
   assert.equal(
     harness.window.mockData.customers.at(-1).taxRateCoefficient,
     null,
@@ -935,9 +945,22 @@ test("showEditCustomerModal updates an existing customer", async () => {
   harness.window.document.querySelector(
     '#edit-customer-form [name="address"]',
   ).value = "Shanghai Pudong";
-  harness.window.document.querySelector(
-    '#edit-customer-form [name="email"]',
-  ).value = "prime@example.com";
+  assert.equal(
+    harness.window.document.querySelector(
+      '#edit-customer-form [name="email"]',
+    ),
+    null,
+  );
+  setRenderedRadioGroupValue(
+    harness.window,
+    "edit-customer-tax-rate-choice-input",
+    "yes",
+  );
+  setRenderedInputValue(
+    harness.window,
+    "edit-customer-tax-rate-input",
+    "1.13",
+  );
   harness.window.document.getElementById("edit-customer-payment-input").value =
     "COD";
   harness.window.document.getElementById("edit-customer-status-input").value =
@@ -949,6 +972,12 @@ test("showEditCustomerModal updates an existing customer", async () => {
   assert.equal(harness.window.mockData.customers[0].name, "Northwind Prime");
   assert.equal(harness.window.mockData.customers[0].paymentTerms, "COD");
   assert.equal(harness.window.mockData.customers[0].status, "inactive");
+  assert.equal(harness.window.mockData.customers[0].hasTaxRate, true);
+  assert.equal(harness.window.mockData.customers[0].taxRateCoefficient, 1.13);
+  assert.equal(
+    harness.window.mockData.customers[0].email,
+    "nina@example.com",
+  );
   assert.equal(saveCalls, 1);
   assert.equal(logCalls[0][0], "edit");
   assert.match(

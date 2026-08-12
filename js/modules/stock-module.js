@@ -108,6 +108,10 @@
     const tbody = document.getElementById("dashboard-activity-table-body");
     if (!tbody) return;
 
+    if (typeof global.refreshDashboardAnalytics === "function") {
+      global.refreshDashboardAnalytics();
+    }
+
     tbody.innerHTML = "";
 
     const recentActivity = stockMovementData.slice(0, 5);
@@ -587,7 +591,7 @@
 
   function showAddOutboundModal() {
     const content = `
-            <form id="add-outbound-form" class="space-y-4">
+            <form id="add-outbound-form" class="app-modal-form-grid">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">商品 <span class="text-danger">*</span></label>
                     <div id="outbound-product-select-container" class="w-full"></div>
@@ -597,7 +601,7 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">数量 <span class="text-danger">*</span></label>
                     <input type="number" name="quantity" min="1" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                 </div>
-                <div>
+                <div class="app-modal-wide-field">
                     <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
                     <textarea name="remark" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"></textarea>
                 </div>
@@ -752,7 +756,7 @@
                     ${buildEditableFieldCard(
                       "备注",
                       '<textarea name="remark" rows="2" class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"></textarea>',
-                      "md:col-span-2 xl:col-span-3",
+                      "app-modal-wide-field",
                     )}
                 </div>
                 <p class="text-xs text-gray-500">搜索到已有商品后，会自动带出分类、供应商、单位、成本单价和销售单价；新商品则按你当前填写的数据创建并记录本次进货。</p>

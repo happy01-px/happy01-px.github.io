@@ -46,6 +46,8 @@ function createScriptPageMarkup() {
         <button id="add-company-btn" type="button">add company</button>
         <button id="add-inbound-btn" type="button">add inbound</button>
         <button id="add-outbound-btn" type="button">add outbound</button>
+        <button id="seed-test-data-button" type="button">seed test data</button>
+        <button id="mobile-seed-test-data-button" type="button">mobile seed test data</button>
         <button id="clear-all-data-button" type="button">clear all</button>
         <button id="mobile-clear-all-data-button" type="button">mobile clear all</button>
         <section id="dashboard" class="page-section"></section>
@@ -65,12 +67,54 @@ function createScriptPageMarkup() {
         <section id="reports" class="page-section hidden"></section>
         <section id="settings" class="page-section hidden"></section>
         <section id="sales-order" class="page-section hidden"></section>
+        <span id="dashboard-total-inventory-value"></span>
+        <span id="dashboard-total-inventory-value-caption"></span>
+        <span id="dashboard-stock-warning-count"></span>
+        <span id="dashboard-stock-warning-caption"></span>
+        <span id="dashboard-pending-bill-count"></span>
+        <span id="dashboard-pending-bill-caption"></span>
+        <span id="dashboard-monthly-inbound-count"></span>
+        <span id="dashboard-monthly-inbound-caption"></span>
         <canvas id="inventoryValueChart"></canvas>
+        <div id="inventoryValueChartEmpty" hidden></div>
         <canvas id="inventoryCategoryChart"></canvas>
+        <div id="inventoryCategoryChartEmpty" hidden></div>
         <canvas id="inventoryTurnoverChart"></canvas>
         <canvas id="inventoryTurnoverRankingChart"></canvas>
     `;
 }
+
+test("design preview defaults to v2 and supports a legacy rollback query", () => {
+  const previewHarness = createWindow({
+    markup: createScriptPageMarkup(),
+    url: "http://127.0.0.1/",
+  });
+  loadScripts(previewHarness.window, ["js/app/design-preview.js"]);
+
+  assert.equal(
+    previewHarness.window.document.documentElement.classList.contains(
+      "design-v2",
+    ),
+    true,
+  );
+  assert.equal(previewHarness.window.__designPreviewMode, "v2");
+  previewHarness.close();
+
+  const legacyHarness = createWindow({
+    markup: createScriptPageMarkup(),
+    url: "http://127.0.0.1/?design=legacy",
+  });
+  loadScripts(legacyHarness.window, ["js/app/design-preview.js"]);
+
+  assert.equal(
+    legacyHarness.window.document.documentElement.classList.contains(
+      "design-v2",
+    ),
+    false,
+  );
+  assert.equal(legacyHarness.window.__designPreviewMode, "legacy");
+  legacyHarness.close();
+});
 
 test("showSection switches pages, syncs hash and triggers page-specific refreshes", () => {
   const harness = createWindow({ markup: createScriptPageMarkup() });
@@ -409,6 +453,56 @@ test("clear all data buttons require two confirmations before clearing", async (
   harness.close();
 });
 
+test("test data buttons seed records and refresh related views", async () => {
+  const harness = createWindow({ markup: createScriptPageMarkup() });
+  const calls = {
+    seed: 0,
+    companies: 0,
+    suppliers: 0,
+    customers: 0,
+    logs: 0,
+  };
+
+  loadScripts(harness.window, getAppShellScriptPaths());
+  harness.window.seedTestData = async () => {
+    calls.seed += 1;
+    return {
+      success: true,
+      persisted: true,
+      createdCount: 4,
+      logCount: 4,
+      skippedCount: 0,
+      conflictCount: 0,
+    };
+  };
+  harness.window.updateCompanyTable = () => {
+    calls.companies += 1;
+  };
+  harness.window.updateSupplierTable = () => {
+    calls.suppliers += 1;
+  };
+  harness.window.updateCustomerTable = () => {
+    calls.customers += 1;
+  };
+  harness.window.renderLogsTable = () => {
+    calls.logs += 1;
+  };
+
+  harness.window.bindActionButtons();
+  harness.window.document.getElementById("seed-test-data-button").click();
+  await flushAsyncTasks(4);
+
+  assert.deepEqual(calls, {
+    seed: 1,
+    companies: 1,
+    suppliers: 1,
+    customers: 1,
+    logs: 1,
+  });
+
+  harness.close();
+});
+
 test("applyHashDrivenSectionRoute honors page hashes and ignores nested bill routes", () => {
   const harness = createWindow({ markup: createScriptPageMarkup() });
   loadScripts(harness.window, getAppShellScriptPaths());
@@ -427,16 +521,32 @@ test("applyHashDrivenSectionRoute honors page hashes and ignores nested bill rou
   harness.close();
 });
 
-test("initCharts initializes every configured dashboard and report chart", () => {
+test("initCharts initializes data-backed dashboard and report charts", () => {
   const harness = createWindow({ markup: createScriptPageMarkup() });
   const chartCalls = [];
 
   loadScripts(harness.window, getAppShellScriptPaths());
+  harness.window.mockData = {
+    products: [
+      {
+        id: "P001",
+        category: "电子产品",
+        stockQuantity: 10,
+        costPrice: 100,
+        minStock: 5,
+      },
+    ],
+    bills: [],
+  };
+  harness.window.stockMovementData = [];
   harness.window.Chart = function Chart(element, config) {
     chartCalls.push({
       id: element.id,
       type: config.type,
     });
+    this.data = config.data;
+    this.options = config.options;
+    this.update = () => {};
   };
 
   harness.window.initCharts();
@@ -453,6 +563,121 @@ test("initCharts initializes every configured dashboard and report chart", () =>
   assert.deepEqual(
     chartCalls.map((entry) => entry.type),
     ["line", "doughnut", "line", "bar"],
+  );
+
+  harness.close();
+});
+
+test("dashboard analytics renders accurate metrics from runtime data", () => {
+  const harness = createWindow({ markup: createScriptPageMarkup() });
+  loadScripts(harness.window, getAppShellScriptPaths());
+
+  const now = new harness.window.Date("2026-08-15T12:00:00");
+  const data = {
+    products: [
+      {
+        id: "P001",
+        category: "电子产品",
+        stockQuantity: 10,
+        costPrice: 100,
+        minStock: 5,
+      },
+      {
+        id: "P002",
+        category: "图书",
+        stockQuantity: 2,
+        costPrice: 50,
+        minStock: 3,
+      },
+    ],
+    bills: [
+      { status: "pending_check" },
+      { status: "partial_paid" },
+      { status: "paid" },
+    ],
+    stockMovements: [
+      {
+        type: "inbound",
+        productId: "P001",
+        quantity: 5,
+        price: 100,
+        createdAt: "2026-08-05T09:00:00",
+      },
+      {
+        type: "outbound",
+        productId: "P001",
+        quantity: 2,
+        price: 100,
+        createdAt: "2026-07-05T09:00:00",
+      },
+    ],
+  };
+
+  const metrics = harness.window.calculateDashboardMetrics(data, now);
+  const trend = harness.window.buildInventoryValueTrend(
+    data.products,
+    data.stockMovements,
+    now,
+  );
+  const categoryDistribution =
+    harness.window.buildInventoryCategoryDistribution(data.products);
+
+  assert.equal(metrics.totalInventoryValue, 1100);
+  assert.equal(metrics.stockWarningCount, 1);
+  assert.equal(metrics.pendingBillCount, 2);
+  assert.equal(metrics.monthlyInboundCount, 1);
+  assert.deepEqual(Array.from(trend.values).slice(-3), [800, 600, 1100]);
+  assert.deepEqual(Array.from(categoryDistribution.labels), [
+    "电子产品",
+    "图书",
+  ]);
+  assert.deepEqual(Array.from(categoryDistribution.values), [1000, 100]);
+
+  harness.close();
+});
+
+test("dashboard analytics shows guided empty states without business data", () => {
+  const harness = createWindow({ markup: createScriptPageMarkup() });
+  const chartCalls = [];
+  loadScripts(harness.window, getAppShellScriptPaths());
+  harness.window.mockData = { products: [], bills: [] };
+  harness.window.stockMovementData = [];
+  harness.window.Chart = function Chart(element, config) {
+    chartCalls.push({ id: element.id, type: config.type });
+  };
+
+  harness.window.initCharts();
+
+  assert.equal(
+    harness.window.document.getElementById("dashboard-total-inventory-value")
+      .textContent,
+    "¥0",
+  );
+  assert.equal(
+    harness.window.document.getElementById("dashboard-stock-warning-count")
+      .textContent,
+    "0",
+  );
+  assert.equal(
+    harness.window.document.getElementById("inventoryValueChart").hidden,
+    true,
+  );
+  assert.equal(
+    harness.window.document.getElementById("inventoryValueChartEmpty").hidden,
+    false,
+  );
+  assert.equal(
+    harness.window.document.getElementById("inventoryCategoryChart").hidden,
+    true,
+  );
+  assert.equal(
+    harness.window.document.getElementById("inventoryCategoryChartEmpty")
+      .hidden,
+    false,
+  );
+  assert.deepEqual(
+    chartCalls.map((entry) => entry.id),
+    ["inventoryTurnoverChart", "inventoryTurnoverRankingChart"],
   );
 
   harness.close();

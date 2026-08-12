@@ -90,6 +90,13 @@ test("index.html boots from the real page markup and renders data-backed section
     document.getElementById("dashboard").classList.contains("hidden"),
     false,
   );
+  assert.equal(document.documentElement.classList.contains("design-v2"), true);
+  assert.ok(document.querySelector('link[href="css/design-preview.css"]'));
+  assert.equal(document.querySelectorAll(".filter-toolbar").length, 4);
+  assert.equal(
+    document.querySelector(".design-preview-header-title").textContent.trim(),
+    "仓储运营中心",
+  );
   assert.equal(
     document.getElementById("inventory").classList.contains("hidden"),
     true,
@@ -99,6 +106,34 @@ test("index.html boots from the real page markup and renders data-backed section
   assert.ok(document.querySelectorAll("#suppliers-table-body tr").length > 0);
   assert.ok(document.querySelectorAll("#companies tbody tr").length > 0);
   assert.ok(document.querySelectorAll("#customers tbody tr").length > 0);
+  assert.equal(document.querySelectorAll("#customers thead th").length, 9);
+  assert.equal(document.querySelectorAll("#suppliers thead th").length, 7);
+  assert.equal(
+    document
+      .querySelector("#suppliers-pagination-container > div")
+      .classList.contains("py-4"),
+    false,
+  );
+  assert.equal(
+    document.querySelector("#customers thead th").textContent.trim(),
+    "客户编号",
+  );
+  ["suppliers", "companies", "customers"].forEach((sectionId) => {
+    assert.ok(
+      document.querySelector(`#${sectionId} .business-data-table`),
+    );
+    assert.ok(
+      document.querySelector(`#${sectionId} .business-table-scroll`),
+    );
+  });
+  assert.doesNotMatch(
+    document.querySelector("#suppliers thead").textContent,
+    /电子邮箱/,
+  );
+  assert.doesNotMatch(
+    document.querySelector("#customers thead").textContent,
+    /电子邮箱/,
+  );
   assert.ok(document.querySelectorAll("#bills-table-body tr").length > 0);
   assert.ok(
     document.querySelectorAll("#dashboard-activity-table-body tr").length > 0,
@@ -163,7 +198,101 @@ test("index.html renders filter controls and keeps the supplier action available
     document.getElementById("modal").classList.contains("hidden"),
     false,
   );
+  assert.ok(document.querySelector("#modal-content .app-modal-form"));
+  assert.ok(
+    document.getElementById("modal-panel").classList.contains("max-w-4xl"),
+  );
+  assert.equal(
+    document.querySelector('#add-supplier-form [name="email"]'),
+    null,
+  );
+  const supplierAddressField = document
+    .querySelector('#add-supplier-form [name="address"]')
+    .closest(".app-modal-two-thirds-row");
+  const supplierPaymentField = document
+    .getElementById("add-supplier-payment-container")
+    .closest(".app-modal-third-row");
+  assert.ok(supplierAddressField);
+  assert.ok(supplierPaymentField);
   assert.match(document.getElementById("modal-title").textContent, /供应商/);
+
+  harness.close();
+});
+
+test("index.html hides log pagination when there are no matching records", async () => {
+  const harness = await bootRealIndexPage({ hash: "#logs" });
+  const { document } = harness.window;
+
+  document.getElementById("log-filter-search").value =
+    "__definitely_no_matching_log__";
+  harness.window.renderLogsTable();
+  await flushAsyncTasks(4);
+
+  assert.equal(
+    document.getElementById("logs-pagination-container").hidden,
+    true,
+  );
+  assert.match(
+    document.getElementById("logs-table-body").textContent,
+    /没有找到匹配的日志记录/,
+  );
+
+  harness.close();
+});
+
+test("index.html balances incomplete rows in three-column modal forms", async () => {
+  const harness = await bootRealIndexPage();
+  const { document } = harness.window;
+
+  document.getElementById("add-company-btn").click();
+  await flushAsyncTasks(4);
+  const companyFields = document.querySelectorAll(
+    "#add-company-form > .grid > *",
+  );
+  assert.equal(companyFields.length, 5);
+  assert.ok(companyFields[3].querySelector('[name="address"]'));
+  assert.ok(companyFields[4].querySelector('[name="email"]'));
+  assert.equal(
+    companyFields[3].classList.contains("app-modal-two-thirds-row"),
+    true,
+  );
+  assert.equal(
+    companyFields[4].classList.contains("app-modal-third-row"),
+    true,
+  );
+
+  document.getElementById("add-customer-btn").click();
+  await flushAsyncTasks(4);
+  const customerForm = document.getElementById("add-customer-form");
+  const customerFields = customerForm.querySelectorAll(":scope > .grid > *");
+  assert.equal(customerFields.length, 7);
+  assert.equal(customerForm.querySelector('[name="email"]'), null);
+  assert.equal(
+    customerForm
+      .querySelector('[name="hasTaxRate"]')
+      .closest(".app-modal-two-thirds-row") !== null,
+    true,
+  );
+  assert.equal(
+    customerForm
+      .querySelector('[name="address"]')
+      .closest(".app-modal-two-thirds-row") !== null,
+    true,
+  );
+  assert.equal(
+    customerForm
+      .querySelector('[name="paymentTerms"]')
+      .closest(".app-modal-third-row") !== null,
+    true,
+  );
+
+  document.getElementById("add-product-btn").click();
+  await flushAsyncTasks(4);
+  const productFields = Array.from(
+    document.querySelectorAll("#add-product-form > .grid > *"),
+  ).filter((field) => !field.classList.contains("app-modal-wide-field"));
+  assert.equal(productFields.length, 7);
+  assert.equal(productFields[6].classList.contains("app-modal-fill-row"), true);
 
   harness.close();
 });

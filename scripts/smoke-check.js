@@ -71,6 +71,7 @@ function main() {
     "js/app/navigation.js",
     "js/app/router.js",
     "js/app/charts.js",
+    "js/app/design-preview.js",
     "js/app/bootstrap.js",
     "js/sales-order.js",
     "eslint.config.js",

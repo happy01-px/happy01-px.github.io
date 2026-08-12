@@ -1362,6 +1362,22 @@ function renderPaginationControl(containerId, stateKey, onPageChange) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
+  const state = paginationState[stateKey];
+  if (!state) return;
+
+  if (state.total <= 0) {
+    container.hidden = true;
+    const existingRoot = window.paginationRoots[containerId];
+    if (existingRoot) {
+      existingRoot.render(null);
+    } else {
+      container.replaceChildren();
+    }
+    return;
+  }
+
+  container.hidden = false;
+
   // 检查 Ant Design 依赖
   if (!window.antd || !window.React || !window.ReactDOM) {
     console.warn(
@@ -1373,8 +1389,6 @@ function renderPaginationControl(containerId, stateKey, onPageChange) {
   const { Pagination, ConfigProvider, theme } = window.antd;
   const React = window.React;
   const ReactDOM = window.ReactDOM;
-  const state = paginationState[stateKey];
-
   // 如果没有 root，创建一个
   if (!window.paginationRoots[containerId]) {
     window.paginationRoots[containerId] = ReactDOM.createRoot(container);
@@ -1406,12 +1420,12 @@ function renderPaginationControl(containerId, stateKey, onPageChange) {
     },
     React.createElement(
       "div",
-      { className: "flex justify-end py-4" },
+      { className: "flex justify-end" },
       React.createElement(Pagination, {
         current: state.page,
         pageSize: state.pageSize,
         total: state.total,
-        showSizeChanger: true,
+        showSizeChanger: state.total > state.pageSize,
         pageSizeOptions: ["10", "20", "50", "100"],
         onChange: onChange,
         showTotal: (total, range) =>
@@ -2194,6 +2208,8 @@ function showModal(title, content, confirmCallback) {
   if (modalPanel) {
     modalPanel.className =
       "bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4";
+    modalPanel.style.maxWidth = "";
+    modalPanel.style.width = "";
   }
   if (modalContent) {
     modalContent.className = "p-4";
@@ -2207,6 +2223,43 @@ function showModal(title, content, confirmCallback) {
   } else {
     modalContent.textContent = String(content ?? "");
   }
+
+  const managedForms = modalContent.querySelectorAll(
+    'form[id^="add-"], form[id^="edit-"]',
+  );
+  managedForms.forEach((form) => {
+    form.classList.add("app-modal-form");
+
+    const layoutContainers = form.classList.contains("app-modal-form-grid")
+      ? [form]
+      : Array.from(form.children).filter((child) =>
+          child.classList.contains("grid"),
+        );
+
+    layoutContainers.forEach((layout) => {
+      const fields = Array.from(layout.children).filter(
+        (field) => !field.classList.contains("app-modal-wide-field"),
+      );
+      fields.forEach((field) =>
+        field.classList.remove("app-modal-half-row", "app-modal-fill-row"),
+      );
+
+      const remainder = fields.length % 3;
+      if (remainder === 1) {
+        fields[fields.length - 1]?.classList.add("app-modal-fill-row");
+      } else if (remainder === 2) {
+        fields
+          .slice(-2)
+          .forEach((field) => field.classList.add("app-modal-half-row"));
+      }
+    });
+  });
+  if (managedForms.length > 0 && modalPanel) {
+    modalPanel.className =
+      "bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4";
+    modalContent.className = "p-2.5 md:p-3";
+  }
+
   document.getElementById("modal").classList.remove("hidden");
 
   // 设置确认按钮回调

@@ -443,7 +443,7 @@
                     ${buildEditableFieldCard(
                       "备注",
                       '<textarea name="notes" rows="2" class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"></textarea>',
-                      "md:col-span-2 xl:col-span-3",
+                      "app-modal-wide-field",
                     )}
                 </div>
                 <p class="text-xs text-gray-500">搜索到已有商品后，会自动带出分类、供应商、单位、成本单价和销售单价；新商品则按你当前填写的数据创建。</p>
@@ -1411,13 +1411,14 @@
                       '<input type="tel" name="contactPhone" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入国内手机号或座机号">',
                     )}
                     ${buildEditableFieldCard(
-                      "电子邮箱",
-                      '<input type="email" name="email" class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
-                    )}
-                    ${buildEditableFieldCard(
                       '公司地址 <span class="text-danger">*</span>',
                       '<input type="text" name="address" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
-                      "md:col-span-2",
+                      "app-modal-two-thirds-row",
+                    )}
+                    ${buildEditableFieldCard(
+                      "电子邮箱",
+                      '<input type="email" name="email" class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
+                      "app-modal-third-row",
                     )}
                 </div>
                 <p class="text-xs text-gray-500">建议先填写常用联系人和联系电话，后续出货公司筛选会直接使用这里的信息。</p>
@@ -1492,7 +1493,6 @@
       getEditableFieldValue(company.contactPhone),
     );
     const addressValue = escapeHTML(getEditableFieldValue(company.address));
-    const emailValue = escapeHTML(getEditableFieldValue(company.email));
     const statusValue = escapeHTML(getStatusMeta(company.status).value);
     const statusMeta = getStatusMeta(company.status);
 
@@ -1516,14 +1516,12 @@
                     ${buildEditableFieldCard(
                       '状态 <span class="text-danger">*</span>',
                       `<div id="edit-company-status-container" class="w-full"></div><input type="hidden" name="status" id="edit-company-status-input" value="${statusValue}">`,
-                    )}
-                    ${buildEditableFieldCard(
-                      "电子邮箱",
-                      `<input type="email" name="email" value="${emailValue}" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">`,
+                      "app-modal-third-row",
                     )}
                     ${buildEditableFieldCard(
                       '公司地址 <span class="text-danger">*</span>',
                       `<input type="text" name="address" required value="${addressValue}" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">`,
+                      "app-modal-two-thirds-row",
                     )}
                 </div>
                 <p class="text-xs text-gray-500">当前窗口为编辑模式，修改后点击保存即可更新公司信息。</p>
@@ -1539,7 +1537,6 @@
       const contactPerson = normalizeTextValue(formData.get("contactPerson"));
       const contactPhone = normalizeTextValue(formData.get("contactPhone"));
       const address = normalizeTextValue(formData.get("address"));
-      const email = normalizeTextValue(formData.get("email"));
       const status =
         normalizeTextValue(
           document.getElementById("edit-company-status-input").value,
@@ -1574,7 +1571,6 @@
         contactPerson,
         contactPhone,
         address,
-        email: getStoredOptionalValue(email),
         status,
         updatedAt: getLocalISOString(),
       });
@@ -1715,18 +1711,14 @@
                       '<input type="tel" name="contactPhone" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
                     )}
                     ${buildEditableFieldCard(
-                      "电子邮箱",
-                      '<input type="email" name="email" class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
-                    )}
-                    ${buildEditableFieldCard(
                       "地址",
                       '<input type="text" name="address" class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="选填，未填写时默认记为 -">',
-                      "md:col-span-2",
+                      "app-modal-two-thirds-row",
                     )}
                     ${buildEditableFieldCard(
                       "付款条件",
                       '<div id="add-supplier-payment-container" class="w-full"></div><input type="hidden" name="paymentTerms" id="add-supplier-payment-input">',
-                      "md:col-span-2",
+                      "app-modal-third-row",
                     )}
                 </div>
                 <p class="text-xs text-gray-500">建议把付款条件先补全，后续进货和对账会直接引用这里的配置。</p>
@@ -1739,7 +1731,6 @@
       const name = formData.get("name").trim();
       const contactPerson = formData.get("contactPerson").trim();
       const contactPhone = formData.get("contactPhone").trim();
-      const email = formData.get("email").trim();
       const address = formData.get("address").trim();
       const paymentTerms = document.getElementById(
         "add-supplier-payment-input",
@@ -1767,7 +1758,7 @@
         name,
         contactPerson,
         contactPhone,
-        email: email || "-",
+        email: "-",
         address: address || "-",
         paymentTerms: paymentTerms || "Net 30",
         creditLimit: 0,
@@ -1807,7 +1798,6 @@
     const contactPhoneValue = escapeHTML(
       getEditableFieldValue(supplier.contactPhone),
     );
-    const emailValue = escapeHTML(getEditableFieldValue(supplier.email));
     const addressValue = escapeHTML(getEditableFieldValue(supplier.address));
     const paymentTermsValue = escapeHTML(
       getEditableFieldValue(supplier.paymentTerms),
@@ -1833,21 +1823,19 @@
                       `<input type="tel" name="contactPhone" required value="${contactPhoneValue}" placeholder="请输入国内手机号或座机号" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">`,
                     )}
                     ${buildEditableFieldCard(
-                      "电子邮箱",
-                      `<input type="email" name="email" value="${emailValue}" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">`,
+                      "地址",
+                      `<input type="text" name="address" value="${addressValue}" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">`,
+                      "app-modal-two-thirds-row",
                     )}
                     ${buildEditableFieldCard(
                       "付款条件",
                       `<div id="edit-supplier-payment-container" class="w-full"></div><input type="hidden" name="paymentTerms" id="edit-supplier-payment-input" value="${paymentTermsValue}">`,
+                      "app-modal-third-row",
                     )}
                     ${buildEditableFieldCard(
                       '状态 <span class="text-danger">*</span>',
                       `<div id="edit-supplier-status-container" class="w-full"></div><input type="hidden" name="status" id="edit-supplier-status-input" value="${statusValue}">`,
-                    )}
-                    ${buildEditableFieldCard(
-                      "地址",
-                      `<input type="text" name="address" value="${addressValue}" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">`,
-                      "md:col-span-2",
+                      "app-modal-wide-field",
                     )}
                 </div>
                 <p class="text-xs text-gray-500">当前窗口为编辑模式，修改后点击保存即可更新供应商信息。</p>
@@ -1862,7 +1850,6 @@
       const name = normalizeTextValue(formData.get("name"));
       const contactPerson = normalizeTextValue(formData.get("contactPerson"));
       const contactPhone = normalizeTextValue(formData.get("contactPhone"));
-      const email = normalizeTextValue(formData.get("email"));
       const address = normalizeTextValue(formData.get("address"));
       const paymentTerms = normalizeTextValue(
         document.getElementById("edit-supplier-payment-input").value,
@@ -1896,7 +1883,6 @@
         name,
         contactPerson,
         contactPhone,
-        email: getStoredOptionalValue(email),
         address: getStoredOptionalValue(address),
         paymentTerms: getStoredOptionalValue(paymentTerms),
         creditLimit: Number.isFinite(Number(supplier.creditLimit))
@@ -1932,17 +1918,26 @@
     );
   }
 
-  function bindAddCustomerTaxRateControls() {
-    const form = document.getElementById("add-customer-form");
+  function bindCustomerTaxRateControls(mode, initialValues = {}) {
+    const prefix = `${mode}-customer-tax-rate`;
+    const form = document.getElementById(`${mode}-customer-form`);
     const choiceContainer = document.getElementById(
-      "add-customer-tax-rate-choice-container",
+      `${prefix}-choice-container`,
     );
     const choiceInput = document.getElementById(
-      "add-customer-tax-rate-choice-input",
+      `${prefix}-choice-input`,
     );
-    const wrap = document.getElementById("add-customer-tax-rate-wrap");
-    const input = document.getElementById("add-customer-tax-rate-input");
+    const wrap = document.getElementById(`${prefix}-wrap`);
+    const input = document.getElementById(`${prefix}-input`);
     if (!form || !choiceContainer || !choiceInput || !wrap || !input) return;
+
+    const initialChoice = initialValues.choice || choiceInput.value || "";
+    const initialCoefficient =
+      initialChoice === "yes" && initialValues.coefficient != null
+        ? String(initialValues.coefficient)
+        : "";
+    choiceInput.value = initialChoice;
+    input.value = initialCoefficient;
 
     const syncVisibility = () => {
       const selectedValue = choiceInput.value || "";
@@ -1958,16 +1953,17 @@
     };
 
     if (typeof renderAntdRadioGroup === "function") {
+      const radioConfig = { name: "hasTaxRate" };
+      if (initialChoice) radioConfig.defaultValue = initialChoice;
+
       renderAntdRadioGroup(
-        "add-customer-tax-rate-choice-container",
-        "add-customer-tax-rate-choice-input",
+        `${prefix}-choice-container`,
+        `${prefix}-choice-input`,
         [
           { value: "no", label: "否" },
           { value: "yes", label: "是" },
         ],
-        {
-          name: "hasTaxRate",
-        },
+        radioConfig,
         (value) => {
           choiceInput.value = value || "";
           syncVisibility();
@@ -1977,11 +1973,12 @@
 
     if (typeof renderAntdInput === "function") {
       renderAntdInput(
-        "add-customer-tax-rate-input-container",
-        "add-customer-tax-rate-input",
+        `${prefix}-input-container`,
+        `${prefix}-input`,
         {
           placeholder: "请输入税率系数",
           inputMode: "decimal",
+          defaultValue: initialCoefficient,
         },
       );
     }
@@ -2012,18 +2009,6 @@
                       '<input type="tel" name="contactPhone" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入国内手机号或座机号">',
                     )}
                     ${buildEditableFieldCard(
-                      '付款条件 <span class="text-danger">*</span>',
-                      '<div id="add-customer-payment-container" class="w-full"></div><input type="hidden" name="paymentTerms" id="add-customer-payment-input" required>',
-                    )}
-                    ${buildEditableFieldCard(
-                      "电子邮箱",
-                      '<input type="email" name="email" class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
-                    )}
-                    ${buildEditableFieldCard(
-                      '客户地址 <span class="text-danger">*</span>',
-                      '<input type="text" name="address" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
-                    )}
-                    ${buildEditableFieldCard(
                       '税率系数 <span class="text-danger">*</span>',
                       `<div class="flex min-h-[40px] flex-col gap-2 sm:flex-row sm:items-center">
                           <div id="add-customer-tax-rate-choice-container" class="shrink-0"></div>
@@ -2033,6 +2018,17 @@
                               <input type="hidden" name="taxRateCoefficient" id="add-customer-tax-rate-input">
                           </div>
                       </div>`,
+                      "app-modal-two-thirds-row",
+                    )}
+                    ${buildEditableFieldCard(
+                      '客户地址 <span class="text-danger">*</span>',
+                      '<input type="text" name="address" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
+                      "app-modal-two-thirds-row",
+                    )}
+                    ${buildEditableFieldCard(
+                      '付款条件 <span class="text-danger">*</span>',
+                      '<div id="add-customer-payment-container" class="w-full"></div><input type="hidden" name="paymentTerms" id="add-customer-payment-input" required>',
+                      "app-modal-third-row",
                     )}
                 </div>
                 <p class="text-xs text-gray-500">建议把付款条件和地址一起补全，后续销售单和送货单会直接引用这些数据。</p>
@@ -2048,7 +2044,6 @@
       const contactPerson = formData.get("contactPerson").trim();
       const contactPhone = formData.get("contactPhone").trim();
       const address = formData.get("address").trim();
-      const email = formData.get("email").trim();
       const hasTaxRate = normalizeTextValue(formData.get("hasTaxRate"));
       const taxRateCoefficientText = normalizeTextValue(
         formData.get("taxRateCoefficient"),
@@ -2112,7 +2107,7 @@
         contactPerson,
         contactPhone,
         address,
-        email: email || "-",
+        email: "-",
         paymentTerms,
         hasTaxRate: hasTaxRate === "yes",
         taxRateCoefficient,
@@ -2138,7 +2133,7 @@
       PAYMENT_OPTIONS,
       "请选择付款条件",
     );
-    bindAddCustomerTaxRateControls();
+    bindCustomerTaxRateControls("add");
   }
 
   function showEditCustomerModal(customerId) {
@@ -2156,7 +2151,6 @@
       getEditableFieldValue(customer.contactPhone),
     );
     const addressValue = escapeHTML(getEditableFieldValue(customer.address));
-    const emailValue = escapeHTML(getEditableFieldValue(customer.email));
     const paymentTermsValue = escapeHTML(
       getEditableFieldValue(customer.paymentTerms),
     );
@@ -2181,8 +2175,15 @@
                       `<input type="tel" name="contactPhone" required value="${contactPhoneValue}" placeholder="请输入国内手机号或座机号" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">`,
                     )}
                     ${buildEditableFieldCard(
-                      "电子邮箱",
-                      `<input type="email" name="email" value="${emailValue}" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">`,
+                      '税率系数 <span class="text-danger">*</span>',
+                      `<div class="flex min-h-[40px] flex-col gap-2 sm:flex-row sm:items-center">
+                          <div id="edit-customer-tax-rate-choice-container" class="shrink-0"></div>
+                          <input type="hidden" name="hasTaxRate" id="edit-customer-tax-rate-choice-input" required>
+                          <div id="edit-customer-tax-rate-wrap" class="invisible pointer-events-none min-w-0 flex-1" aria-hidden="true">
+                              <div id="edit-customer-tax-rate-input-container" class="w-full"></div>
+                              <input type="hidden" name="taxRateCoefficient" id="edit-customer-tax-rate-input">
+                          </div>
+                      </div>`,
                     )}
                     ${buildEditableFieldCard(
                       '付款条件 <span class="text-danger">*</span>',
@@ -2211,10 +2212,14 @@
       const contactPerson = normalizeTextValue(formData.get("contactPerson"));
       const contactPhone = normalizeTextValue(formData.get("contactPhone"));
       const address = normalizeTextValue(formData.get("address"));
-      const email = normalizeTextValue(formData.get("email"));
+      const hasTaxRate = normalizeTextValue(formData.get("hasTaxRate"));
+      const taxRateCoefficientText = normalizeTextValue(
+        formData.get("taxRateCoefficient"),
+      );
       const paymentTerms = normalizeTextValue(
         document.getElementById("edit-customer-payment-input").value,
       );
+      let taxRateCoefficient = null;
       const status =
         normalizeTextValue(
           document.getElementById("edit-customer-status-input").value,
@@ -2240,6 +2245,22 @@
         alert("请选择付款条件");
         return false;
       }
+      if (!hasTaxRate) {
+        alert("请选择是否有税率系数");
+        return false;
+      }
+      if (hasTaxRate === "yes") {
+        if (!taxRateCoefficientText) {
+          alert("请输入税率系数");
+          return false;
+        }
+
+        taxRateCoefficient = Number(taxRateCoefficientText);
+        if (!Number.isFinite(taxRateCoefficient) || taxRateCoefficient <= 0) {
+          alert("请输入有效的税率系数");
+          return false;
+        }
+      }
       if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
         alert("请输入有效的国内联系电话（手机号或座机号）");
         return false;
@@ -2253,8 +2274,9 @@
         contactPerson,
         contactPhone,
         address,
-        email: getStoredOptionalValue(email),
         paymentTerms,
+        hasTaxRate: hasTaxRate === "yes",
+        taxRateCoefficient,
         status,
         updatedAt: getLocalISOString(),
       });
@@ -2283,6 +2305,10 @@
       "edit-customer-status-input",
       customer.status || "active",
     );
+    bindCustomerTaxRateControls("edit", {
+      choice: customer.hasTaxRate ? "yes" : "no",
+      coefficient: customer.taxRateCoefficient,
+    });
   }
 
   function updateCustomerTable() {
@@ -2309,7 +2335,7 @@
     const paginatedCustomers = sortedCustomers.slice(startIndex, endIndex);
 
     if (paginatedCustomers.length === 0) {
-      renderAntdEmptyTableRow(tbody, 10, "暂无客户记录");
+      renderAntdEmptyTableRow(tbody, 9, "暂无客户记录");
       renderPaginationControl(
         "customer-pagination-container",
         "customers",
@@ -2326,7 +2352,6 @@
       const safeContactPerson = escapeHTML(customer.contactPerson || "-");
       const safeContactPhone = escapeHTML(customer.contactPhone || "-");
       const safeAddress = escapeHTML(customer.address || "-");
-      const safeEmail = escapeHTML(customer.email || "-");
       const safePaymentTerms = escapeHTML(customer.paymentTerms || "-");
       const statusMeta = getStatusMeta(customer.status);
       const safeStatusLabel = escapeHTML(statusMeta.label);
@@ -2340,7 +2365,6 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeContactPerson}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeContactPhone}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeAddress}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeEmail}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safePaymentTerms}</td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusMeta.className}">${safeStatusLabel}</span>
@@ -2421,7 +2445,7 @@
     const paginatedSuppliers = sortedSuppliers.slice(startIndex, endIndex);
 
     if (paginatedSuppliers.length === 0) {
-      renderAntdEmptyTableRow(tbody, 8, "暂无供应商记录");
+      renderAntdEmptyTableRow(tbody, 7, "暂无供应商记录");
       renderPaginationControl(
         "suppliers-pagination-container",
         "suppliers",
@@ -2436,7 +2460,6 @@
       const safeSupplierName = escapeHTML(supplier.name || "-");
       const safeContactPerson = escapeHTML(supplier.contactPerson || "-");
       const safeContactPhone = escapeHTML(supplier.contactPhone || "-");
-      const safeEmail = escapeHTML(supplier.email || "-");
       const safePaymentTerms = escapeHTML(supplier.paymentTerms || "-");
       const statusMeta = getStatusMeta(supplier.status);
       const safeStatusLabel = escapeHTML(statusMeta.label);
@@ -2448,7 +2471,6 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeContactPerson}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeContactPhone}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeEmail}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safePaymentTerms}</td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusMeta.className}">${safeStatusLabel}</span>

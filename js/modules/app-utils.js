@@ -213,9 +213,9 @@
 
     const config = options && typeof options === "object" ? options : {};
     const row = document.createElement("tr");
-    if (config.rowClassName) {
-      row.className = config.rowClassName;
-    }
+    row.className = ["app-empty-table-row", config.rowClassName]
+      .filter(Boolean)
+      .join(" ");
 
     const cell = document.createElement("td");
     cell.colSpan = colspan;

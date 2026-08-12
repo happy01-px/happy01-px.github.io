@@ -418,16 +418,16 @@
     );
   }
 
-  function resetPaginationAfterClearAllData() {
+  function resetPaginationAfterDataChange(clearTotals = false) {
     Object.values(global.paginationState || {}).forEach((state) => {
       if (!state || typeof state !== "object") return;
       state.page = 1;
-      state.total = 0;
+      if (clearTotals) state.total = 0;
     });
   }
 
-  function refreshViewsAfterClearAllData() {
-    resetPaginationAfterClearAllData();
+  function refreshViewsAfterDataChange(clearTotals = false) {
+    resetPaginationAfterDataChange(clearTotals);
 
     if (typeof global.updateInventoryTable === "function") {
       global.updateInventoryTable();
@@ -522,7 +522,7 @@
 
     try {
       const persisted = await global.clearAllSystemData();
-      refreshViewsAfterClearAllData();
+      refreshViewsAfterDataChange(true);
 
       const mobileSidebar = document.getElementById("mobile-sidebar");
       if (mobileSidebar) {
@@ -538,6 +538,65 @@
         );
       } else {
         global.showAntdMessage?.("error", "清空失败，原数据已保留。");
+      }
+    } finally {
+      button.disabled = false;
+      button.classList.remove("opacity-70", "cursor-not-allowed");
+      button.innerHTML = previousHtml;
+    }
+  }
+
+  async function handleSeedTestDataClick(event) {
+    event.preventDefault();
+    const button = event.currentTarget;
+
+    if (typeof global.seedTestData !== "function") {
+      global.showAntdMessage?.("error", "写入失败：系统尚未加载数据服务。");
+      return;
+    }
+
+    const previousHtml = button.innerHTML;
+    button.disabled = true;
+    button.classList.add("opacity-70", "cursor-not-allowed");
+    button.innerHTML =
+      '<i class="fa fa-spinner fa-spin"></i><span>写入中...</span>';
+
+    try {
+      const result = await global.seedTestData();
+
+      if (!result?.success) {
+        global.showAntdMessage?.("error", "测试数据写入失败，原数据已保留。");
+        return;
+      }
+
+      refreshViewsAfterDataChange();
+
+      const mobileSidebar = document.getElementById("mobile-sidebar");
+      if (mobileSidebar) mobileSidebar.classList.add("hidden");
+
+      if (result.createdCount === 0) {
+        const conflictText = result.conflictCount
+          ? "客户编号 KH 已被其他客户占用，请先修改该编号。"
+          : "预设测试数据已存在，本次未重复写入。";
+        global.showAntdMessage?.(
+          result.conflictCount ? "warning" : "info",
+          conflictText,
+        );
+      } else if (!result.persisted) {
+        global.showAntdMessage?.(
+          "warning",
+          `已在当前页面写入 ${result.createdCount} 条测试数据和 ${result.logCount} 条日志，但未连接数据目录，刷新后不会保留。`,
+        );
+      } else if (result.conflictCount) {
+        global.showAntdMessage?.(
+          "warning",
+          `已写入 ${result.createdCount} 条测试数据；客户编号 KH 已被占用，客户数据未写入。`,
+        );
+      } else {
+        global.showAntdMessage?.(
+          "success",
+          `已写入 ${result.createdCount} 条测试数据，并生成 ${result.logCount} 条日志。`,
+        );
       }
     } finally {
       button.disabled = false;
@@ -654,6 +713,19 @@
         },
       );
     }
+
+    [
+      document.getElementById("seed-test-data-button"),
+      document.getElementById("mobile-seed-test-data-button"),
+    ].forEach((button) => {
+      if (!button) return;
+      bindElementEventOnce(
+        button,
+        "seedTestDataClickBound",
+        "click",
+        handleSeedTestDataClick,
+      );
+    });
 
     [
       document.getElementById("clear-all-data-button"),

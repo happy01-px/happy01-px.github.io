@@ -222,6 +222,197 @@
     }
   }
 
+  function createSeedLog(objectType, objectName, contactPerson) {
+    return {
+      id: createRuntimeId("LOG"),
+      timestamp: new Date(),
+      userId: currentUser.id,
+      userName: currentUser.name,
+      actionType: "add",
+      objectType,
+      objectName,
+      details: `新增${
+        objectType === "company"
+          ? "公司"
+          : objectType === "supplier"
+            ? "供应商"
+            : "客户"
+      }，联系人：${contactPerson}`,
+      ipAddress: clientIP,
+    };
+  }
+
+  function hasRecordWithName(records, name) {
+    const normalizedName = String(name).trim().toLocaleLowerCase();
+    return normalizeList(records).some(
+      (record) =>
+        String(record?.name || "")
+          .trim()
+          .toLocaleLowerCase() === normalizedName,
+    );
+  }
+
+  async function seedTestData() {
+    const previousDataset = createRuntimeDatasetSnapshot();
+    const now = getLocalISOString();
+    const createdLogs = [];
+    let createdCount = 0;
+    let skippedCount = 0;
+    let conflictCount = 0;
+
+    const companies = [
+      {
+        name: "化工",
+        contactPerson: "雪王",
+        contactPhone: "13333333333",
+        address: "东莞",
+      },
+      {
+        name: "劳保",
+        contactPerson: "孙悟空",
+        contactPhone: "16666666666",
+        address: "虎门",
+      },
+    ];
+
+    companies.forEach((company) => {
+      if (hasRecordWithName(mockData.companies, company.name)) {
+        skippedCount += 1;
+        return;
+      }
+
+      mockData.companies.push({
+        id: createSequentialId(mockData.companies, "CO"),
+        ...company,
+        email: "-",
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      });
+      createdLogs.push(
+        createSeedLog("company", company.name, company.contactPerson),
+      );
+      createdCount += 1;
+    });
+
+    const supplier = {
+      name: "供应商",
+      contactPerson: "供应商联系人",
+      contactPhone: "15555555555",
+    };
+    if (hasRecordWithName(mockData.suppliers, supplier.name)) {
+      skippedCount += 1;
+    } else {
+      mockData.suppliers.push({
+        id: createSequentialId(mockData.suppliers, "S"),
+        ...supplier,
+        email: "-",
+        address: "-",
+        paymentTerms: "Net 30",
+        creditLimit: 0,
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      });
+      createdLogs.push(
+        createSeedLog("supplier", supplier.name, supplier.contactPerson),
+      );
+      createdCount += 1;
+    }
+
+    const customer = {
+      id: "KH",
+      name: "客户",
+      contactPerson: "客户联系人",
+      contactPhone: "17777777777",
+      address: "深圳",
+      email: "-",
+      paymentTerms: "Net 30",
+      hasTaxRate: false,
+      taxRateCoefficient: null,
+      creditLimit: 0,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    };
+    const customerWithSameName = hasRecordWithName(
+      mockData.customers,
+      customer.name,
+    );
+    const customerWithSameId = normalizeList(mockData.customers).find(
+      (record) =>
+        String(record?.id || "").trim().toLocaleLowerCase() ===
+        customer.id.toLocaleLowerCase(),
+    );
+
+    if (customerWithSameName) {
+      skippedCount += 1;
+    } else if (customerWithSameId) {
+      conflictCount += 1;
+    } else {
+      mockData.customers.push(customer);
+      createdLogs.push(
+        createSeedLog("customer", customer.name, customer.contactPerson),
+      );
+      createdCount += 1;
+    }
+
+    if (createdCount === 0) {
+      return {
+        success: true,
+        persisted: storeState.mode === STORAGE_MODES.remote,
+        createdCount,
+        logCount: 0,
+        skippedCount,
+        conflictCount,
+      };
+    }
+
+    logsData.unshift(...createdLogs);
+
+    try {
+      const persisted = await persistDataset();
+      applyDefaultDataset(createRuntimeDatasetSnapshot());
+      return {
+        success: true,
+        persisted,
+        createdCount,
+        logCount: createdLogs.length,
+        skippedCount,
+        conflictCount,
+      };
+    } catch (error) {
+      console.error("Failed to write preset test data.", error);
+
+      if (storeState.mode === STORAGE_MODES.remote) {
+        try {
+          await saveRemoteTables(previousDataset);
+        } catch (rollbackError) {
+          console.error(
+            "Failed to restore dataset after test data write failure.",
+            rollbackError,
+          );
+        }
+      }
+
+      mockData = normalizeMockData(previousDataset);
+      stockMovementData = restoreStockMovementDates(
+        previousDataset.stockMovements,
+      );
+      logsData = restoreLogDates(previousDataset.logs);
+      applyDefaultDataset(previousDataset);
+
+      return {
+        success: false,
+        persisted: false,
+        createdCount: 0,
+        logCount: 0,
+        skippedCount: 0,
+        conflictCount: 0,
+      };
+    }
+  }
+
   function loadStockMovementData() {
     stockMovementData = restoreStockMovementDates(
       deepClone(defaultStockMovementData),
@@ -330,6 +521,7 @@
   global.persistStockMovementData = persistStockMovementData;
   global.persistLogsData = persistLogsData;
   global.clearAllSystemData = clearAllSystemData;
+  global.seedTestData = seedTestData;
   global.exportAllData = exportAllData;
   global.importData = importData;
   global.getDataPersistenceMode = getDataPersistenceMode;
@@ -339,6 +531,7 @@
     loadMockData,
     saveMockData,
     clearAllSystemData,
+    seedTestData,
     loadStockMovementData,
     loadLogsData,
     persistStockMovementData,

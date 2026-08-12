@@ -1,15 +1,15 @@
 [
     {
         "id": "S001",
-        "name": "???",
-        "contactPerson": "1",
-        "contactPhone": "13333333333",
+        "name": "供应商",
+        "contactPerson": "供应商联系人",
+        "contactPhone": "15555555555",
         "email": "-",
         "address": "-",
         "paymentTerms": "Net 30",
         "creditLimit": 0,
         "status": "active",
-        "createdAt": "2026-07-21T16:50:23",
-        "updatedAt": "2026-07-21T16:50:23"
+        "createdAt": "2026-08-03T17:19:53",
+        "updatedAt": "2026-08-04T15:58:22"
     }
 ]

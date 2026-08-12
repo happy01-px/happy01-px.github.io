@@ -215,6 +215,89 @@ test("clearAllSystemData empties every persisted table", async () => {
   harness.close();
 });
 
+test("seedTestData writes the preset records and logs without duplicates", async () => {
+  const harness = createWindow();
+  const fixture = createFixtureData();
+  const savedTables = new Map();
+
+  loadDataStoreScripts(harness.window);
+  installSplitDataFetch(harness.window, fixture, async (url, options) => {
+    savedTables.set(url, JSON.parse(options.body));
+    return {
+      ok: true,
+      status: 200,
+      statusText: "OK",
+    };
+  });
+
+  await harness.window.loadMockData();
+  harness.window.loadStockMovementData();
+  harness.window.loadLogsData();
+
+  const initialLogCount = harness.window.logsData.length;
+  const firstResult = await harness.window.seedTestData();
+
+  assert.equal(firstResult.success, true);
+  assert.equal(firstResult.persisted, true);
+  assert.equal(firstResult.createdCount, 4);
+  assert.equal(firstResult.logCount, 4);
+  assert.equal(
+    harness.window.mockData.companies.find((item) => item.name === "化工")
+      .contactPerson,
+    "雪王",
+  );
+  assert.equal(
+    harness.window.mockData.companies.find((item) => item.name === "劳保")
+      .address,
+    "虎门",
+  );
+  assert.equal(
+    harness.window.mockData.suppliers.find((item) => item.name === "供应商")
+      .contactPhone,
+    "15555555555",
+  );
+
+  const customer = harness.window.mockData.customers.find(
+    (item) => item.name === "客户",
+  );
+  assert.equal(customer.id, "KH");
+  assert.equal(customer.address, "深圳");
+  assert.equal(customer.paymentTerms, "Net 30");
+  assert.equal(customer.hasTaxRate, false);
+  assert.equal(customer.taxRateCoefficient, null);
+  assert.equal(harness.window.logsData.length, initialLogCount + 4);
+  assert.deepEqual(
+    Array.from(
+      harness.window.logsData.slice(0, 4),
+      (item) => item.objectName,
+    ),
+    ["化工", "劳保", "供应商", "客户"],
+  );
+  assert.equal(savedTables.get("/api/save/logs").length, initialLogCount + 4);
+
+  const lengthsAfterFirstWrite = {
+    companies: harness.window.mockData.companies.length,
+    suppliers: harness.window.mockData.suppliers.length,
+    customers: harness.window.mockData.customers.length,
+    logs: harness.window.logsData.length,
+  };
+  const secondResult = await harness.window.seedTestData();
+
+  assert.equal(secondResult.createdCount, 0);
+  assert.equal(secondResult.logCount, 0);
+  assert.deepEqual(
+    {
+      companies: harness.window.mockData.companies.length,
+      suppliers: harness.window.mockData.suppliers.length,
+      customers: harness.window.mockData.customers.length,
+      logs: harness.window.logsData.length,
+    },
+    lengthsAfterFirstWrite,
+  );
+
+  harness.close();
+});
+
 test("importData updates in-memory state and persists imported tables when remote storage is available", async () => {
   const harness = createWindow();
   const fixture = createFixtureData();

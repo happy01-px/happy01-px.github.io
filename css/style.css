@@ -360,3 +360,56 @@ body
 #sales-order .sales-order-company-select .ant-select-selection-placeholder {
   text-align: center !important;
 }
+
+/* Keep business list headers horizontal and lock body cells to the same columns. */
+.business-data-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.business-data-table thead th {
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.business-data-table :is(th, td) {
+  padding-right: 12px !important;
+  padding-left: 12px !important;
+}
+
+@media (min-width: 1600px) {
+  .business-table-scroll {
+    overflow-x: hidden !important;
+  }
+}
+
+@media (max-width: 1599px) {
+  .business-data-table--supplier {
+    min-width: 1120px;
+  }
+
+  .business-data-table--company {
+    min-width: 980px;
+  }
+
+  .business-data-table--customer {
+    min-width: 1360px;
+  }
+
+  .business-data-table :is(th, td):last-child {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    box-shadow: -8px 0 12px -12px rgba(15, 23, 42, 0.5);
+  }
+
+  .business-data-table thead th:last-child {
+    z-index: 3;
+    background: #f9fafb;
+  }
+
+  .business-data-table tbody td:last-child {
+    background: #ffffff;
+  }
+}

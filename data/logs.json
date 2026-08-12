@@ -1,13 +1,68 @@
 [
     {
-        "id": "LOG1784623823582756",
-        "timestamp": "2026-07-21T08:50:23.582Z",
+        "id": "LOG1785830302536319",
+        "timestamp": "2026-08-04T07:58:22.536Z",
         "userId": "U001",
-        "userName": "???",
+        "userName": "张三",
+        "actionType": "edit",
+        "objectType": "supplier",
+        "objectName": "供应商",
+        "details": "编辑供应商信息，联系人：供应商联系人",
+        "ipAddress": "192.168.1.100"
+    },
+    {
+        "id": "LOG1785830298699292",
+        "timestamp": "2026-08-04T07:58:18.699Z",
+        "userId": "U001",
+        "userName": "张三",
+        "actionType": "edit",
+        "objectType": "supplier",
+        "objectName": "供应商",
+        "details": "编辑供应商信息，联系人：供应商联系人",
+        "ipAddress": "192.168.1.100"
+    },
+    {
+        "id": "LOG1785748793063159",
+        "timestamp": "2026-08-03T09:19:53.063Z",
+        "userId": "U001",
+        "userName": "张三",
+        "actionType": "add",
+        "objectType": "company",
+        "objectName": "化工",
+        "details": "新增公司，联系人：雪王",
+        "ipAddress": "192.168.1.100"
+    },
+    {
+        "id": "LOG1785748793063735",
+        "timestamp": "2026-08-03T09:19:53.063Z",
+        "userId": "U001",
+        "userName": "张三",
+        "actionType": "add",
+        "objectType": "company",
+        "objectName": "劳保",
+        "details": "新增公司，联系人：孙悟空",
+        "ipAddress": "192.168.1.100"
+    },
+    {
+        "id": "LOG1785748793063753",
+        "timestamp": "2026-08-03T09:19:53.063Z",
+        "userId": "U001",
+        "userName": "张三",
         "actionType": "add",
         "objectType": "supplier",
-        "objectName": "???",
-        "details": "???????????????1",
+        "objectName": "供应商",
+        "details": "新增供应商，联系人：供应商联系人",
+        "ipAddress": "192.168.1.100"
+    },
+    {
+        "id": "LOG1785748793063844",
+        "timestamp": "2026-08-03T09:19:53.063Z",
+        "userId": "U001",
+        "userName": "张三",
+        "actionType": "add",
+        "objectType": "customer",
+        "objectName": "客户",
+        "details": "新增客户，联系人：客户联系人",
         "ipAddress": "192.168.1.100"
     }
 ]

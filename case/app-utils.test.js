@@ -114,6 +114,12 @@ test("AppUtils renders Ant Design Empty for shared empty states when runtime is 
       ?.getAttribute("data-image"),
     "simple",
   );
+  assert.equal(
+    harness.window.document
+      .querySelector("#empty-table tr")
+      .classList.contains("app-empty-table-row"),
+    true,
+  );
   assert.match(
     harness.window.document.getElementById("empty-table").textContent,
     /暂无记录/,

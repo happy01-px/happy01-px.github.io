@@ -1,1 +1,17 @@
-[]
+[
+    {
+        "id": "KH",
+        "name": "客户",
+        "contactPerson": "客户联系人",
+        "contactPhone": "17777777777",
+        "address": "深圳",
+        "email": "-",
+        "paymentTerms": "Net 30",
+        "hasTaxRate": false,
+        "taxRateCoefficient": null,
+        "creditLimit": 0,
+        "status": "active",
+        "createdAt": "2026-08-03T17:19:53",
+        "updatedAt": "2026-08-03T17:19:53"
+    }
+]
