@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="仓库库存管理系统">
+  <defs>
+    <linearGradient id="brand" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7762f6" />
+      <stop offset="1" stop-color="#5138d8" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#brand)" />
+  <path d="M112 231 256 119l144 112" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="38" />
+  <path d="M143 222v163h226V222" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="38" />
+  <path d="M206 385V279h100v106" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="38" />
+</svg>

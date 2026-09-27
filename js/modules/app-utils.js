@@ -2,12 +2,12 @@
   const existingUser = global.currentUser;
 
   global.currentUser = existingUser || {
-    id: "U001",
-    name: "张三",
-    role: "admin",
+    id: "LOCAL_ADMIN",
+    name: "本地管理员",
+    role: "local_admin",
   };
 
-  global.clientIP = global.clientIP || "192.168.1.100";
+  global.clientIP = global.clientIP || "127.0.0.1";
 
   function getLocalISOString() {
     const now = new Date();
@@ -33,7 +33,9 @@
       products: normalizeList(data.products),
       suppliers: normalizeList(data.suppliers),
       customers: normalizeList(data.customers),
+      customerProductPrices: normalizeList(data.customerProductPrices),
       companies: normalizeList(data.companies),
+      warehouses: normalizeList(data.warehouses),
       bills: normalizeList(data.bills),
       deliveryNotes: normalizeList(data.deliveryNotes),
     };
@@ -52,6 +54,56 @@
       ...log,
       timestamp: log?.timestamp ? new Date(log.timestamp) : new Date(),
     }));
+  }
+
+  function stageAuditLogs(entries) {
+    const auditEntries = Array.isArray(entries) ? entries : [entries];
+    if (!Array.isArray(global.logsData)) global.logsData = [];
+
+    return auditEntries.filter(Boolean).map((entry) => {
+      const record = {
+        id: createRuntimeId("LOG"),
+        timestamp: new Date(),
+        userId: global.currentUser.id,
+        userName: global.currentUser.name,
+        actionType: entry.actionType,
+        objectType: entry.objectType,
+        objectName: entry.objectName,
+        details: entry.details,
+        ipAddress: global.clientIP,
+      };
+      global.logsData.unshift(record);
+      return record;
+    });
+  }
+
+  function rollbackStagedAuditLogs(records) {
+    const ids = new Set(normalizeList(records).map((record) => record.id));
+    global.logsData = normalizeList(global.logsData).filter(
+      (record) => !ids.has(record.id),
+    );
+
+    const logsSection = document.querySelector("#logs");
+    if (
+      logsSection &&
+      !logsSection.classList.contains("hidden") &&
+      typeof global.renderLogsTable === "function"
+    ) {
+      global.renderLogsTable();
+    }
+  }
+
+  function finalizeStagedAuditLogs(records) {
+    if (typeof global.addLog !== "function") return;
+    normalizeList(records).forEach((record) => {
+      global.addLog(
+        record.actionType,
+        record.objectType,
+        record.objectName,
+        record.details,
+        { append: false, persist: false, record },
+      );
+    });
   }
 
   function escapeHTML(value) {
@@ -161,6 +213,7 @@
     return true;
   }
 
+  /** @param {any} description @param {any} options */
   function createAntdEmptyNode(description, options = {}) {
     if (!global.React || !global.antd || !global.antd.Empty) {
       return null;
@@ -188,6 +241,7 @@
     );
   }
 
+  /** @param {any} targetOrId @param {any} description @param {any} options */
   function renderAntdEmptyState(targetOrId, description, options = {}) {
     const target =
       typeof targetOrId === "string"
@@ -208,6 +262,7 @@
     return false;
   }
 
+  /** @param {any} tbody @param {number} colspan @param {any} description @param {any} options */
   function renderAntdEmptyTableRow(tbody, colspan, description, options = {}) {
     if (!tbody) return false;
 
@@ -240,11 +295,15 @@
   global.normalizeMockData = normalizeMockData;
   global.restoreStockMovementDates = restoreStockMovementDates;
   global.restoreLogDates = restoreLogDates;
+  global.stageAuditLogs = stageAuditLogs;
+  global.rollbackStagedAuditLogs = rollbackStagedAuditLogs;
+  global.finalizeStagedAuditLogs = finalizeStagedAuditLogs;
   global.escapeHTML = escapeHTML;
   global.sanitizeHTMLFragment = sanitizeHTMLFragment;
   global.setSafeInnerHTML = setSafeInnerHTML;
   global.createSequentialId = createSequentialId;
   global.createRuntimeId = createRuntimeId;
+  global.renderAntdNode = renderAntdNode;
   global.createAntdEmptyNode = createAntdEmptyNode;
   global.renderAntdEmptyState = renderAntdEmptyState;
   global.renderAntdEmptyTableRow = renderAntdEmptyTableRow;
@@ -256,11 +315,15 @@
     normalizeMockData,
     restoreStockMovementDates,
     restoreLogDates,
+    stageAuditLogs,
+    rollbackStagedAuditLogs,
+    finalizeStagedAuditLogs,
     escapeHTML,
     sanitizeHTMLFragment,
     setSafeInnerHTML,
     createSequentialId,
     createRuntimeId,
+    renderAntdNode,
     createAntdEmptyNode,
     renderAntdEmptyState,
     renderAntdEmptyTableRow,

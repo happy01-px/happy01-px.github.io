@@ -30,7 +30,86 @@
   };
 
   let currentSalesOrder = createEmptySalesOrder();
-  let currentSalesOrderStep = "form";
+  let currentPrintableDeliveryNote = null;
+  let salesOrderPaperResizeObserver = null;
+  let salesOrderResizeFallbackBound = false;
+  let salesOrderLayoutFrame = 0;
+
+  const SALES_ORDER_PAPER_WIDTH = 1220;
+  const SALES_ORDER_PAPER_LAYOUTS = Object.freeze([
+    {
+      viewportId: "sales-order-paper-viewport",
+      paperId: "sales-order-paper",
+    },
+    {
+      viewportId: "sales-order-preview-viewport",
+      paperId: "sales-order-preview-content",
+    },
+    {
+      viewportId: "sales-order-print-viewport",
+      paperId: "sales-order-print-content",
+    },
+  ]);
+
+  function syncSalesOrderPaperLayout() {
+    SALES_ORDER_PAPER_LAYOUTS.forEach(({ viewportId, paperId }) => {
+      const viewport = document.getElementById(viewportId);
+      const paper = document.getElementById(paperId);
+      if (!viewport || !paper || viewport.clientWidth <= 0) return;
+
+      const naturalWidth = paper.offsetWidth || SALES_ORDER_PAPER_WIDTH;
+      const naturalHeight = paper.offsetHeight;
+      const scale = Math.min(1, viewport.clientWidth / naturalWidth);
+      const renderedWidth = naturalWidth * scale;
+
+      paper.style.transform = `scale(${scale})`;
+      paper.style.marginLeft = `${Math.max(0, (viewport.clientWidth - renderedWidth) / 2)}px`;
+      viewport.style.height = `${Math.ceil(naturalHeight * scale)}px`;
+      viewport.dataset.scale = scale.toFixed(4);
+    });
+  }
+
+  function scheduleSalesOrderPaperLayout() {
+    if (
+      salesOrderLayoutFrame &&
+      typeof global.cancelAnimationFrame === "function"
+    ) {
+      global.cancelAnimationFrame(salesOrderLayoutFrame);
+    }
+
+    const schedule =
+      typeof global.requestAnimationFrame === "function"
+        ? global.requestAnimationFrame.bind(global)
+        : (callback) => global.setTimeout(callback, 0);
+    salesOrderLayoutFrame = schedule(() => {
+      salesOrderLayoutFrame = 0;
+      syncSalesOrderPaperLayout();
+    });
+  }
+
+  function initSalesOrderPaperScaling() {
+    const elements = SALES_ORDER_PAPER_LAYOUTS.flatMap(
+      ({ viewportId, paperId }) => [
+        document.getElementById(viewportId),
+        document.getElementById(paperId),
+      ],
+    ).filter(Boolean);
+
+    if (typeof global.ResizeObserver === "function") {
+      salesOrderPaperResizeObserver?.disconnect();
+      salesOrderPaperResizeObserver = new global.ResizeObserver(
+        scheduleSalesOrderPaperLayout,
+      );
+      elements.forEach((element) =>
+        salesOrderPaperResizeObserver.observe(element),
+      );
+    } else if (!salesOrderResizeFallbackBound) {
+      global.addEventListener("resize", scheduleSalesOrderPaperLayout);
+      salesOrderResizeFallbackBound = true;
+    }
+
+    scheduleSalesOrderPaperLayout();
+  }
 
   function getTodayCompactDate() {
     const now = new Date();
@@ -56,20 +135,6 @@
     return `${year}${month}${day}`;
   }
 
-  function formatDisplayDateTime(value) {
-    if (!value) return "-";
-    const parsed = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(parsed.getTime())) return String(value);
-
-    const year = parsed.getFullYear();
-    const month = String(parsed.getMonth() + 1).padStart(2, "0");
-    const day = String(parsed.getDate()).padStart(2, "0");
-    const hours = String(parsed.getHours()).padStart(2, "0");
-    const minutes = String(parsed.getMinutes()).padStart(2, "0");
-    const seconds = String(parsed.getSeconds()).padStart(2, "0");
-    return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
-  }
-
   function createSalesOrderNumber() {
     const compactDate = getTodayCompactDate();
     const existedCount = (
@@ -90,6 +155,11 @@
       unit: "-",
       quantity: "",
       price: "",
+      referencePrice: null,
+      referencePriceOriginal: null,
+      referencePriceTaxMode: null,
+      lastTransactionPrice: null,
+      priceSource: "product-default",
       remark: "",
     };
   }
@@ -100,7 +170,10 @@
       issueDate: getTodayCompactDate(),
       companyId: "",
       customerId: "",
+      warehouseId: global.getDefaultWarehouseId?.() || "WH001",
       customerNo: "--",
+      taxRate: 0,
+      priceTaxMode: "exclusive",
       items: [createSalesOrderItem()],
     };
   }
@@ -178,6 +251,17 @@
     return initials.join("").slice(0, 2);
   }
 
+  function getCustomerCodePrefix(customer) {
+    const idLetters = String(customer?.id || "")
+      .toUpperCase()
+      .match(/[A-Z]/g);
+    if (idLetters && idLetters.length >= 2) {
+      return idLetters.slice(0, 2).join("");
+    }
+
+    return getCustomerInitials(customer?.name);
+  }
+
   function getCustomerNo(customerId, issueDate) {
     const customer = findCustomerById(customerId);
     if (!customer) return "--";
@@ -195,12 +279,60 @@
       );
     }).length;
 
-    return `${getCustomerInitials(customer.name)}${yearShort}-${String(existedCount + 1).padStart(3, "0")}`;
+    return `${getCustomerCodePrefix(customer)}${yearShort}-${String(existedCount + 1).padStart(3, "0")}`;
   }
 
   function parseNumber(value) {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function roundMoney(value) {
+    return Math.round((parseNumber(value) + Number.EPSILON) * 100) / 100;
+  }
+
+  function getCustomerTaxRate(customer) {
+    const explicitRate = Number(customer?.defaultTaxRate);
+    if (Number.isFinite(explicitRate) && explicitRate >= 0) {
+      return Math.min(1, explicitRate);
+    }
+    const coefficient = Number(customer?.taxRateCoefficient);
+    if (!customer?.hasTaxRate || !Number.isFinite(coefficient)) return 0;
+    return Math.min(
+      1,
+      Math.max(0, coefficient > 1 ? coefficient - 1 : coefficient),
+    );
+  }
+
+  /**
+   * @param {Array<{quantity: string|number, price: string|number}>} [items]
+   */
+  function getOrderAmounts(items) {
+    const amountItems = Array.isArray(items) ? items : getDeliveryItems();
+    const enteredAmount = roundMoney(
+      amountItems.reduce(
+        (total, item) =>
+          total + parseNumber(item.quantity) * parseNumber(item.price),
+        0,
+      ),
+    );
+    const taxRate = Math.max(0, parseNumber(currentSalesOrder.taxRate));
+    if (currentSalesOrder.priceTaxMode === "inclusive") {
+      const totalAmount = enteredAmount;
+      const subtotal = roundMoney(totalAmount / (1 + taxRate));
+      return {
+        subtotal,
+        taxAmount: roundMoney(totalAmount - subtotal),
+        totalAmount,
+      };
+    }
+    const subtotal = enteredAmount;
+    const taxAmount = roundMoney(subtotal * taxRate);
+    return {
+      subtotal,
+      taxAmount,
+      totalAmount: roundMoney(subtotal + taxAmount),
+    };
   }
 
   function formatMoney(value) {
@@ -289,17 +421,12 @@
     );
   }
 
-  function getSalesOrderTotalAmount() {
-    return getDeliveryItems().reduce(
-      (total, item) =>
-        total + parseNumber(item.quantity) * parseNumber(item.price),
-      0,
-    );
-  }
-
   function updateSalesOrderTotals() {
-    const totalAmount = getSalesOrderTotalAmount();
+    const amounts = getOrderAmounts();
+    const totalAmount = amounts.totalAmount;
     setText("sales-order-total-amount-display", formatMoney(totalAmount));
+    setText("sales-order-subtotal-display", formatMoney(amounts.subtotal));
+    setText("sales-order-tax-amount-display", formatMoney(amounts.taxAmount));
     setText(
       "sales-order-total-amount-uppercase",
       convertAmountToChineseUpper(totalAmount),
@@ -328,15 +455,73 @@
     );
     setInputValue("sales-customer-phone-input", customer?.contactPhone || "");
     setInputValue("sales-customer-payment-input", customer?.paymentTerms || "");
+    currentSalesOrder.taxRate = getCustomerTaxRate(customer);
+    currentSalesOrder.priceTaxMode =
+      customer?.priceTaxMode === "inclusive" ? "inclusive" : "exclusive";
+    setInputValue(
+      "sales-order-tax-rate-input",
+      (currentSalesOrder.taxRate * 100).toFixed(2).replace(/\.00$/, ""),
+    );
+    setInputValue(
+      "sales-order-price-tax-mode-input",
+      currentSalesOrder.priceTaxMode,
+    );
+    setText(
+      "sales-order-price-label",
+      currentSalesOrder.priceTaxMode === "inclusive"
+        ? "含税单价(RMB)"
+        : "未税单价(RMB)",
+    );
+    updateSalesOrderTotals();
+  }
+
+  function refreshSelectedProductPrices() {
+    currentSalesOrder.items.forEach((item) => {
+      if (item.productId) applyProductSelection(item.id, item.productId);
+    });
+  }
+
+  function bindSalesTaxControls() {
+    const taxInput = document.getElementById("sales-order-tax-rate-input");
+    const modeInput = document.getElementById(
+      "sales-order-price-tax-mode-input",
+    );
+    if (taxInput && !taxInput.dataset.bound) {
+      taxInput.dataset.bound = "true";
+      taxInput.addEventListener("input", () => {
+        const percentage = Math.min(
+          100,
+          Math.max(0, parseNumber(taxInput.value)),
+        );
+        currentSalesOrder.taxRate = percentage / 100;
+        updateSalesOrderTotals();
+      });
+    }
+    if (modeInput && !modeInput.dataset.bound) {
+      modeInput.dataset.bound = "true";
+      modeInput.addEventListener("change", () => {
+        currentSalesOrder.priceTaxMode =
+          modeInput.value === "inclusive" ? "inclusive" : "exclusive";
+        setText(
+          "sales-order-price-label",
+          currentSalesOrder.priceTaxMode === "inclusive"
+            ? "含税单价(RMB)"
+            : "未税单价(RMB)",
+        );
+        updateSalesOrderTotals();
+      });
+    }
   }
 
   function renderCompanySelect() {
     if (typeof global.renderAntdSelect !== "function") return;
 
-    const companyOptions = (mockData?.companies || []).map((company) => ({
-      value: company.id,
-      label: company.name,
-    }));
+    const companyOptions = (mockData?.companies || [])
+      .filter((company) => company.status !== "inactive")
+      .map((company) => ({
+        value: company.id,
+        label: company.name,
+      }));
 
     global.renderAntdSelect(
       "sales-order-company-container",
@@ -359,10 +544,12 @@
   function renderCustomerSelect() {
     if (typeof global.renderAntdSelect !== "function") return;
 
-    const customerOptions = (mockData?.customers || []).map((customer) => ({
-      value: customer.id,
-      label: customer.name,
-    }));
+    const customerOptions = (mockData?.customers || [])
+      .filter((customer) => customer.status !== "inactive")
+      .map((customer) => ({
+        value: customer.id,
+        label: customer.name,
+      }));
 
     global.renderAntdSelect(
       "sales-order-customer-container",
@@ -378,6 +565,7 @@
         currentSalesOrder.customerId = value || "";
         applyCustomerToForm(findCustomerById(currentSalesOrder.customerId));
         updateCustomerNoDisplay();
+        refreshSelectedProductPrices();
       },
     );
   }
@@ -434,6 +622,7 @@
           currentSalesOrder.issueDate = nextValue;
           hiddenInput.value = nextValue;
           updateCustomerNoDisplay();
+          refreshSelectedProductPrices();
         },
       });
     };
@@ -446,10 +635,16 @@
   }
 
   function getProductOptions() {
-    return (mockData?.products || []).map((product) => ({
-      value: product.id,
-      label: product.name,
-    }));
+    return (mockData?.products || [])
+      .filter(
+        (product) =>
+          product.status !== "inactive" &&
+          parseNumber(product.stockQuantity) > 0,
+      )
+      .map((product) => ({
+        value: product.id,
+        label: product.name,
+      }));
   }
 
   function getProductStockText(product) {
@@ -468,6 +663,32 @@
     if (stockQuantity <= 0) return "text-red-600";
     if (stockQuantity <= minStock) return "text-orange-500";
     return "text-green-600";
+  }
+
+  function getProductPriceHint(item, product) {
+    if (!item || !product) return "";
+    const referenceText =
+      item.referencePrice === null
+        ? "客户参考价：未设置"
+        : `客户参考价：¥${parseNumber(item.referencePrice).toFixed(2)}`;
+    const lastText =
+      item.lastTransactionPrice === null
+        ? "上次成交：无"
+        : `上次成交：¥${parseNumber(item.lastTransactionPrice).toFixed(2)}`;
+    return `${referenceText} / ${lastText} / 成本：¥${parseNumber(product.costPrice).toFixed(2)}`;
+  }
+
+  function normalizeReferencePrice(customerPrice) {
+    if (!customerPrice) return null;
+    const originalPrice = parseNumber(customerPrice.referencePrice);
+    const sourceMode =
+      customerPrice.priceTaxMode === "inclusive" ? "inclusive" : "exclusive";
+    const targetMode = currentSalesOrder.priceTaxMode;
+    const taxRate = parseNumber(currentSalesOrder.taxRate);
+    if (sourceMode === targetMode || taxRate <= 0) return originalPrice;
+    return sourceMode === "inclusive"
+      ? roundMoney(originalPrice / (1 + taxRate))
+      : roundMoney(originalPrice * (1 + taxRate));
   }
 
   function normalizeQuantityInput(value) {
@@ -576,13 +797,46 @@
       item.spec = "-";
       item.unit = "-";
       item.price = "";
+      item.referencePrice = null;
+      item.referencePriceOriginal = null;
+      item.referencePriceTaxMode = null;
+      item.lastTransactionPrice = null;
+      item.priceSource = "product-default";
       item.quantity = "";
       item.remark = "";
     } else {
       item.productName = product.name || "";
       item.spec = product.category || "-";
       item.unit = product.unit || "-";
-      item.price = parseNumber(product.retailPrice).toFixed(2);
+      const customerPrice =
+        currentSalesOrder.customerId &&
+        typeof global.getEffectiveCustomerPrice === "function"
+          ? global.getEffectiveCustomerPrice(
+              currentSalesOrder.customerId,
+              product.id,
+              currentSalesOrder.companyId,
+            )
+          : null;
+      item.referencePrice = normalizeReferencePrice(customerPrice);
+      item.referencePriceOriginal = customerPrice
+        ? parseNumber(customerPrice.referencePrice)
+        : null;
+      item.referencePriceTaxMode = customerPrice?.priceTaxMode || null;
+      item.lastTransactionPrice =
+        currentSalesOrder.customerId &&
+        typeof global.getLastCustomerProductPrice === "function"
+          ? global.getLastCustomerProductPrice(
+              currentSalesOrder.customerId,
+              product.id,
+              currentSalesOrder.companyId,
+            )
+          : null;
+      item.price = parseNumber(
+        customerPrice?.referencePrice ?? product.retailPrice,
+      ).toFixed(2);
+      item.priceSource = customerPrice
+        ? "customer-price-list"
+        : "product-default";
     }
 
     const specNode = document.getElementById(`sales-order-item-spec-${rowId}`);
@@ -597,6 +851,9 @@
     const stockHintNode = document.getElementById(
       `sales-order-item-stock-${rowId}`,
     );
+    const priceHintNode = document.getElementById(
+      `sales-order-item-price-hint-${rowId}`,
+    );
 
     if (specNode) specNode.textContent = item.spec || "-";
     if (unitNode) unitNode.textContent = item.unit || "-";
@@ -609,6 +866,9 @@
         ? `mt-1 min-h-4 text-left text-xs ${getProductStockClassName(product)}`
         : "invisible pointer-events-none mt-1 min-h-4 text-left text-xs text-gray-500";
     }
+    if (priceHintNode) {
+      priceHintNode.textContent = getProductPriceHint(item, product);
+    }
     renderSalesOrderQuantityInput(rowId);
 
     syncRowAmount(rowId);
@@ -619,6 +879,14 @@
     if (!item) return;
 
     item[field] = value;
+    if (field === "price") {
+      const referencePrice = item.referencePrice;
+      item.priceSource =
+        referencePrice !== null &&
+        parseNumber(value) === parseNumber(referencePrice)
+          ? "customer-price-list"
+          : "manual";
+    }
     syncRowAmount(rowId);
   }
 
@@ -723,6 +991,7 @@
                 </td>
                 <td class="border-r border-gray-300 px-3 py-2">
                     <input id="${priceInputId}" type="number" min="0" step="0.01" class="w-full border-0 bg-transparent px-0 py-0 text-center text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0" value="${escapeHTML(item.price)}">
+                    <div id="sales-order-item-price-hint-${item.id}" class="mt-1 text-center text-[11px] leading-4 text-gray-500">${escapeHTML(getProductPriceHint(item, findProductById(item.productId)))}</div>
                 </td>
                 <td class="border-r border-gray-300 px-3 py-3 text-center font-medium" id="sales-order-item-amount-${item.id}">${(parseNumber(item.quantity) * parseNumber(item.price)).toFixed(2)}</td>
                 <td class="px-3 py-2">
@@ -759,6 +1028,7 @@
     });
 
     updateSalesOrderTotals();
+    scheduleSalesOrderPaperLayout();
   }
 
   function setStepState(stepIndex) {
@@ -805,16 +1075,29 @@
       unit: item.unit || "-",
       quantity: parseNumber(item.quantity),
       price: parseNumber(item.price),
-      amount: parseNumber(item.quantity) * parseNumber(item.price),
+      referencePrice:
+        item.referencePrice === null ? null : parseNumber(item.referencePrice),
+      referencePriceOriginal:
+        item.referencePriceOriginal === null
+          ? null
+          : parseNumber(item.referencePriceOriginal),
+      referencePriceTaxMode: item.referencePriceTaxMode,
+      lastTransactionPrice:
+        item.lastTransactionPrice === null
+          ? null
+          : parseNumber(item.lastTransactionPrice),
+      priceSource: item.priceSource || "manual",
+      amount: roundMoney(parseNumber(item.quantity) * parseNumber(item.price)),
       remark: item.remark || "",
     }));
 
-    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
+    const amounts = getOrderAmounts(items);
 
     return {
       orderNo: currentSalesOrder.orderNo,
       issueDate: formatCompactDate(currentSalesOrder.issueDate),
       companyId: currentSalesOrder.companyId,
+      warehouseId: global.getDefaultWarehouseId?.() || "WH001",
       companyName: company?.name || "",
       companyAddress: getInputValue("sales-company-address-input"),
       companyPhone: getInputValue("sales-company-phone-input"),
@@ -826,8 +1109,12 @@
       customerPhone: getInputValue("sales-customer-phone-input"),
       paymentTerms: getInputValue("sales-customer-payment-input"),
       customerNo: currentSalesOrder.customerNo || "--",
+      taxRate: currentSalesOrder.taxRate,
+      priceTaxMode: currentSalesOrder.priceTaxMode,
       items,
-      totalAmount,
+      subtotal: amounts.subtotal,
+      taxAmount: amounts.taxAmount,
+      totalAmount: amounts.totalAmount,
     };
   }
 
@@ -854,8 +1141,19 @@
         };
       }
 
+      if (item.price <= 0) {
+        return {
+          ok: false,
+          message: `请确认商品“${item.productName || "未命名商品"}”的本次送货单价，单价必须大于 0。`,
+        };
+      }
+
       const product = findProductById(item.productId);
-      const currentStock = parseNumber(product?.stockQuantity);
+      const salesWarehouseId = payload.warehouseId;
+      const currentStock =
+        typeof global.getLedgerQuantity === "function"
+          ? global.getLedgerQuantity(item.productId, salesWarehouseId)
+          : parseNumber(product?.stockQuantity);
       if (!product) {
         return { ok: false, message: "存在无效商品，请重新选择。" };
       }
@@ -875,6 +1173,13 @@
     const safePayload = payload || {};
     const safeItems = (items || []).filter((item) => item && item.productName);
     const safeTotalAmount = parseNumber(totalAmount);
+    const safeSubtotal = parseNumber(safePayload.subtotal ?? safeTotalAmount);
+    const safeTaxAmount = parseNumber(safePayload.taxAmount);
+    const taxRateText = `${(parseNumber(safePayload.taxRate) * 100).toFixed(2).replace(/\.00$/, "")}%`;
+    const priceLabel =
+      safePayload.priceTaxMode === "inclusive"
+        ? "含税单价(RMB)"
+        : "未税单价(RMB)";
     const rowsMarkup = safeItems
       .map(
         (item, index) => `
@@ -947,13 +1252,18 @@
                             <th class="w-[160px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold">规格</th>
                             <th class="w-[100px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold">单位</th>
                             <th class="w-[140px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold">出库数量</th>
-                            <th class="w-[170px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold">未税单价(RMB)</th>
+                            <th class="w-[170px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold">${priceLabel}</th>
                             <th class="w-[170px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold">金额(RMB)</th>
                             <th class="border-b border-gray-300 px-3 py-3 text-center font-semibold">备注</th>
                         </tr>
                     </thead>
                     <tbody>${rowsMarkup}</tbody>
                     <tfoot>
+                        <tr class="bg-white text-sm text-gray-700">
+                            <td colspan="4" class="border-t border-r border-gray-300 px-4 py-2 text-right">未税金额：${formatMoney(safeSubtotal)}</td>
+                            <td colspan="2" class="border-t border-r border-gray-300 px-4 py-2 text-center">税点：${taxRateText}</td>
+                            <td colspan="2" class="border-t border-gray-300 px-4 py-2 text-center">税额：${formatMoney(safeTaxAmount)}</td>
+                        </tr>
                         <tr class="bg-gray-50">
                             <td colspan="2" class="border-t border-r border-gray-300 px-4 py-3 text-center text-[16px] font-semibold text-gray-900">合计金额：</td>
                             <td colspan="2" class="border-t border-r border-gray-300 px-4 py-3 text-center text-[16px] font-semibold text-gray-900">${formatMoney(safeTotalAmount)}</td>
@@ -982,6 +1292,133 @@
         `;
   }
 
+  function buildDeliveryNotePrintMarkup(note) {
+    if (!note) return "";
+
+    const payload = {
+      companyName: note.companyName,
+      issueDate: note.issueDate || note.deliveryDate || note.createdAt,
+      companyAddress: note.companyAddress,
+      companyPhone: note.companyPhone,
+      companyContact: note.companyContact,
+      customerName: note.customerName,
+      customerAddress: note.customerAddress,
+      customerContact: note.customerContact,
+      customerPhone: note.customerPhone,
+      paymentTerms: note.paymentTerms,
+      customerNo: note.customerNo,
+      subtotal: note.subtotal,
+      taxAmount: note.taxAmount,
+      taxRate: note.taxRateSnapshot ?? note.taxRate,
+      priceTaxMode: note.priceTaxModeSnapshot || note.priceTaxMode,
+    };
+    const items = (note.details || []).map((detail) => ({
+      productName: detail.productNameSnapshot || detail.productName,
+      spec: detail.specSnapshot || detail.spec,
+      unit: detail.unitSnapshot || detail.unit,
+      deliveryQty: detail.quantity,
+      price: detail.confirmedUnitPrice ?? detail.unitPrice ?? detail.price ?? 0,
+      remark: detail.notes || detail.remark || "",
+    }));
+
+    return buildSalesOrderPreviewMarkup(
+      payload,
+      items,
+      Number(note.totalAmount) || 0,
+    );
+  }
+
+  function printSalesOrderMarkup(markup, title = "送货单") {
+    if (!markup || typeof global.print !== "function") {
+      alert("当前浏览器无法调用打印功能，请更换浏览器后重试。");
+      return false;
+    }
+
+    document.getElementById("delivery-note-print-root")?.remove();
+    const printRoot = document.createElement("div");
+    printRoot.id = "delivery-note-print-root";
+    printRoot.className = "delivery-note-print-root";
+    printRoot.innerHTML = `<div class="delivery-note-print-document">${markup}</div>`;
+    document.body.appendChild(printRoot);
+
+    const originalTitle = document.title;
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      document.body.classList.remove("delivery-note-printing");
+      printRoot.remove();
+      document.title = originalTitle;
+    };
+
+    document.title = title;
+    document.body.classList.add("delivery-note-printing");
+    global.addEventListener("afterprint", cleanup, { once: true });
+
+    try {
+      global.print();
+    } catch (error) {
+      console.error("Delivery note print failed:", error);
+      cleanup();
+      alert("打印窗口打开失败，请重试。");
+      return false;
+    }
+
+    global.setTimeout(cleanup, 1000);
+    return true;
+  }
+
+  function printDeliveryNote(note) {
+    const markup = buildDeliveryNotePrintMarkup(note);
+    const printTitle = `送货单-${note?.customerNo || note?.orderNo || ""}`;
+    return printSalesOrderMarkup(markup, printTitle);
+  }
+
+  function showSalesOrderPrintStep(note) {
+    currentPrintableDeliveryNote = note;
+    const printContent = document.getElementById("sales-order-print-content");
+    if (printContent) {
+      printContent.innerHTML = buildDeliveryNotePrintMarkup(note);
+    }
+
+    document.getElementById("sales-order-form-panel")?.classList.add("hidden");
+    document
+      .getElementById("sales-order-preview-panel")
+      ?.classList.add("hidden");
+    document
+      .getElementById("sales-order-print-panel")
+      ?.classList.remove("hidden");
+    setStepState(3);
+    scheduleSalesOrderPaperLayout();
+  }
+
+  function printCurrentSalesOrder() {
+    if (!currentPrintableDeliveryNote) {
+      alert("当前没有可打印的送货单。");
+      return false;
+    }
+    return printDeliveryNote(currentPrintableDeliveryNote);
+  }
+
+  function finishSalesOrderPrint() {
+    currentPrintableDeliveryNote = null;
+    resetSalesOrderForm();
+    if (typeof global.showSection === "function") {
+      global.showSection("stock-movement");
+    }
+
+    const deliveryTab = document.querySelector(
+      '#stock-tabs button[data-tab="delivery-note"]',
+    );
+    if (deliveryTab) {
+      document
+        .querySelectorAll("#stock-tabs button")
+        .forEach((button) => button.classList.remove("active"));
+      deliveryTab.classList.add("active");
+    }
+    global.renderStockMovementTable?.("delivery-note");
+  }
+
   function renderPreviewContent() {
     const previewContainer = document.getElementById(
       "sales-order-preview-content",
@@ -994,15 +1431,18 @@
       payload.items,
       payload.totalAmount,
     );
+    scheduleSalesOrderPaperLayout();
   }
 
   function showSalesOrderForm() {
     const formPanel = document.getElementById("sales-order-form-panel");
     const previewPanel = document.getElementById("sales-order-preview-panel");
+    const printPanel = document.getElementById("sales-order-print-panel");
     if (formPanel) formPanel.classList.remove("hidden");
     if (previewPanel) previewPanel.classList.add("hidden");
-    currentSalesOrderStep = "form";
+    if (printPanel) printPanel.classList.add("hidden");
     setStepState(1);
+    scheduleSalesOrderPaperLayout();
   }
 
   function showSalesOrderPreview() {
@@ -1016,15 +1456,17 @@
 
     const formPanel = document.getElementById("sales-order-form-panel");
     const previewPanel = document.getElementById("sales-order-preview-panel");
+    const printPanel = document.getElementById("sales-order-print-panel");
     if (formPanel) formPanel.classList.add("hidden");
     if (previewPanel) previewPanel.classList.remove("hidden");
-    currentSalesOrderStep = "preview";
+    if (printPanel) printPanel.classList.add("hidden");
     setStepState(2);
+    scheduleSalesOrderPaperLayout();
   }
 
   function resetSalesOrderForm() {
+    currentPrintableDeliveryNote = null;
     currentSalesOrder = createEmptySalesOrder();
-    currentSalesOrderStep = "form";
 
     setText("sales-order-no", currentSalesOrder.orderNo);
     setText("sales-order-agreement-text", SALES_ORDER_AGREEMENT_TEXT);
@@ -1033,6 +1475,7 @@
     renderCompanySelect();
     renderCustomerSelect();
     renderIssueDatePicker();
+    bindSalesTaxControls();
 
     applyCompanyToForm(null);
     applyCustomerToForm(null);
@@ -1045,9 +1488,12 @@
       "sales-order-preview-content",
     );
     if (previewContainer) previewContainer.innerHTML = "";
+    const printContainer = document.getElementById("sales-order-print-content");
+    if (printContainer) printContainer.innerHTML = "";
   }
 
   function initSalesOrder() {
+    initSalesOrderPaperScaling();
     resetSalesOrderForm();
   }
 
@@ -1086,6 +1532,24 @@
     const payload = validation.payload;
     const now = new Date();
     const deliveryNoteId = createRuntimeId("SD");
+    const previousProductState = new Map(
+      payload.items.map((item) => {
+        const product = findProductById(item.productId);
+        return [
+          item.productId,
+          product
+            ? {
+                stockQuantity: product.stockQuantity,
+                updatedAt: product.updatedAt,
+              }
+            : null,
+        ];
+      }),
+    );
+    const previousDeliveryNotes = Array.isArray(mockData.deliveryNotes)
+      ? mockData.deliveryNotes.slice()
+      : [];
+    const previousStockMovements = stockMovementData.slice();
 
     payload.items.forEach((item) => {
       const product = findProductById(item.productId);
@@ -1107,8 +1571,13 @@
       orderNo: payload.orderNo,
       issueDate: payload.issueDate,
       deliveryDate: payload.issueDate,
-      status: "created",
+      status: "confirmed",
+      subtotal: payload.subtotal,
+      taxAmount: payload.taxAmount,
       totalAmount: payload.totalAmount,
+      taxRateSnapshot: payload.taxRate,
+      priceTaxModeSnapshot: payload.priceTaxMode,
+      warehouseId: payload.warehouseId,
       notes: payload.items
         .map((item) => `${item.productName} x ${item.quantity}`)
         .join("；"),
@@ -1131,13 +1600,25 @@
         deliveryId: deliveryNoteId,
         productId: item.productId,
         productName: item.productName,
+        productNameSnapshot: item.productName,
         quantity: item.quantity,
         unit: item.unit,
+        unitSnapshot: item.unit,
         spec: item.spec,
+        specificationSnapshot: item.spec,
         unitPrice: item.price,
+        confirmedUnitPrice: item.price,
+        referencePriceSnapshot: item.referencePrice,
+        referencePriceOriginalSnapshot: item.referencePriceOriginal,
+        referencePriceTaxModeSnapshot: item.referencePriceTaxMode,
+        lastTransactionPriceSnapshot: item.lastTransactionPrice,
+        priceSource: item.priceSource,
+        taxRateSnapshot: payload.taxRate,
+        priceTaxModeSnapshot: payload.priceTaxMode,
+        lineAmount: item.amount,
         totalAmount: item.amount,
         notes: item.remark || "",
-        status: "created",
+        status: "confirmed",
       })),
     };
 
@@ -1147,15 +1628,22 @@
     mockData.deliveryNotes.unshift(deliveryNote);
 
     payload.items.forEach((item) => {
+      const warehouseId = payload.warehouseId;
       stockMovementData.unshift({
         id: createRuntimeId("SM"),
         type: "outbound",
+        status: "confirmed",
         productId: item.productId,
         productName: item.productName,
         quantity: item.quantity,
         unit: item.unit,
         operator: currentUser.name,
+        warehouseId,
+        locationCode: global.getDefaultLocationCode?.(warehouseId) || "",
+        batchNo: "",
+        expiryDate: null,
         remark: item.remark || `销售出库 - ${payload.orderNo}`,
+        price: item.price,
         customerId: payload.customerId,
         customerName: payload.customerName,
         companyId: payload.companyId,
@@ -1167,18 +1655,39 @@
       });
     });
 
-    if (typeof addLog === "function") {
-      addLog(
-        "add",
-        "delivery-note",
-        payload.orderNo,
-        `新增销售出库单：${payload.customerName || "-"} / ${payload.orderNo}`,
-      );
+    const auditLogs = stageAuditLogs({
+      actionType: "add",
+      objectType: "delivery-note",
+      objectName: payload.orderNo,
+      details: `新增销售出库单：${payload.customerName || "-"} / ${payload.orderNo}`,
+    });
+    let saved = true;
+    if (typeof saveMockData === "function") {
+      saved = await saveMockData();
     }
 
-    if (typeof saveMockData === "function") {
-      await saveMockData();
+    if (saved === false) {
+      rollbackStagedAuditLogs(auditLogs);
+      previousProductState.forEach((state, productId) => {
+        const product = findProductById(productId);
+        if (product && state) {
+          product.stockQuantity = state.stockQuantity;
+          product.updatedAt = state.updatedAt;
+        }
+      });
+      mockData.deliveryNotes = previousDeliveryNotes;
+      stockMovementData = previousStockMovements;
+      if (typeof global.updateInventoryTable === "function") {
+        global.updateInventoryTable();
+      }
+      if (typeof global.renderDashboardActivity === "function") {
+        global.renderDashboardActivity();
+      }
+      alert("销售出库保存失败，本次库存和单据变更已回滚。");
+      return false;
     }
+
+    finalizeStagedAuditLogs(auditLogs);
 
     if (typeof global.updateInventoryTable === "function") {
       global.updateInventoryTable();
@@ -1188,16 +1697,9 @@
       global.renderDashboardActivity();
     }
 
-    if (typeof global.showSection === "function") {
-      global.showSection("stock-movement");
-    }
-
-    if (typeof global.renderStockMovementTable === "function") {
-      global.renderStockMovementTable("all");
-    }
-
-    resetSalesOrderForm();
-    alert("销售出库已提交。");
+    showSalesOrderPrintStep(deliveryNote);
+    alert("销售出库已提交，请打印送货单。");
+    return true;
   }
 
   global.initSalesOrder = initSalesOrder;
@@ -1207,5 +1709,11 @@
   global.goToSalesOrderForm = showSalesOrderForm;
   global.cancelSalesOrder = cancelSalesOrder;
   global.submitSalesOrder = submitSalesOrder;
+  global.printCurrentSalesOrder = printCurrentSalesOrder;
+  global.finishSalesOrderPrint = finishSalesOrderPrint;
+  global.printDeliveryNote = printDeliveryNote;
+  global.printSalesOrderMarkup = printSalesOrderMarkup;
+  global.buildDeliveryNotePrintMarkup = buildDeliveryNotePrintMarkup;
   global.buildSalesOrderPreviewMarkup = buildSalesOrderPreviewMarkup;
+  global.syncSalesOrderPaperLayout = syncSalesOrderPaperLayout;
 })(window);

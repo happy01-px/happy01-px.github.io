@@ -3,12 +3,14 @@ const path = require("path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  applyFixtureState,
   createWindow,
   dispatchDomContentLoaded,
   flushAsyncTasks,
   loadScripts,
   projectRoot,
 } = require("./helpers/browser-harness");
+const { createFixtureData } = require("./helpers/fixtures");
 
 function readProjectFile(relativePath) {
   return fs.readFileSync(path.join(projectRoot, relativePath), "utf8");
@@ -82,7 +84,7 @@ async function bootRealIndexPage(options = {}) {
   return harness;
 }
 
-test("index.html boots from the real page markup and renders data-backed sections", async () => {
+test("index.html boots from the real page markup and renders data-aware sections", async () => {
   const harness = await bootRealIndexPage();
   const { document } = harness.window;
 
@@ -92,39 +94,95 @@ test("index.html boots from the real page markup and renders data-backed section
   );
   assert.equal(document.documentElement.classList.contains("design-v2"), true);
   assert.ok(document.querySelector('link[href="css/design-preview.css"]'));
+  assert.ok(
+    document
+      .querySelector("body > .flex > .flex-1")
+      .classList.contains("min-w-0"),
+    "the responsive app shell should be allowed to shrink within the viewport",
+  );
   assert.equal(document.querySelectorAll(".filter-toolbar").length, 4);
   assert.equal(
     document.querySelector(".design-preview-header-title").textContent.trim(),
-    "仓储运营中心",
+    "仪表盘",
+  );
+  assert.equal(
+    document
+      .querySelector(".design-preview-header-subtitle")
+      .textContent.trim(),
+    "欢迎回来，管理员！这是您的库存管理概览。",
+  );
+  assert.equal(
+    document
+      .querySelector("#dashboard > :first-child")
+      .classList.contains("page-heading-shell-empty"),
+    true,
+    "the dashboard heading should move into the application header",
+  );
+  assert.equal(document.title, "仓库库存管理系统");
+  assert.match(readProjectFile("css/design-preview.css"), /--brand:\s*#654df1/);
+  assert.match(readProjectFile("css/design-preview.css"), /flex:\s*0 0 180px/);
+  assert.match(
+    readProjectFile("css/design-preview.css"),
+    /\.design-v2 header \{[\s\S]*?min-height:\s*60px/,
+  );
+  assert.match(
+    readProjectFile("css/design-preview.css"),
+    /white-space:\s*nowrap/,
+  );
+  assert.match(
+    readProjectFile("css/style.css"),
+    /#modal-panel\s*\{[\s\S]*?max-height:\s*calc\(100dvh - 32px\)/,
   );
   assert.equal(
     document.getElementById("inventory").classList.contains("hidden"),
     true,
   );
 
-  assert.ok(document.querySelectorAll("#inventory-table-body tr").length > 0);
-  assert.ok(document.querySelectorAll("#suppliers-table-body tr").length > 0);
-  assert.ok(document.querySelectorAll("#companies tbody tr").length > 0);
-  assert.ok(document.querySelectorAll("#customers tbody tr").length > 0);
+  assert.ok(document.getElementById("inventory-table-body"));
+  assert.ok(document.getElementById("usage-guide"));
+  assert.equal(
+    document
+      .querySelector('[data-target="usage-guide"] span')
+      .textContent.trim(),
+    "使用说明",
+  );
+  assert.equal(
+    document.querySelectorAll("#usage-guide .usage-guide-flow > li").length,
+    6,
+  );
+  assert.ok(document.getElementById("suppliers-table-body"));
+  assert.ok(document.querySelector("#companies tbody"));
+  assert.ok(document.querySelector("#customers tbody"));
   assert.equal(document.querySelectorAll("#customers thead th").length, 9);
   assert.equal(document.querySelectorAll("#suppliers thead th").length, 7);
   assert.equal(
-    document
-      .querySelector("#suppliers-pagination-container > div")
-      .classList.contains("py-4"),
-    false,
+    document.querySelector(".business-data-table--customer col:nth-child(2)")
+      .style.width,
+    "16%",
   );
+  assert.equal(
+    document.querySelector(".business-data-table--customer col:nth-child(5)")
+      .style.width,
+    "15%",
+  );
+  assert.equal(
+    document.querySelector(".business-data-table--customer col:nth-child(8)")
+      .style.width,
+    "18%",
+  );
+  assert.equal(
+    document.querySelector(".business-data-table--customer col:nth-child(9)")
+      .style.width,
+    "17%",
+  );
+  assert.ok(document.getElementById("suppliers-pagination-container"));
   assert.equal(
     document.querySelector("#customers thead th").textContent.trim(),
     "客户编号",
   );
   ["suppliers", "companies", "customers"].forEach((sectionId) => {
-    assert.ok(
-      document.querySelector(`#${sectionId} .business-data-table`),
-    );
-    assert.ok(
-      document.querySelector(`#${sectionId} .business-table-scroll`),
-    );
+    assert.ok(document.querySelector(`#${sectionId} .business-data-table`));
+    assert.ok(document.querySelector(`#${sectionId} .business-table-scroll`));
   });
   assert.doesNotMatch(
     document.querySelector("#suppliers thead").textContent,
@@ -134,9 +192,53 @@ test("index.html boots from the real page markup and renders data-backed section
     document.querySelector("#customers thead").textContent,
     /电子邮箱/,
   );
-  assert.ok(document.querySelectorAll("#bills-table-body tr").length > 0);
-  assert.ok(
-    document.querySelectorAll("#dashboard-activity-table-body tr").length > 0,
+  assert.ok(document.getElementById("bills-table-body"));
+  assert.ok(document.getElementById("dashboard-activity-table-body"));
+  const customerPairSelector = document.querySelector(
+    ".customer-price-pair-selector",
+  );
+  assert.ok(customerPairSelector);
+  assert.equal(
+    document.getElementById("customer-price-pair-actions").parentElement,
+    customerPairSelector,
+  );
+  assert.equal(
+    document.getElementById("customer-price-pair-summary").parentElement,
+    customerPairSelector,
+  );
+  assert.match(
+    readProjectFile("css/style.css"),
+    /\.customer-price-pair-selector\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1fr\) auto/,
+  );
+  assert.equal(document.querySelectorAll(".data-table-card").length, 7);
+  const operationHeaders = Array.from(
+    document.querySelectorAll(".data-table-card thead th"),
+  ).filter((header) => header.textContent.trim() === "操作");
+  assert.equal(operationHeaders.length, 6);
+  operationHeaders.forEach((header) => {
+    assert.equal(header.classList.contains("table-action-header"), true);
+    assert.equal(header.classList.contains("text-left"), true);
+    assert.equal(header.classList.contains("text-right"), false);
+  });
+  assert.match(
+    readProjectFile("css/design-preview.css"),
+    /\.data-table-card thead tr \{[\s\S]*?height:\s*52px/,
+  );
+  assert.match(
+    readProjectFile("css/design-preview.css"),
+    /\.data-table-card \.app-empty-table-row > td \{[\s\S]*?height:\s*208px/,
+  );
+  assert.match(
+    readProjectFile("css/design-preview.css"),
+    /@media \(min-width:\s*1360px\)[\s\S]*?\.business-table-scroll[\s\S]*?overflow-x:\s*auto/,
+  );
+  assert.match(
+    readProjectFile("css/design-preview.css"),
+    /\.business-data-table thead th:last-child,[\s\S]*?position:\s*sticky;[\s\S]*?right:\s*0;/,
+  );
+  assert.match(
+    readProjectFile("css/design-preview.css"),
+    /\.business-data-table \.app-empty-table-row > td:last-child \{[\s\S]*?position:\s*static !important;/,
   );
 
   assert.ok(
@@ -148,9 +250,34 @@ test("index.html boots from the real page markup and renders data-backed section
   harness.close();
 });
 
+test("index.html opens the usage guide below system settings", async () => {
+  const harness = await bootRealIndexPage({ hash: "#usage-guide" });
+  const { document } = harness.window;
+
+  assert.equal(
+    document.getElementById("usage-guide").classList.contains("hidden"),
+    false,
+  );
+  assert.equal(
+    document.getElementById("settings").classList.contains("hidden"),
+    true,
+  );
+  assert.match(
+    document.getElementById("usage-guide").textContent,
+    /推荐建档顺序/,
+  );
+  assert.match(
+    document.getElementById("usage-guide").textContent,
+    /资料停用与历史保护/,
+  );
+
+  harness.close();
+});
+
 test("index.html honors hash routing and reaches the sales-order workflow from the real page", async () => {
   const harness = await bootRealIndexPage({ hash: "#stock-movement" });
   const { document } = harness.window;
+  applyFixtureState(harness.window, createFixtureData());
 
   assert.equal(
     document.getElementById("stock-movement").classList.contains("hidden"),
@@ -180,9 +307,65 @@ test("index.html honors hash routing and reaches the sales-order workflow from t
   harness.close();
 });
 
-test("index.html renders filter controls and keeps the supplier action available", async () => {
+test("a direct sales-order route restores its document copy and form rows", async () => {
+  const harness = await bootRealIndexPage({ hash: "#sales-order" });
+  const { document } = harness.window;
+
+  assert.equal(
+    document.getElementById("sales-order").classList.contains("hidden"),
+    false,
+  );
+  assert.match(
+    document.getElementById("sales-order-no").textContent.trim(),
+    /^XS\d{12}$/,
+  );
+  assert.ok(document.querySelectorAll("#sales-order-table-body tr").length > 0);
+  assert.match(
+    document.getElementById("sales-order-agreement-text").textContent,
+    /货品保证质量/,
+  );
+  assert.match(
+    document.getElementById("sales-order-note-text").textContent,
+    /第一联白仓库存收款根联/,
+  );
+
+  harness.close();
+});
+
+test("a direct history import route shows recovery actions after refresh", async () => {
+  const harness = await bootRealIndexPage({
+    hash: "#history-import-workflow",
+  });
+  const { document } = harness.window;
+
+  assert.equal(
+    document
+      .getElementById("history-import-workflow")
+      .classList.contains("hidden"),
+    false,
+  );
+  assert.match(
+    document.getElementById("delivery-import-workflow-content").textContent,
+    /没有待处理的导入任务/,
+  );
+  assert.equal(
+    document.getElementById("delivery-import-workflow-primary").textContent,
+    "选择送货单 / 对账单文件",
+  );
+  assert.equal(
+    document
+      .getElementById("delivery-import-workflow-actions")
+      .classList.contains("hidden"),
+    false,
+  );
+
+  harness.close();
+});
+
+test("index.html renders filters and opens supplier editing on a routed page", async () => {
   const harness = await bootRealIndexPage();
   const { document } = harness.window;
+  applyFixtureState(harness.window, createFixtureData());
 
   assert.ok(document.querySelector("#filter-search-container input"));
   assert.ok(document.querySelector("#log-filter-user-container input"));
@@ -190,17 +373,28 @@ test("index.html renders filter controls and keeps the supplier action available
   assert.ok(document.querySelector("#log-date-range-picker-container input"));
   assert.ok(document.querySelector("#bills-date-range-picker-container input"));
   assert.ok(document.querySelector("#bills-filter-search-container input"));
+  assert.equal(document.getElementById("stock-warehouse-filter"), null);
+  assert.equal(document.getElementById("sales-order-warehouse-input"), null);
+  assert.doesNotMatch(
+    document.getElementById("stock-movement").textContent,
+    /仓间调拨|新增仓库/,
+  );
 
   document.getElementById("add-supplier-btn").click();
   await flushAsyncTasks(6);
 
   assert.equal(
     document.getElementById("modal").classList.contains("hidden"),
+    true,
+  );
+  assert.equal(
+    document
+      .getElementById("business-form-workflow")
+      .classList.contains("hidden"),
     false,
   );
-  assert.ok(document.querySelector("#modal-content .app-modal-form"));
   assert.ok(
-    document.getElementById("modal-panel").classList.contains("max-w-4xl"),
+    document.querySelector("#business-form-workflow-content .app-modal-form"),
   );
   assert.equal(
     document.querySelector('#add-supplier-form [name="email"]'),
@@ -214,7 +408,11 @@ test("index.html renders filter controls and keeps the supplier action available
     .closest(".app-modal-third-row");
   assert.ok(supplierAddressField);
   assert.ok(supplierPaymentField);
-  assert.match(document.getElementById("modal-title").textContent, /供应商/);
+  assert.match(
+    document.getElementById("business-form-workflow-title").textContent,
+    /供应商/,
+  );
+  assert.equal(harness.window.location.hash, "#business-form-workflow");
 
   harness.close();
 });
@@ -243,6 +441,7 @@ test("index.html hides log pagination when there are no matching records", async
 test("index.html balances incomplete rows in three-column modal forms", async () => {
   const harness = await bootRealIndexPage();
   const { document } = harness.window;
+  applyFixtureState(harness.window, createFixtureData());
 
   document.getElementById("add-company-btn").click();
   await flushAsyncTasks(4);
@@ -265,7 +464,7 @@ test("index.html balances incomplete rows in three-column modal forms", async ()
   await flushAsyncTasks(4);
   const customerForm = document.getElementById("add-customer-form");
   const customerFields = customerForm.querySelectorAll(":scope > .grid > *");
-  assert.equal(customerFields.length, 7);
+  assert.equal(customerFields.length, 8);
   assert.equal(customerForm.querySelector('[name="email"]'), null);
   assert.equal(
     customerForm
@@ -288,11 +487,19 @@ test("index.html balances incomplete rows in three-column modal forms", async ()
 
   document.getElementById("add-product-btn").click();
   await flushAsyncTasks(4);
-  const productFields = Array.from(
-    document.querySelectorAll("#add-product-form > .grid > *"),
-  ).filter((field) => !field.classList.contains("app-modal-wide-field"));
-  assert.equal(productFields.length, 7);
-  assert.equal(productFields[6].classList.contains("app-modal-fill-row"), true);
+  const inboundBatchForm = document.getElementById("add-inbound-batch-form");
+  assert.ok(inboundBatchForm);
+  assert.ok(document.getElementById("inbound-batch-company-id"));
+  assert.ok(document.getElementById("inbound-batch-supplier-id"));
+  assert.equal(
+    document.querySelectorAll("#inbound-batch-rows [data-inbound-row]").length,
+    1,
+  );
+  assert.ok(document.getElementById("inbound-batch-add-row"));
+  assert.equal(inboundBatchForm.querySelector('[name="warehouseId"]'), null);
+  assert.equal(inboundBatchForm.querySelector('[name="locationCode"]'), null);
+  assert.equal(inboundBatchForm.querySelector('[name="batchNo"]'), null);
+  assert.equal(inboundBatchForm.querySelector('[name="expiryDate"]'), null);
 
   harness.close();
 });
@@ -310,6 +517,41 @@ test("index.html reroutes alert messages into Ant Design message prompts", async
     /进货记录添加成功/,
   );
   assert.ok(harness.window.document.getElementById("antd-message-host"));
+
+  harness.window.alert("进货失败：数据未能保存，本次变更已回滚");
+  await flushAsyncTasks(4);
+  assert.equal(harness.antdMessages.at(-1)?.type, "error");
+
+  harness.close();
+});
+
+test("business form route returns to its source from back and cancel", async () => {
+  const harness = await bootRealIndexPage();
+  const { document } = harness.window;
+  applyFixtureState(harness.window, createFixtureData());
+
+  harness.window.showSection("companies");
+  document.getElementById("add-company-btn").click();
+  await flushAsyncTasks(4);
+  assert.equal(
+    document
+      .getElementById("business-form-workflow")
+      .classList.contains("hidden"),
+    false,
+  );
+  document.getElementById("business-form-back").click();
+  assert.equal(
+    document.getElementById("companies").classList.contains("hidden"),
+    false,
+  );
+
+  document.getElementById("add-company-btn").click();
+  await flushAsyncTasks(4);
+  document.getElementById("business-form-workflow-cancel").click();
+  assert.equal(
+    document.getElementById("companies").classList.contains("hidden"),
+    false,
+  );
 
   harness.close();
 });

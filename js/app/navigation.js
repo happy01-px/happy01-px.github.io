@@ -9,10 +9,306 @@
     "sales-order": "stock-movement",
     "bills-create": "bills",
     "bills-view": "bills",
+    "history-import-workflow": "settings",
   };
 
   let desktopSidebarMenuSelectedKey = "dashboard";
   let desktopSidebarMenuOpenKeys = [DESKTOP_SIDEBAR_SUBMENU_KEY];
+
+  const WORKFLOW_TARGETS = Object.freeze({
+    company: {
+      label: "公司",
+      sectionId: "companies",
+      open() {
+        global.showAddCompanyModal?.();
+      },
+    },
+    supplier: {
+      label: "供应商",
+      sectionId: "suppliers",
+      open() {
+        global.showAddSupplierModal?.();
+      },
+    },
+    customer: {
+      label: "客户",
+      sectionId: "customers",
+      open() {
+        global.showAddCustomerModal?.();
+      },
+    },
+    product: {
+      label: "进货 / 商品",
+      sectionId: "inventory",
+      open() {
+        global.showAddInboundModal?.();
+      },
+    },
+    inbound: {
+      label: "进货记录",
+      sectionId: "stock-movement",
+      open() {
+        global.showAddInboundModal?.();
+      },
+    },
+    outbound: {
+      label: "出货单",
+      sectionId: "sales-order",
+      open() {
+        const section = document.getElementById("sales-order");
+        if (section?.classList.contains("hidden")) {
+          global.initSalesOrder?.();
+        }
+      },
+    },
+  });
+
+  const WORKFLOW_ACTION_LABELS = Object.freeze({
+    addSupplier: "新增供应商",
+    addCustomer: "新增客户",
+    addProduct: "新增进货 / 商品",
+    addInbound: "新增进货 / 商品",
+    addOutbound: "新增出货",
+    addBill: "新增对账单",
+  });
+
+  function getWorkflowList(key) {
+    const value = global.mockData?.[key];
+    return Array.isArray(value) ? value : [];
+  }
+
+  function getActiveWorkflowList(key) {
+    return getWorkflowList(key).filter(
+      (record) => record && !["inactive", "disabled"].includes(record.status),
+    );
+  }
+
+  function hasAvailableInventory() {
+    return getActiveWorkflowList("products").some(
+      (product) => Number(product.stockQuantity || 0) > 0,
+    );
+  }
+
+  function getUsedBillSourceIds() {
+    const usedIds = new Set();
+    getWorkflowList("bills")
+      .filter((bill) => bill && bill.status !== "voided")
+      .forEach((bill) => {
+        const sourceIds = Array.isArray(bill.sourceDocumentIds)
+          ? bill.sourceDocumentIds
+          : [];
+        sourceIds.forEach((sourceId) => usedIds.add(String(sourceId)));
+      });
+    return usedIds;
+  }
+
+  function hasUnbilledSupplierSource() {
+    const usedIds = getUsedBillSourceIds();
+    return (
+      Array.isArray(global.stockMovementData) ? global.stockMovementData : []
+    ).some(
+      (record) =>
+        record?.type === "inbound" &&
+        record.supplierId &&
+        !usedIds.has(String(record.id)),
+    );
+  }
+
+  function hasUnbilledCustomerSource() {
+    const usedIds = getUsedBillSourceIds();
+    return getWorkflowList("deliveryNotes").some(
+      (record) =>
+        record &&
+        (record.type === "sales" || record.customerId) &&
+        !usedIds.has(String(record.id)),
+    );
+  }
+
+  function buildWorkflowPrerequisite(targetKey, action, chain, reason) {
+    return {
+      ...WORKFLOW_TARGETS[targetKey],
+      targetKey,
+      action,
+      actionLabel: WORKFLOW_ACTION_LABELS[action] || "继续操作",
+      chain,
+      reason,
+    };
+  }
+
+  function resolveWorkflowPrerequisite(action, options = {}) {
+    if (!global.mockData) return null;
+
+    const hasCompanies = getActiveWorkflowList("companies").length > 0;
+    const hasSuppliers = getActiveWorkflowList("suppliers").length > 0;
+    const hasCustomers = getActiveWorkflowList("customers").length > 0;
+    const hasProducts = getActiveWorkflowList("products").length > 0;
+
+    if (action !== "addCompany" && !hasCompanies) {
+      return buildWorkflowPrerequisite(
+        "company",
+        action,
+        ["公司", "客户/供应商", "商品", "业务单据"],
+        "公司是所有客户、供应商和业务单据的归属主体。",
+      );
+    }
+
+    if (["addProduct", "addInbound"].includes(action) && !hasSuppliers) {
+      return buildWorkflowPrerequisite(
+        "supplier",
+        action,
+        ["公司", "供应商", "商品", "进货"],
+        "商品和进货记录必须关联一个有效供应商。",
+      );
+    }
+
+    if (action === "addOutbound" && !hasCustomers) {
+      return buildWorkflowPrerequisite(
+        "customer",
+        action,
+        ["公司", "客户", "商品", "出货"],
+        "出货单必须关联一个有效客户。",
+      );
+    }
+
+    if (action === "addOutbound" && !hasProducts) {
+      return buildWorkflowPrerequisite(
+        "product",
+        action,
+        ["公司", "客户", "商品", "出货"],
+        "出货必须选择已经建立且有库存的商品。",
+      );
+    }
+
+    if (action === "addOutbound" && !hasAvailableInventory()) {
+      return buildWorkflowPrerequisite(
+        "inbound",
+        action,
+        ["公司", "供应商", "商品", "进货", "出货"],
+        "当前没有可用库存，需要先完成进货或录入期初库存。",
+      );
+    }
+
+    if (action === "addBill") {
+      const statementType =
+        options.statementType === "supplier" ? "supplier" : "customer";
+
+      if (statementType === "supplier" && !hasSuppliers) {
+        return buildWorkflowPrerequisite(
+          "supplier",
+          action,
+          ["公司", "供应商", "进货记录", "供应商对账单"],
+          "供应商对账单必须关联一个有效供应商。",
+        );
+      }
+
+      if (statementType === "customer" && !hasCustomers) {
+        return buildWorkflowPrerequisite(
+          "customer",
+          action,
+          ["公司", "客户", "送货单", "客户对账单"],
+          "客户对账单必须关联一个有效客户。",
+        );
+      }
+
+      if (statementType === "supplier" && !hasUnbilledSupplierSource()) {
+        return buildWorkflowPrerequisite(
+          "inbound",
+          action,
+          ["公司", "供应商", "进货记录", "供应商对账单"],
+          "目前没有可用于生成对账单的未对账进货记录。",
+        );
+      }
+
+      if (statementType === "customer" && !hasUnbilledCustomerSource()) {
+        return buildWorkflowPrerequisite(
+          "outbound",
+          action,
+          ["公司", "客户", "送货单", "客户对账单"],
+          "目前没有可用于生成对账单的未对账送货单。",
+        );
+      }
+    }
+
+    return null;
+  }
+
+  function buildWorkflowPromptContent(prerequisite) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "workflow-prerequisite-prompt";
+
+    const summary = document.createElement("div");
+    summary.className = "workflow-prerequisite-summary";
+    summary.innerHTML = `
+      <span class="workflow-prerequisite-icon" aria-hidden="true"><i class="fa fa-link"></i></span>
+      <div>
+        <p class="workflow-prerequisite-kicker">需要先准备基础数据</p>
+        <p class="workflow-prerequisite-message">创建“${prerequisite.actionLabel}”前，需要先创建“${prerequisite.label}”。</p>
+      </div>
+    `;
+    wrapper.appendChild(summary);
+
+    const reason = document.createElement("p");
+    reason.className = "workflow-prerequisite-reason";
+    reason.textContent = prerequisite.reason;
+    wrapper.appendChild(reason);
+
+    const chain = document.createElement("div");
+    chain.className = "workflow-prerequisite-chain";
+    chain.setAttribute("aria-label", "业务数据创建顺序");
+    prerequisite.chain.forEach((step, index) => {
+      const badge = document.createElement("span");
+      badge.className =
+        step === prerequisite.label ||
+        (prerequisite.targetKey === "inbound" && step === "进货") ||
+        (prerequisite.targetKey === "outbound" && step === "出货")
+          ? "is-current"
+          : "";
+      badge.textContent = step;
+      chain.appendChild(badge);
+      if (index < prerequisite.chain.length - 1) {
+        const arrow = document.createElement("i");
+        arrow.className = "fa fa-angle-right";
+        arrow.setAttribute("aria-hidden", "true");
+        chain.appendChild(arrow);
+      }
+    });
+    wrapper.appendChild(chain);
+
+    const question = document.createElement("p");
+    question.className = "workflow-prerequisite-question";
+    question.textContent = `是否现在前往创建${prerequisite.label}？`;
+    wrapper.appendChild(question);
+    return wrapper;
+  }
+
+  function showWorkflowPrerequisitePrompt(prerequisite) {
+    if (!prerequisite || typeof global.showModal !== "function") return false;
+
+    global.showModal(
+      "先完成前置数据",
+      buildWorkflowPromptContent(prerequisite),
+      function onGoCreatePrerequisite() {
+        global.setTimeout(() => {
+          global.showSection?.(prerequisite.sectionId);
+          prerequisite.open?.();
+        }, 0);
+      },
+    );
+
+    const confirmButton = document.getElementById("modal-confirm");
+    const cancelButton = document.getElementById("modal-cancel");
+    if (confirmButton)
+      confirmButton.textContent = `去创建${prerequisite.label}`;
+    if (cancelButton) cancelButton.textContent = "暂不处理";
+    return true;
+  }
+
+  function guardWorkflowAction(action, options = {}) {
+    const prerequisite = resolveWorkflowPrerequisite(action, options);
+    if (!prerequisite) return true;
+    showWorkflowPrerequisitePrompt(prerequisite);
+    return false;
+  }
 
   function normalizeDesktopSidebarSection(sectionId) {
     return DESKTOP_SIDEBAR_SECTION_MAP[sectionId] || sectionId;
@@ -79,6 +375,11 @@
         icon: createDesktopSidebarIcon("fa fa-exchange"),
       },
       {
+        key: "price-management",
+        label: "价格管理",
+        icon: createDesktopSidebarIcon("fa fa-tags"),
+      },
+      {
         key: DESKTOP_SIDEBAR_SUBMENU_KEY,
         label: "管理中心",
         icon: createDesktopSidebarIcon("fa fa-cogs"),
@@ -107,6 +408,11 @@
         key: "settings",
         label: "系统设置",
         icon: createDesktopSidebarIcon("fa fa-cog"),
+      },
+      {
+        key: "usage-guide",
+        label: "使用说明",
+        icon: createDesktopSidebarIcon("fa fa-book"),
       },
     ];
   }
@@ -158,23 +464,27 @@
         ConfigProvider,
         {
           theme: {
-            algorithm: theme.darkAlgorithm,
+            algorithm: theme.defaultAlgorithm,
             token: {
-              colorPrimary: "#1677ff",
-              borderRadius: 10,
-              fontSize: 15,
+              colorPrimary: "#654df1",
+              colorText: "#242229",
+              colorTextSecondary: "#77747e",
+              colorBorder: "#e5e2ea",
+              colorBgContainer: "#ffffff",
+              borderRadius: 12,
+              fontSize: 14,
             },
             components: {
               Menu: {
-                darkItemBg: "transparent",
-                darkSubMenuItemBg: "transparent",
-                darkItemColor: "rgba(255,255,255,0.78)",
-                darkItemHoverColor: "#ffffff",
-                darkItemHoverBg: "rgba(255,255,255,0.08)",
-                darkItemSelectedBg: "#1677ff",
-                darkItemSelectedColor: "#ffffff",
-                itemBorderRadius: 10,
-                subMenuItemBorderRadius: 8,
+                itemBg: "transparent",
+                subMenuItemBg: "#f7f6fa",
+                itemColor: "#625e68",
+                itemHoverColor: "#4d37c7",
+                itemHoverBg: "#f7f6fa",
+                itemSelectedBg: "#eeeafe",
+                itemSelectedColor: "#4d37c7",
+                itemBorderRadius: 12,
+                subMenuItemBorderRadius: 10,
                 itemHeight: 44,
                 iconSize: 16,
               },
@@ -182,7 +492,7 @@
           },
         },
         React.createElement(Menu, {
-          theme: "dark",
+          theme: "light",
           mode: "inline",
           inlineIndent: 20,
           triggerSubMenuAction: "click",
@@ -359,7 +669,7 @@
         "sidebarToggleClickBound",
         "click",
         function onSidebarToggle() {
-          const isDesktop = global.innerWidth >= 768;
+          const isDesktop = global.innerWidth > 900;
           if (isDesktop) {
             const desktopSidebar = document.getElementById("desktop-sidebar");
             if (!desktopSidebar) return;
@@ -653,7 +963,10 @@
         addSupplierBtn,
         "addSupplierClickBound",
         "click",
-        global.showAddSupplierModal,
+        function onAddSupplier() {
+          if (!guardWorkflowAction("addSupplier")) return;
+          global.showAddSupplierModal?.();
+        },
       );
     }
 
@@ -663,7 +976,10 @@
         addProductBtn,
         "addProductClickBound",
         "click",
-        global.showAddProductModal,
+        function onAddProduct() {
+          if (!guardWorkflowAction("addProduct")) return;
+          global.showAddInboundModal?.();
+        },
       );
     }
 
@@ -673,7 +989,10 @@
         addCustomerBtn,
         "addCustomerClickBound",
         "click",
-        global.showAddCustomerModal,
+        function onAddCustomer() {
+          if (!guardWorkflowAction("addCustomer")) return;
+          global.showAddCustomerModal?.();
+        },
       );
     }
 
@@ -693,7 +1012,10 @@
         addInboundBtn,
         "addInboundClickBound",
         "click",
-        global.showAddInboundModal,
+        function onAddInbound() {
+          if (!guardWorkflowAction("addInbound")) return;
+          global.showAddInboundModal?.();
+        },
       );
     }
 
@@ -704,11 +1026,9 @@
         "addOutboundClickBound",
         "click",
         function onAddOutbound() {
+          if (!guardWorkflowAction("addOutbound")) return;
           if (typeof global.showSection === "function") {
             global.showSection("sales-order");
-          }
-          if (typeof global.initSalesOrder === "function") {
-            global.initSalesOrder();
           }
         },
       );
@@ -748,6 +1068,9 @@
   global.renderDesktopSidebarMenu = renderDesktopSidebarMenu;
   global.bindElementEventOnce = bindElementEventOnce;
   global.bindDocumentEventOnce = bindDocumentEventOnce;
+  global.resolveWorkflowPrerequisite = resolveWorkflowPrerequisite;
+  global.showWorkflowPrerequisitePrompt = showWorkflowPrerequisitePrompt;
+  global.guardWorkflowAction = guardWorkflowAction;
   global.bindNavigationEvents = bindNavigationEvents;
   global.bindMobileEvents = bindMobileEvents;
   global.bindModalEvents = bindModalEvents;

@@ -1,0 +1,16 @@
+[
+    {
+        "id": "WH001",
+        "code": "MAIN",
+        "name": "主仓库",
+        "status": "active",
+        "locations": [
+            {
+                "code": "A01",
+                "name": "默认库位"
+            }
+        ],
+        "createdAt": "2026-01-01T00:00:00",
+        "updatedAt": "2026-01-01T00:00:00"
+    }
+]

@@ -52,7 +52,114 @@ function createStockMovementMarkup() {
     `;
 }
 
-test("addProduct creates a new product and renders the inventory table", () => {
+test("company table keeps long names and addresses inside their columns", () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  fixture.mockData.companies[0].name = "示例工业科技有限公司";
+  fixture.mockData.companies[0].contactPerson = "熊总";
+  fixture.mockData.companies[0].contactPhone = "13800000000";
+  fixture.mockData.companies[0].address = "示例市示例产业园16号";
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.getInitial = (name) => String(name || "?").charAt(0);
+  harness.window.updateCompanyTable();
+
+  const cells = harness.window.document.querySelectorAll(
+    "#companies tbody tr:first-child td",
+  );
+  assert.equal(
+    cells[0].querySelector(".company-cell-wrap").textContent,
+    fixture.mockData.companies[0].name,
+  );
+  assert.equal(cells[1].textContent.trim(), "熊总");
+  assert.equal(cells[2].textContent.trim(), "13800000000");
+  assert.equal(
+    cells[3].querySelector(".company-cell-wrap").textContent,
+    fixture.mockData.companies[0].address,
+  );
+
+  harness.close();
+});
+
+test("supplier table wraps long names and payment terms within their columns", () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  fixture.mockData.suppliers[0].name = "示例新材料科技有限公司供应中心";
+  fixture.mockData.suppliers[0].contactPerson = "张总";
+  fixture.mockData.suppliers[0].contactPhone = "13800138000";
+  fixture.mockData.suppliers[0].paymentTerms = "月结三十天并于次月十五日前付款";
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.getInitial = (name) => String(name || "?").charAt(0);
+  harness.window.updateSupplierTable();
+
+  const cells = harness.window.document.querySelectorAll(
+    "#suppliers-table-body tr:first-child td",
+  );
+  assert.equal(
+    cells[0].querySelector(".supplier-cell-wrap").textContent,
+    fixture.mockData.suppliers[0].name,
+  );
+  assert.equal(cells[1].textContent.trim(), "张总");
+  assert.equal(cells[2].textContent.trim(), "13800138000");
+  assert.equal(
+    cells[3].querySelector(".supplier-cell-wrap").textContent,
+    fixture.mockData.suppliers[0].paymentTerms,
+  );
+
+  harness.close();
+});
+
+test("customer table wraps long imported names and addresses within their columns", () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  fixture.mockData.customers[0].name = "示例金属表面处理有限公司";
+  fixture.mockData.customers[0].contactPerson = "新";
+  fixture.mockData.customers[0].contactPhone = "13800000001";
+  fixture.mockData.customers[0].address = "示例产业园B08栋3楼";
+  fixture.mockData.customers[0].paymentTerms = "月结30天";
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.getInitial = (name) => String(name || "?").charAt(0);
+  harness.window.updateCustomerTable();
+
+  const cells = harness.window.document.querySelectorAll(
+    "#customers tbody tr:first-child td",
+  );
+  assert.equal(
+    cells[1].querySelector(".customer-cell-wrap").textContent,
+    fixture.mockData.customers[0].name,
+  );
+  assert.equal(cells[2].textContent.trim(), "新");
+  assert.equal(cells[3].textContent.trim(), "13800000001");
+  assert.equal(
+    cells[4].querySelector(".customer-cell-wrap").textContent,
+    fixture.mockData.customers[0].address,
+  );
+  assert.equal(
+    cells[5].querySelector(".customer-cell-wrap").textContent,
+    "月结30天",
+  );
+
+  harness.close();
+});
+
+test("addProduct creates a new product and renders the inventory table", async () => {
   const harness = createWindow({ markup: createMasterDataMarkup() });
   const fixture = createFixtureData();
   const logCalls = [];
@@ -75,7 +182,7 @@ test("addProduct creates a new product and renders the inventory table", () => {
       .charAt(0)
       .toUpperCase();
 
-  harness.window.addProduct({
+  await harness.window.addProduct({
     name: "Fresh Product",
     category: "家具",
     unit: "盒",
@@ -115,76 +222,45 @@ test("addProduct creates a new product and renders the inventory table", () => {
     harness.window.document.querySelectorAll("#inventory-table-body tr").length,
     3,
   );
+  const productNameCell = harness.window.document.querySelector(
+    "#inventory-table-body tr:first-child td:first-child",
+  );
+  assert.equal(productNameCell.querySelector("i"), null);
+  assert.match(productNameCell.textContent, /Fresh Product/);
+  const productActionCell = harness.window.document.querySelector(
+    "#inventory-table-body tr:first-child td:last-child",
+  );
+  assert.equal(productActionCell.classList.contains("table-action-cell"), true);
+  assert.ok(productActionCell.querySelector(".table-action-links"));
 
   harness.close();
 });
 
-test("showAddProductModal allows creating a product with a new category", async () => {
+test("showAddProductModal delegates to the unified inbound product flow", () => {
   const harness = createWindow({ markup: createMasterDataMarkup() });
-  const fixture = createFixtureData();
+  const receivedOptions = /** @type {any[]} */ ([]);
 
   loadScripts(harness.window, [
     "js/modules/app-utils.js",
     "js/modules/app-state.js",
     "js/modules/master-data-module.js",
   ]);
-  applyFixtureState(harness.window, fixture);
-  harness.window.addLog = () => {};
-  harness.window.saveMockData = () => {};
-  harness.window.getInitial = (name) =>
-    String(name || "?")
-      .charAt(0)
-      .toUpperCase();
+  harness.window.showAddInboundModal = (options) => {
+    receivedOptions.push(options);
+    return "opened";
+  };
 
-  harness.window.showAddProductModal();
-
-  assert.equal(
-    harness.window.__testHarness.renderSelects.get("modal-category-input")
-      .config.mode,
-    "tags",
-  );
-  assert.equal(
-    harness.window.__testHarness.renderSelects.get("modal-category-input")
-      .config.enableCreateOption,
-    true,
-  );
-
-  setRenderedSelectValue(
-    harness.window,
-    "modal-product-choice-input",
-    "Flexible Stand",
-  );
-  setRenderedSelectValue(harness.window, "modal-category-input", "办公耗材");
-  setRenderedSelectValue(harness.window, "modal-supplier-input", "S001");
-  harness.window.document.querySelector(
-    '#add-product-form [name="unit"]',
-  ).value = "套";
-  harness.window.document.querySelector(
-    '#add-product-form [name="quantity"]',
-  ).value = "7";
-  harness.window.document.querySelector(
-    '#add-product-form [name="costPrice"]',
-  ).value = "12.5";
-  harness.window.document.querySelector(
-    '#add-product-form [name="retailPrice"]',
-  ).value = "25";
-
-  await clickModalConfirm(harness.window);
-
-  const createdProduct = harness.window.mockData.products.find(
-    (product) => product.name === "Flexible Stand",
-  );
-  assert.ok(createdProduct);
-  assert.equal(createdProduct.category, "办公耗材");
-  assert.equal(createdProduct.unit, "套");
+  assert.equal(harness.window.showAddProductModal(), "opened");
+  assert.equal(receivedOptions[0].source, "inventory");
 
   harness.close();
 });
-
-test("showAddProductModal blocks invalid required number fields", async () => {
+test("showEditProductModal updates product attributes without changing stock", async () => {
   const harness = createWindow({ markup: createMasterDataMarkup() });
   const fixture = createFixtureData();
+  const originalStockQuantity = fixture.mockData.products[0].stockQuantity;
   let saveCalls = 0;
+  const logCalls = [];
 
   loadScripts(harness.window, [
     "js/modules/app-utils.js",
@@ -192,70 +268,122 @@ test("showAddProductModal blocks invalid required number fields", async () => {
     "js/modules/master-data-module.js",
   ]);
   applyFixtureState(harness.window, fixture);
-  harness.window.addLog = () => {};
   harness.window.saveMockData = () => {
     saveCalls += 1;
+    return true;
   };
-  harness.window.getInitial = (name) =>
-    String(name || "?")
-      .charAt(0)
-      .toUpperCase();
+  harness.window.addLog = (...args) => logCalls.push(args);
+  harness.window.getInitial = (name) => String(name || "?").charAt(0);
 
-  harness.window.showAddProductModal();
+  harness.window.updateInventoryTable();
+  const productRow = Array.from(
+    harness.window.document.querySelectorAll("#inventory-table-body tr"),
+  ).find((row) => row.textContent.includes("Widget"));
+  assert.ok(productRow);
+  const editButton = productRow.querySelector('[data-action="edit"]');
+  assert.ok(editButton);
+  editButton.click();
+  harness.window.document.querySelector(
+    '#edit-product-form [name="name"]',
+  ).value = "Widget Pro";
+  harness.window.document.querySelector(
+    '#edit-product-form [name="unit"]',
+  ).value = "箱";
+  harness.window.document.querySelector(
+    '#edit-product-form [name="costPrice"]',
+  ).value = "120";
+  harness.window.document.querySelector(
+    '#edit-product-form [name="retailPrice"]',
+  ).value = "180";
+  harness.window.document.querySelector(
+    '#edit-product-form [name="minStock"]',
+  ).value = "8";
+  harness.window.document.querySelector(
+    '#edit-product-form [name="maxStock"]',
+  ).value = "80";
   setRenderedSelectValue(
     harness.window,
-    "modal-product-choice-input",
-    "Invalid Required Product",
+    "edit-product-category-input",
+    "办公设备",
   );
-  setRenderedSelectValue(harness.window, "modal-category-input", "临时分类");
-  setRenderedSelectValue(harness.window, "modal-supplier-input", "S001");
-  harness.window.document.querySelector(
-    '#add-product-form [name="unit"]',
-  ).value = "件";
-  harness.window.document.querySelector(
-    '#add-product-form [name="quantity"]',
-  ).value = "0";
-  harness.window.document.querySelector(
-    '#add-product-form [name="costPrice"]',
-  ).value = "12.5";
-  harness.window.document.querySelector(
-    '#add-product-form [name="retailPrice"]',
-  ).value = "25";
-
-  assert.equal(await clickModalConfirm(harness.window), false);
-  assert.match(harness.alerts.at(-1), /请输入有效的数量/);
-
-  harness.window.document.querySelector(
-    '#add-product-form [name="quantity"]',
-  ).value = "3";
-  harness.window.document.querySelector(
-    '#add-product-form [name="costPrice"]',
-  ).value = "-1";
-
-  assert.equal(await clickModalConfirm(harness.window), false);
-  assert.match(harness.alerts.at(-1), /请输入有效的成本单价/);
-
-  harness.window.document.querySelector(
-    '#add-product-form [name="costPrice"]',
-  ).value = "12.5";
-  harness.window.document.querySelector(
-    '#add-product-form [name="retailPrice"]',
-  ).value = "-1";
-
-  assert.equal(await clickModalConfirm(harness.window), false);
-  assert.match(harness.alerts.at(-1), /请输入有效的销售单价/);
-  assert.equal(saveCalls, 0);
-  assert.equal(
-    harness.window.mockData.products.some(
-      (product) => product.name === "Invalid Required Product",
-    ),
-    false,
+  setRenderedSelectValue(harness.window, "edit-product-supplier-input", "S002");
+  setRenderedSelectValue(
+    harness.window,
+    "edit-product-status-input",
+    "inactive",
   );
+
+  const result = await clickModalConfirm(harness.window);
+  const updatedProduct = harness.window.mockData.products.find(
+    (product) => product.id === "P001",
+  );
+
+  assert.equal(result, true);
+  assert.equal(updatedProduct.name, "Widget Pro");
+  assert.equal(updatedProduct.category, "办公设备");
+  assert.equal(updatedProduct.unit, "箱");
+  assert.equal(updatedProduct.costPrice, 120);
+  assert.equal(updatedProduct.retailPrice, 180);
+  assert.equal(updatedProduct.minStock, 8);
+  assert.equal(updatedProduct.maxStock, 80);
+  assert.equal(updatedProduct.supplierId, "S002");
+  assert.equal(updatedProduct.status, "inactive");
+  assert.equal(updatedProduct.stockQuantity, originalStockQuantity);
+  assert.equal(saveCalls, 1);
+  assert.equal(logCalls[0][0], "edit");
+  assert.equal(logCalls[0][1], "product");
 
   harness.close();
 });
 
-test("addProduct syncs new inventory to all and inbound stock tables", () => {
+test("master data and its audit log are persisted in the same save", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  const initialLogCount = fixture.logsData.length;
+  /** @type {Record<string, unknown> | null} */
+  let auditLogAtSave = null;
+  let separateLogSaveCalls = 0;
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+    "js/modules/logs-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.persistLogsData = () => {
+    separateLogSaveCalls += 1;
+  };
+  harness.window.saveMockData = () => {
+    auditLogAtSave = harness.window.logsData[0];
+    return true;
+  };
+  harness.window.getInitial = (name) => String(name || "?").charAt(0);
+
+  const result = await harness.window.addProduct({
+    name: "Atomic Audit Product",
+    category: "办公设备",
+    unit: "件",
+    quantity: 3,
+    costPrice: 10,
+    retailPrice: 18,
+    minStock: 2,
+    maxStock: 20,
+    supplierId: "S001",
+    notes: "atomic audit",
+  });
+
+  assert.equal(result, true);
+  assert.ok(auditLogAtSave);
+  assert.equal(auditLogAtSave.objectType, "product");
+  assert.equal(auditLogAtSave.objectName, "Atomic Audit Product");
+  assert.equal(harness.window.logsData.length, initialLogCount + 1);
+  assert.equal(separateLogSaveCalls, 0);
+
+  harness.close();
+});
+
+test("addProduct syncs new inventory to all and inbound stock tables", async () => {
   const harness = createWindow({
     markup: `${createMasterDataMarkup()}${createStockMovementMarkup()}`,
   });
@@ -275,7 +403,7 @@ test("addProduct syncs new inventory to all and inbound stock tables", () => {
       .charAt(0)
       .toUpperCase();
 
-  harness.window.addProduct({
+  await harness.window.addProduct({
     name: "Synced Product",
     category: "瀹跺叿",
     unit: "箱",
@@ -307,7 +435,7 @@ test("addProduct syncs new inventory to all and inbound stock tables", () => {
   harness.close();
 });
 
-test("addProduct merges inventory when the same product already exists", () => {
+test("addProduct merges inventory and reactivates the same product", async () => {
   const harness = createWindow({ markup: createMasterDataMarkup() });
   const fixture = createFixtureData();
   const logCalls = [];
@@ -318,6 +446,7 @@ test("addProduct merges inventory when the same product already exists", () => {
     "js/modules/master-data-module.js",
   ]);
   applyFixtureState(harness.window, fixture);
+  harness.window.mockData.products[0].status = "inactive";
   harness.window.addLog = (...args) => {
     logCalls.push(args);
   };
@@ -327,7 +456,7 @@ test("addProduct merges inventory when the same product already exists", () => {
       .charAt(0)
       .toUpperCase();
 
-  harness.window.addProduct({
+  await harness.window.addProduct({
     name: "Widget",
     category: "电子产品",
     quantity: 6,
@@ -339,8 +468,10 @@ test("addProduct merges inventory when the same product already exists", () => {
 
   assert.equal(harness.window.mockData.products.length, 2);
   assert.equal(harness.window.mockData.products[0].stockQuantity, 26);
+  assert.equal(harness.window.mockData.products[0].status, "active");
   assert.equal(harness.window.stockMovementData.length, 3);
   assert.equal(harness.window.stockMovementData[0].type, "inbound");
+  assert.equal(harness.window.stockMovementData[0].status, "confirmed");
   assert.equal(harness.window.stockMovementData[0].productId, "P001");
   assert.equal(harness.window.stockMovementData[0].quantity, 6);
   assert.equal(harness.window.stockMovementData[0].supplierName, "Acme Supply");
@@ -776,7 +907,7 @@ test("showAddCustomerModal requires payment terms before saving", async () => {
   harness.close();
 });
 
-test("showAddCustomerModal validates conditional tax rate coefficient", async () => {
+test("showAddCustomerModal validates the conditional default tax point", async () => {
   const harness = createWindow({ markup: createMasterDataMarkup() });
   const fixture = createFixtureData();
   let saveCalls = 0;
@@ -816,7 +947,7 @@ test("showAddCustomerModal validates conditional tax rate coefficient", async ()
     "Net 30";
 
   assert.equal(await clickModalConfirm(harness.window), false);
-  assert.match(harness.alerts.at(-1), /请选择是否有税率系数/);
+  assert.match(harness.alerts.at(-1), /请选择是否有税点/);
 
   setRenderedRadioGroupValue(
     harness.window,
@@ -831,13 +962,13 @@ test("showAddCustomerModal validates conditional tax rate coefficient", async ()
     false,
   );
   assert.equal(await clickModalConfirm(harness.window), false);
-  assert.match(harness.alerts.at(-1), /请输入税率系数/);
+  assert.match(harness.alerts.at(-1), /请输入税点/);
 
   setRenderedInputValue(harness.window, "add-customer-tax-rate-input", "-1");
   assert.equal(await clickModalConfirm(harness.window), false);
-  assert.match(harness.alerts.at(-1), /请输入有效的税率系数/);
+  assert.match(harness.alerts.at(-1), /税点必须/);
 
-  setRenderedInputValue(harness.window, "add-customer-tax-rate-input", "1.13");
+  setRenderedInputValue(harness.window, "add-customer-tax-rate-input", "13");
   assert.equal(await clickModalConfirm(harness.window), true);
 
   const createdCustomer = harness.window.mockData.customers.find(
@@ -846,6 +977,7 @@ test("showAddCustomerModal validates conditional tax rate coefficient", async ()
   assert.ok(createdCustomer);
   assert.equal(createdCustomer.hasTaxRate, true);
   assert.equal(createdCustomer.taxRateCoefficient, 1.13);
+  assert.equal(createdCustomer.defaultTaxRate, 0.13);
   assert.equal(saveCalls, 1);
 
   harness.close();
@@ -946,9 +1078,7 @@ test("showEditCustomerModal updates an existing customer", async () => {
     '#edit-customer-form [name="address"]',
   ).value = "Shanghai Pudong";
   assert.equal(
-    harness.window.document.querySelector(
-      '#edit-customer-form [name="email"]',
-    ),
+    harness.window.document.querySelector('#edit-customer-form [name="email"]'),
     null,
   );
   setRenderedRadioGroupValue(
@@ -956,11 +1086,7 @@ test("showEditCustomerModal updates an existing customer", async () => {
     "edit-customer-tax-rate-choice-input",
     "yes",
   );
-  setRenderedInputValue(
-    harness.window,
-    "edit-customer-tax-rate-input",
-    "1.13",
-  );
+  setRenderedInputValue(harness.window, "edit-customer-tax-rate-input", "13");
   harness.window.document.getElementById("edit-customer-payment-input").value =
     "COD";
   harness.window.document.getElementById("edit-customer-status-input").value =
@@ -974,10 +1100,8 @@ test("showEditCustomerModal updates an existing customer", async () => {
   assert.equal(harness.window.mockData.customers[0].status, "inactive");
   assert.equal(harness.window.mockData.customers[0].hasTaxRate, true);
   assert.equal(harness.window.mockData.customers[0].taxRateCoefficient, 1.13);
-  assert.equal(
-    harness.window.mockData.customers[0].email,
-    "nina@example.com",
-  );
+  assert.equal(harness.window.mockData.customers[0].defaultTaxRate, 0.13);
+  assert.equal(harness.window.mockData.customers[0].email, "nina@example.com");
   assert.equal(saveCalls, 1);
   assert.equal(logCalls[0][0], "edit");
   assert.match(
@@ -988,7 +1112,7 @@ test("showEditCustomerModal updates an existing customer", async () => {
   harness.close();
 });
 
-test("supplier delete button waits for confirmation before removing data", async () => {
+test("referenced supplier delete requires confirmation and deactivates the record", async () => {
   const harness = createWindow({ markup: createMasterDataMarkup() });
   const fixture = createFixtureData();
   let saveCalls = 0;
@@ -1025,8 +1149,9 @@ test("supplier delete button waits for confirmation before removing data", async
       .split("\n")
       .filter(Boolean),
     [
-      "确定要删除“Acme Supply”吗？删除后无法撤销。",
-      "删除后，1 个商品会显示为“未知供应商”。",
+      "“Acme Supply”已有业务数据，不能直接删除。是否改为停用？",
+      "停用后不会出现在新业务的选择列表中，已有历史记录仍会完整保留。",
+      "已有 1 个商品关联了这家供应商。",
       "已有 1 张对账单会保留这家供应商的历史快照。",
       "已有 1 条库存流水会保留这家供应商的历史快照。",
     ],
@@ -1041,16 +1166,17 @@ test("supplier delete button waits for confirmation before removing data", async
     .click();
   await flushAsyncTasks();
 
-  assert.equal(harness.window.mockData.suppliers.length, 1);
+  assert.equal(harness.window.mockData.suppliers.length, 2);
+  assert.equal(harness.window.mockData.suppliers[0].status, "inactive");
   assert.equal(saveCalls, 1);
-  assert.equal(logCalls[0][0], "delete");
+  assert.equal(logCalls[0][0], "edit");
   assert.equal(
     harness.window.document
       .getElementById("suppliers-table-body")
       .textContent.includes("Acme Supply"),
-    false,
+    true,
   );
-  assert.match(harness.alerts.at(-1), /已删除/);
+  assert.match(harness.alerts.at(-1), /已停用/);
 
   harness.close();
 });
@@ -1064,6 +1190,7 @@ test("supplier delete button waits for confirmation before removing data", async
     selector: "#inventory-table-body [data-action='delete']",
     collectionName: "products",
     deletedName: "Widget",
+    referenced: true,
   },
   {
     name: "company",
@@ -1073,6 +1200,7 @@ test("supplier delete button waits for confirmation before removing data", async
     selector: "#companies tbody [data-action='delete']",
     collectionName: "companies",
     deletedName: "Happy Warehouse",
+    referenced: false,
   },
   {
     name: "customer",
@@ -1082,9 +1210,10 @@ test("supplier delete button waits for confirmation before removing data", async
     selector: "#customers tbody [data-action='delete']",
     collectionName: "customers",
     deletedName: "Northwind",
+    referenced: true,
   },
 ].forEach((scenario) => {
-  test(`${scenario.name} delete button removes the record after confirmation`, async () => {
+  test(`${scenario.name} delete keeps referenced history and removes unused records`, async () => {
     const harness = createWindow({ markup: createMasterDataMarkup() });
     const fixture = createFixtureData();
     let saveCalls = 0;
@@ -1113,15 +1242,235 @@ test("supplier delete button waits for confirmation before removing data", async
     harness.window.document.querySelector(scenario.selector).click();
     await flushAsyncTasks();
 
-    assert.equal(harness.window.mockData[scenario.collectionName].length, 1);
+    assert.equal(
+      harness.window.mockData[scenario.collectionName].length,
+      scenario.referenced ? 2 : 1,
+    );
+    if (scenario.referenced) {
+      assert.equal(
+        harness.window.mockData[scenario.collectionName][0].status,
+        "inactive",
+      );
+    }
     assert.equal(saveCalls, 1);
-    assert.equal(logCalls[0][0], "delete");
+    assert.equal(logCalls[0][0], scenario.referenced ? "edit" : "delete");
     assert.equal(
       harness.window.document.body.textContent.includes(scenario.deletedName),
-      false,
+      scenario.referenced,
     );
-    assert.match(harness.alerts.at(-1), /已删除/);
+    assert.match(
+      harness.alerts.at(-1),
+      scenario.referenced ? /已停用/ : /已删除/,
+    );
 
     harness.close();
   });
+});
+
+test("addProduct restores product and stock movement data when persistence fails", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  const logCalls = [];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  const originalMockData = JSON.stringify(harness.window.mockData);
+  const originalStockMovements = JSON.stringify(
+    harness.window.stockMovementData,
+  );
+  const originalLogs = JSON.stringify(harness.window.logsData);
+  harness.window.saveMockData = async () => false;
+  harness.window.addLog = (...args) => logCalls.push(args);
+
+  const result = await harness.window.addProduct({
+    name: "Rollback Product",
+    category: "家具",
+    unit: "件",
+    quantity: 5,
+    costPrice: 20,
+    retailPrice: 30,
+    supplierId: "S001",
+    notes: "must roll back",
+  });
+
+  assert.equal(result, false);
+  assert.equal(JSON.stringify(harness.window.mockData), originalMockData);
+  assert.equal(
+    JSON.stringify(harness.window.stockMovementData),
+    originalStockMovements,
+  );
+  assert.equal(JSON.stringify(harness.window.logsData), originalLogs);
+  assert.equal(logCalls.length, 0);
+  assert.match(harness.alerts.at(-1), /已回滚/);
+
+  harness.close();
+});
+
+test("product edit restores attributes and audit log when persistence fails", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  const logCalls = [];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  const originalMockData = JSON.stringify(harness.window.mockData);
+  const originalLogs = JSON.stringify(harness.window.logsData);
+  harness.window.saveMockData = () => false;
+  harness.window.addLog = (...args) => logCalls.push(args);
+
+  harness.window.showEditProductModal("P001");
+  harness.window.document.querySelector(
+    '#edit-product-form [name="name"]',
+  ).value = "Should Roll Back";
+  harness.window.document.querySelector(
+    '#edit-product-form [name="costPrice"]',
+  ).value = "999";
+
+  const result = await clickModalConfirm(harness.window);
+
+  assert.equal(result, false);
+  assert.equal(JSON.stringify(harness.window.mockData), originalMockData);
+  assert.equal(JSON.stringify(harness.window.logsData), originalLogs);
+  assert.equal(logCalls.length, 0);
+  assert.match(harness.alerts.at(-1), /已回滚/);
+
+  harness.close();
+});
+
+[
+  {
+    name: "company",
+    show(window) {
+      window.showEditCompanyModal("CO001");
+      window.document.querySelector('#edit-company-form [name="name"]').value =
+        "Company Rollback";
+    },
+  },
+  {
+    name: "supplier",
+    show(window) {
+      window.showEditSupplierModal("S001");
+      window.document.querySelector('#edit-supplier-form [name="name"]').value =
+        "Supplier Rollback";
+    },
+  },
+  {
+    name: "customer",
+    show(window) {
+      window.showEditCustomerModal("C001");
+      window.document.querySelector('#edit-customer-form [name="name"]').value =
+        "Customer Rollback";
+    },
+  },
+].forEach((scenario) => {
+  test(`${scenario.name} edit restores the complete dataset when persistence fails`, async () => {
+    const harness = createWindow({ markup: createMasterDataMarkup() });
+    const fixture = createFixtureData();
+    const logCalls = [];
+
+    loadScripts(harness.window, [
+      "js/modules/app-utils.js",
+      "js/modules/app-state.js",
+      "js/modules/master-data-module.js",
+    ]);
+    applyFixtureState(harness.window, fixture);
+    const originalMockData = JSON.stringify(harness.window.mockData);
+    const originalStockMovements = JSON.stringify(
+      harness.window.stockMovementData,
+    );
+    harness.window.saveMockData = () => false;
+    harness.window.addLog = (...args) => logCalls.push(args);
+
+    scenario.show(harness.window);
+    const result = await clickModalConfirm(harness.window);
+
+    assert.equal(result, false);
+    assert.equal(JSON.stringify(harness.window.mockData), originalMockData);
+    assert.equal(
+      JSON.stringify(harness.window.stockMovementData),
+      originalStockMovements,
+    );
+    assert.equal(logCalls.length, 0);
+    assert.match(harness.alerts.at(-1), /已回滚/);
+
+    harness.close();
+  });
+});
+
+test("supplier deactivation is rolled back and not logged when persistence fails", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  const logCalls = [];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  const originalMockData = JSON.stringify(harness.window.mockData);
+  harness.window.saveMockData = () => false;
+  harness.window.addLog = (...args) => logCalls.push(args);
+  harness.window.queueConfirmResult(true);
+
+  const result = await harness.window.deleteSupplier("S001");
+
+  assert.equal(result, false);
+  assert.equal(JSON.stringify(harness.window.mockData), originalMockData);
+  assert.equal(logCalls.length, 0);
+  assert.match(harness.alerts.at(-1), /已回滚/);
+
+  harness.close();
+});
+
+test("customer id edit restores all related references when persistence fails", async () => {
+  const harness = createWindow({ markup: createMasterDataMarkup() });
+  const fixture = createFixtureData();
+  fixture.mockData.deliveryNotes.push({
+    id: "DN-C-ROLLBACK",
+    customerId: "C001",
+    customerName: "Northwind",
+  });
+  fixture.stockMovementData[1].customerId = "C001";
+  const logCalls = [];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/master-data-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  const originalMockData = JSON.stringify(harness.window.mockData);
+  const originalStockMovements = JSON.stringify(
+    harness.window.stockMovementData,
+  );
+  harness.window.saveMockData = () => false;
+  harness.window.addLog = (...args) => logCalls.push(args);
+
+  harness.window.showViewCustomerModal("C001");
+  const idInput = harness.window.document.getElementById(
+    "view-customer-id-input",
+  );
+  idInput.value = "VIP-ROLLBACK";
+  harness.window.document.getElementById("view-customer-id-save").click();
+  await flushAsyncTasks();
+
+  assert.equal(JSON.stringify(harness.window.mockData), originalMockData);
+  assert.equal(
+    JSON.stringify(harness.window.stockMovementData),
+    originalStockMovements,
+  );
+  assert.equal(idInput.value, "C001");
+  assert.equal(logCalls.length, 0);
+  assert.match(harness.alerts.at(-1), /已回滚/);
+
+  harness.close();
 });

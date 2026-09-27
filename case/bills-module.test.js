@@ -76,6 +76,17 @@ test("updateBillsTable renders the active customer statements and empty states",
   );
   assert.match(text, /BILL-C-001/);
   assert.doesNotMatch(text, /BILL-S-001/);
+  assert.equal(
+    harness.window.document
+      .querySelector("#bills thead th:last-child")
+      .classList.contains("table-action-header"),
+    true,
+  );
+  const actionCell = harness.window.document.querySelector(
+    "#bills-table-body tr:first-child td:last-child",
+  );
+  assert.equal(actionCell.classList.contains("table-action-cell"), true);
+  assert.ok(actionCell.querySelector(".table-action-links"));
 
   harness.window.document.getElementById("bills-filter-search").value =
     "missing";
@@ -182,6 +193,73 @@ test("create bill flow blocks invalid tax rate values", async () => {
     harness.window.mockData.bills.length,
     fixture.mockData.bills.length,
   );
+
+  harness.close();
+});
+
+test("create bill flow rolls back the statement when persistence fails", async () => {
+  const harness = createWindow({
+    markup: createBillsMarkup(),
+    loadReactRuntime: true,
+  });
+  const fixture = createFixtureData();
+  fixture.mockData.deliveryNotes = [
+    {
+      id: "SD-ROLLBACK",
+      type: "sales",
+      orderNo: "XS-ROLLBACK",
+      issueDate: "2026-05-10",
+      status: "confirmed",
+      companyId: "CO001",
+      customerId: "C001",
+      details: [
+        {
+          id: "SDD-ROLLBACK",
+          deliveryId: "SD-ROLLBACK",
+          productId: "P001",
+          productName: "Widget",
+          quantity: 2,
+          unit: "个",
+          unitPrice: 150,
+          totalAmount: 300,
+          status: "confirmed",
+        },
+      ],
+      createdAt: "2026-05-10T10:00:00",
+      updatedAt: "2026-05-10T10:00:00",
+    },
+  ];
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/bills-core.js",
+    "js/modules/bills-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.saveMockData = async () => false;
+  harness.window.addLog = () => {};
+
+  dispatchDomContentLoaded(harness.window);
+  await flushAsyncTasks();
+  const initialBillCount = harness.window.mockData.bills.length;
+  harness.window.document.getElementById("add-bill-btn").click();
+  harness.window.document.getElementById("bill-create-type").value = "customer";
+  harness.window.document.getElementById("bill-create-company").value = "CO001";
+  harness.window.document.getElementById("bill-create-party").value = "C001";
+  harness.window.document.getElementById("bill-create-date").value =
+    "2026-05-31";
+  harness.window.document.getElementById("bill-create-period-start").value =
+    "2026-05-01";
+  harness.window.document.getElementById("bill-create-period-end").value =
+    "2026-05-31";
+  harness.window.document.getElementById("bill-create-tax-rate").value = "1";
+
+  harness.window.document.getElementById("bill-create-submit-btn").click();
+  await flushAsyncTasks(6);
+
+  assert.equal(harness.window.mockData.bills.length, initialBillCount);
+  assert.match(harness.alerts.at(-1), /已回滚/);
 
   harness.close();
 });

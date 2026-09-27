@@ -1,24 +1,13 @@
 [
-    {
-        "id": "CO001",
-        "name": "化工",
-        "contactPerson": "雪王",
-        "contactPhone": "13333333333",
-        "address": "东莞",
-        "email": "-",
-        "status": "active",
-        "createdAt": "2026-08-03T17:19:53",
-        "updatedAt": "2026-08-03T17:19:53"
-    },
-    {
-        "id": "CO002",
-        "name": "劳保",
-        "contactPerson": "孙悟空",
-        "contactPhone": "16666666666",
-        "address": "虎门",
-        "email": "-",
-        "status": "active",
-        "createdAt": "2026-08-03T17:19:53",
-        "updatedAt": "2026-08-03T17:19:53"
-    }
+  {
+    "id": "CO001",
+    "name": "示例公司",
+    "contactPerson": "示例联系人",
+    "contactPhone": "未提供",
+    "address": "示例地址",
+    "email": "-",
+    "status": "active",
+    "createdAt": "2026-01-01T00:00:00",
+    "updatedAt": "2026-01-01T00:00:00"
+  }
 ]

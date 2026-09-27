@@ -31,12 +31,20 @@
       global.initInventoryFilters();
       global.initLogFilters();
       global.initBillFilters();
+      global.renderWarehouseInventoryControls?.();
 
       global.updateInventoryTable();
       global.updateCompanyTable();
       global.updateSupplierTable();
       global.updateCustomerTable();
       global.updateBillsTable();
+
+      if (
+        global.getSectionIdFromHash?.() === "history-import-workflow" &&
+        typeof global.DeliveryNoteImport?.restoreWorkflowDraft === "function"
+      ) {
+        global.DeliveryNoteImport.restoreWorkflowDraft();
+      }
 
       if (!global.applyHashDrivenSectionRoute()) {
         const activeLink = document.querySelector(".nav-link.active");

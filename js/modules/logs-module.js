@@ -1,6 +1,6 @@
 (function initLogsModule(global) {
-  function addLog(actionType, objectType, objectName, details) {
-    const log = {
+  function addLog(actionType, objectType, objectName, details, options = {}) {
+    const log = options.record || {
       id: createRuntimeId("LOG"),
       timestamp: new Date(),
       userId: currentUser.id,
@@ -12,15 +12,43 @@
       ipAddress: clientIP,
     };
 
-    logsData.unshift(log);
-    if (typeof persistLogsData === "function") {
-      persistLogsData();
+    const appended = options.append !== false;
+    if (appended) {
+      logsData.unshift(log);
+    }
+    if (options.persist !== false && typeof persistLogsData === "function") {
+      const rollbackFailedPersistence = (error) => {
+        if (appended) {
+          logsData = logsData.filter((candidate) => candidate.id !== log.id);
+          if (
+            document.querySelector("#logs:not(.hidden)") &&
+            typeof renderLogsTable === "function"
+          ) {
+            renderLogsTable();
+          }
+        }
+        console.error("Audit log persistence failed:", error);
+      };
+
+      try {
+        Promise.resolve(persistLogsData())
+          .then((saved) => {
+            if (saved === false) {
+              rollbackFailedPersistence(new Error("save returned false"));
+            }
+          })
+          .catch(rollbackFailedPersistence);
+      } catch (error) {
+        rollbackFailedPersistence(error);
+      }
     }
 
     const logsSection = document.querySelector("#logs");
     if (logsSection && !logsSection.classList.contains("hidden")) {
       renderLogsTable();
     }
+
+    return log;
   }
 
   function renderLogsTable() {
@@ -74,7 +102,10 @@
       return true;
     });
 
-    filteredLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    filteredLogs.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
 
     paginationState.logs.total = filteredLogs.length;
     let { page, pageSize } = paginationState.logs;

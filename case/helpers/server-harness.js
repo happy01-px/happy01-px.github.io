@@ -6,6 +6,7 @@ const { projectRoot } = require("./browser-harness");
 
 const SERVER_FILES = [
   "preview_server.js",
+  "server",
   "index.html",
   "assets",
   "css",
@@ -33,11 +34,37 @@ function copyProjectForServer() {
     fs.copyFileSync(source, target);
   });
 
+  // Runtime snapshots belong to the active local preview and must never leak
+  // into an isolated server test fixture.
+  const copiedDataRoot = path.resolve(tempDir, "data");
+  const copiedSnapshots = path.resolve(copiedDataRoot, ".snapshots");
+  if (
+    copiedSnapshots.startsWith(`${copiedDataRoot}${path.sep}`) &&
+    fs.existsSync(copiedSnapshots)
+  ) {
+    fs.rmSync(copiedSnapshots, { recursive: true, force: true });
+  }
+
+  // The active preview may have a live SQLite database beside the JSON seeds.
+  // Isolated server tests must always initialize from their copied fixtures.
+  ["inventory.sqlite", "inventory.sqlite-shm", "inventory.sqlite-wal"].forEach(
+    (fileName) => {
+      const copiedDatabaseFile = path.resolve(copiedDataRoot, fileName);
+      if (copiedDatabaseFile.startsWith(`${copiedDataRoot}${path.sep}`)) {
+        fs.rmSync(copiedDatabaseFile, { force: true });
+      }
+    },
+  );
+
   return tempDir;
 }
 
-function startPreviewServer() {
+function startPreviewServer(options = {}) {
   const tempDir = copyProjectForServer();
+
+  if (typeof options.beforeStart === "function") {
+    options.beforeStart(tempDir);
+  }
 
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ["preview_server.js"], {

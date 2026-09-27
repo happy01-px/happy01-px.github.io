@@ -1,861 +1,44 @@
 (function initMasterDataModule(global) {
-  const DOMESTIC_PHONE_REGEX = /^1[3-9]\d{9}$|^0\d{2,3}-?\d{7,8}$/;
-  const PRODUCT_CATEGORIES = ["电子产品", "服装", "家具", "图书"];
-  const PAYMENT_OPTIONS = [
-    { value: "Net 30", label: "Net 30" },
-    { value: "Net 45", label: "Net 45" },
-    { value: "Net 60", label: "Net 60" },
-    { value: "COD", label: "货到付款" },
-  ];
-  const STATUS_OPTIONS = [
-    { value: "active", label: "活跃" },
-    { value: "inactive", label: "停用" },
-  ];
-
-  function formatDateTime(value) {
-    return new Date(value).toLocaleString("zh-CN", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-  }
-
-  function normalizeTextValue(value) {
-    return String(value ?? "").trim();
-  }
-
-  function getEditableFieldValue(value) {
-    const normalized = normalizeTextValue(value);
-    return normalized === "-" ? "" : normalized;
-  }
-
-  function getStoredOptionalValue(value) {
-    const normalized = normalizeTextValue(value);
-    return normalized || "-";
-  }
-
-  function getStatusMeta(status) {
-    switch (status) {
-      case "inactive":
-        return {
-          value: "inactive",
-          label: "停用",
-          className: "bg-gray-100 text-gray-800",
-        };
-      default:
-        return {
-          value: "active",
-          label: "活跃",
-          className: "bg-green-100 text-green-800",
-        };
-    }
-  }
-
-  function buildRecordInfoCard(record) {
-    const safeId = escapeHTML(record.id || "-");
-    const safeCreatedAt = escapeHTML(
-      formatDateTime(record.createdAt || new Date()),
-    );
-    const safeUpdatedAt = escapeHTML(
-      formatDateTime(record.updatedAt || new Date()),
-    );
-
-    return `
-            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <div class="text-sm font-medium text-gray-700 mb-3">记录信息</div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                    <div>
-                        <div class="text-xs text-gray-500 mb-1">编号</div>
-                        <div class="font-medium text-gray-800">${safeId}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-500 mb-1">创建时间</div>
-                        <div class="font-medium text-gray-800">${safeCreatedAt}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-500 mb-1">更新时间</div>
-                        <div class="font-medium text-gray-800">${safeUpdatedAt}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-  }
-
-  function ensureUniqueName(items, currentId, nextName, entityLabel) {
-    const normalizedNextName = normalizeTextValue(nextName).toLowerCase();
-    const exists = items.some(
-      (item) =>
-        item.id !== currentId &&
-        normalizeTextValue(item.name).toLowerCase() === normalizedNextName,
-    );
-
-    if (exists) {
-      alert(`${entityLabel}名称已存在，请使用其他名称`);
-      return false;
-    }
-
-    return true;
-  }
-
-  function ensureUniqueRecordId(items, currentId, nextId, entityLabel) {
-    const normalizedNextId = normalizeTextValue(nextId).toLowerCase();
-    const exists = items.some(
-      (item) =>
-        item.id !== currentId &&
-        normalizeTextValue(item.id).toLowerCase() === normalizedNextId,
-    );
-
-    if (exists) {
-      alert(`${entityLabel}编号已存在，请使用其他编号`);
-      return false;
-    }
-
-    return true;
-  }
-
-  function renderStatusSelect(containerId, inputId, value) {
-    renderAntdSelect(containerId, inputId, STATUS_OPTIONS, {
-      placeholder: "请选择状态",
-      value: value || "active",
-    });
-  }
-
-  function renderPaymentTermsSelect(
-    containerId,
-    inputId,
-    value,
-    placeholder = "请选择付款条件",
-  ) {
-    renderAntdSelect(containerId, inputId, PAYMENT_OPTIONS, {
-      placeholder,
-      value: value || undefined,
-    });
-  }
-
-  function formatCurrencyValue(value) {
-    if (value === null || value === undefined || value === "") {
-      return "-";
-    }
-
-    const numericValue = Number(value);
-    return Number.isFinite(numericValue)
-      ? `¥${numericValue.toLocaleString()}`
-      : "-";
-  }
-
-  function getProductStatusMeta(product) {
-    if (!product || product.stockQuantity === 0) {
-      return {
-        label: "缺货",
-        className: "bg-red-100 text-red-800",
-      };
-    }
-
-    if (product.stockQuantity < product.minStock) {
-      return {
-        label: "库存不足",
-        className: "bg-yellow-100 text-yellow-800",
-      };
-    }
-
-    if (product.stockQuantity > product.maxStock) {
-      return {
-        label: "库存过剩",
-        className: "bg-blue-100 text-blue-800",
-      };
-    }
-
-    return {
-      label: "正常",
-      className: "bg-green-100 text-green-800",
-    };
-  }
-
-  function countMatchingItems(list, predicate) {
-    if (!Array.isArray(list)) return 0;
-    return list.reduce((total, item) => total + (predicate(item) ? 1 : 0), 0);
-  }
-
-  async function requestDeleteConfirmation(
-    entityLabel,
-    recordName,
-    hints = [],
-  ) {
-    const content = [
-      `确定要删除“${recordName || "-"}”吗？删除后无法撤销。`,
-      ...hints.filter(Boolean),
-    ].join("\n");
-
-    if (typeof window.showAntdConfirm === "function") {
-      return window.showAntdConfirm({
-        title: `删除${entityLabel}`,
-        content,
-        okText: "删除",
-        cancelText: "取消",
-        okType: "danger",
-        centered: true,
-      });
-    }
-
-    return true;
-  }
-
-  async function persistMasterDataChanges() {
-    if (typeof saveMockData === "function") {
-      return Promise.resolve(saveMockData());
-    }
-
-    return true;
-  }
-
-  function getActiveStockTabName() {
-    return (
-      document.querySelector("#stock-tabs .active")?.getAttribute("data-tab") ||
-      "all"
+  const core = global.AppMasterDataCore;
+  if (!core) {
+    throw new Error(
+      "master-data-core.js must load before master-data-module.js",
     );
   }
 
-  function refreshInventoryDependencies() {
-    if (typeof updateInventoryTable === "function") {
-      updateInventoryTable();
-    }
-
-    if (typeof initInventoryFilters === "function") {
-      initInventoryFilters();
-    }
-  }
-
-  function refreshStockDependencies() {
-    if (typeof renderStockMovementTable === "function") {
-      renderStockMovementTable(getActiveStockTabName());
-    }
-
-    if (typeof renderDashboardActivity === "function") {
-      renderDashboardActivity();
-    }
-  }
-
-  function refreshBillDependencies() {
-    if (typeof renderBillPartyFilter === "function") {
-      renderBillPartyFilter();
-    }
-
-    if (typeof updateBillsTable === "function") {
-      updateBillsTable();
-    }
-  }
-
-  function updateCustomerReferenceIds(previousId, nextId) {
-    normalizeList(mockData.bills).forEach((record) => {
-      if (
-        record.statementType === "customer" &&
-        record.partyId === previousId
-      ) {
-        record.partyId = nextId;
-      }
-    });
-
-    normalizeList(mockData.deliveryNotes).forEach((note) => {
-      if (note.customerId === previousId) {
-        note.customerId = nextId;
-      }
-    });
-
-    normalizeList(stockMovementData).forEach((record) => {
-      if (record.customerId === previousId) {
-        record.customerId = nextId;
-      }
-    });
-  }
-
-  function configureReadonlyModal() {
-    const confirmBtn = document.getElementById("modal-confirm");
-    const cancelBtn = document.getElementById("modal-cancel");
-    const modalPanel = document.getElementById("modal-panel");
-    const modalContent = document.getElementById("modal-content");
-
-    if (modalPanel) {
-      modalPanel.className =
-        "bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4";
-    }
-
-    if (modalContent) {
-      modalContent.className = "p-3 md:p-4";
-    }
-
-    if (confirmBtn) {
-      confirmBtn.textContent = "关闭";
-    }
-
-    if (cancelBtn) {
-      cancelBtn.classList.add("hidden");
-    }
-  }
-
-  function getSafeDisplayValue(value) {
-    return escapeHTML(getStoredOptionalValue(value));
-  }
-
-  function buildReadonlySummaryCard(iconClass, title, subtitle, statusMeta) {
-    const safeTitle = getSafeDisplayValue(title);
-    const safeSubtitle = escapeHTML(normalizeTextValue(subtitle));
-    const safeStatusLabel = escapeHTML(statusMeta.label);
-
-    return `
-            <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="flex items-center min-w-0">
-                        <div class="flex-shrink-0 h-10 w-10 bg-white rounded-lg border border-gray-200 flex items-center justify-center">
-                            <i class="fa fa-${iconClass} text-gray-500 text-xl"></i>
-                        </div>
-                        <div class="ml-3 min-w-0">
-                            <div class="text-base font-semibold text-gray-900 truncate">${safeTitle}</div>
-                            <div class="text-xs text-gray-500">${safeSubtitle}</div>
-                        </div>
-                    </div>
-                    <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusMeta.className}">${safeStatusLabel}</span>
-                </div>
-            </div>
-        `;
-  }
-
-  function buildReadonlyFieldCard(label, valueMarkup, extraClasses = "") {
-    const safeLabel = escapeHTML(label);
-    const className = extraClasses ? ` ${extraClasses}` : "";
-
-    return `
-            <div class="rounded-lg border border-gray-200 p-3${className}">
-                <div class="text-xs text-gray-500 mb-1">${safeLabel}</div>
-                <div class="text-sm font-medium text-gray-900 break-words">${valueMarkup}</div>
-            </div>
-        `;
-  }
-
-  function buildEditableFieldCard(labelMarkup, fieldMarkup, extraClasses = "") {
-    const className = extraClasses ? ` ${extraClasses}` : "";
-
-    return `
-            <div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5${className}">
-                <label class="block text-xs font-semibold text-gray-500 mb-1.5">${labelMarkup}</label>
-                ${fieldMarkup}
-            </div>
-        `;
-  }
-
-  function buildFormIntroCard(iconClass, title, description) {
-    const safeTitle = escapeHTML(title);
-    const safeDescription = escapeHTML(description);
-
-    return `
-            <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
-                <div class="flex items-start gap-3">
-                    <div class="flex-shrink-0 h-10 w-10 rounded-xl bg-white border border-blue-100 flex items-center justify-center">
-                        <i class="fa fa-${iconClass} text-blue-600 text-lg"></i>
-                    </div>
-                    <div class="min-w-0">
-                        <div class="text-base font-semibold text-gray-900">${safeTitle}</div>
-                        <div class="text-sm text-gray-600 mt-0.5">${safeDescription}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-  }
-
-  function configureWideFormModal(confirmText = "保存") {
-    const confirmBtn = document.getElementById("modal-confirm");
-    const cancelBtn = document.getElementById("modal-cancel");
-    const modalPanel = document.getElementById("modal-panel");
-    const modalContent = document.getElementById("modal-content");
-
-    if (modalPanel) {
-      modalPanel.className =
-        "bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4";
-    }
-
-    if (modalContent) {
-      modalContent.className = "p-2.5 md:p-3";
-    }
-
-    if (confirmBtn) {
-      confirmBtn.textContent = confirmText;
-    }
-
-    if (cancelBtn) {
-      cancelBtn.classList.remove("hidden");
-      cancelBtn.textContent = "取消";
-    }
-  }
-
-  function getProductIcon(category) {
-    switch (category) {
-      case "电子产品":
-        return "mobile";
-      case "服装":
-        return "shopping-bag";
-      case "家具":
-        return "cube";
-      case "图书":
-        return "book";
-      default:
-        return "cube";
-    }
-  }
-
-  function showAddProductModal() {
-    const formContent = `
-            <form id="add-product-form" class="space-y-2.5">
-                ${buildFormIntroCard("cube", "新增商品", "填写基础信息后即可创建商品，系统会自动生成 SKU 并写入库存。")}
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
-                    ${buildEditableFieldCard(
-                      '商品名称 <span class="text-danger">*</span>',
-                      '<div id="modal-product-name-container" class="w-full"></div><input type="hidden" name="name" id="modal-product-name-input" required><input type="hidden" id="modal-product-choice-input">',
-                      "xl:col-span-2",
-                    )}
-                    ${buildEditableFieldCard(
-                      '分类 <span class="text-danger">*</span>',
-                      '<div id="modal-category-container" class="w-full"></div><input type="hidden" name="category" id="modal-category-input" required>',
-                    )}
-                    ${buildEditableFieldCard(
-                      '当前入库数量 <span class="text-danger">*</span>',
-                      '<input type="number" name="quantity" min="1" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
-                    )}
-                    ${buildEditableFieldCard(
-                      '成本单价 <span class="text-danger">*</span>',
-                      '<input type="number" name="costPrice" required min="0" step="0.01" class="w-full border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
-                    )}
-                    ${buildEditableFieldCard(
-                      '销售单价 <span class="text-danger">*</span>',
-                      '<input type="number" name="retailPrice" required min="0" step="0.01" class="w-full border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
-                    )}
-                    ${buildEditableFieldCard(
-                      '供应商 <span class="text-danger">*</span>',
-                      '<div id="modal-supplier-container" class="w-full"></div><input type="hidden" name="supplierId" id="modal-supplier-input" required>',
-                      "xl:col-span-2",
-                    )}
-                    ${buildEditableFieldCard(
-                      '单位 <span class="text-danger">*</span>',
-                      '<input type="text" name="unit" required placeholder="如：个、件、箱" class="w-full border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">',
-                    )}
-                    ${buildEditableFieldCard(
-                      "备注",
-                      '<textarea name="notes" rows="2" class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"></textarea>',
-                      "app-modal-wide-field",
-                    )}
-                </div>
-                <p class="text-xs text-gray-500">搜索到已有商品后，会自动带出分类、供应商、单位、成本单价和销售单价；新商品则按你当前填写的数据创建。</p>
-            </form>
-        `;
-
-    const productOptions = [...mockData.products]
-      .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
-      .map((product) => ({
-        value: product.id,
-        label: product.name,
-      }));
-    const categoryOptions = [
-      ...new Set(
-        PRODUCT_CATEGORIES.concat(
-          normalizeList(mockData.products)
-            .map((product) => String(product?.category || "").trim())
-            .filter(Boolean),
-        ),
-      ),
-    ].map((category) => ({
-      value: category,
-      label: category,
-    }));
-    const supplierOptions = mockData.suppliers.map((supplier) => ({
-      value: supplier.id,
-      label: supplier.name,
-    }));
-    let lastLoadedProductId = "";
-
-    showModal("新增商品", formContent, function onConfirm() {
-      const form = document.getElementById("add-product-form");
-      const formData = new FormData(form);
-
-      if (!formData.get("name")) {
-        alert("请输入商品名称");
-        return false;
-      }
-      if (!formData.get("category")) {
-        alert("请选择分类");
-        return false;
-      }
-      if (!formData.get("quantity")) {
-        alert("请输入数量");
-        return false;
-      }
-      if (!formData.get("costPrice")) {
-        alert("请输入成本单价");
-        return false;
-      }
-      if (!formData.get("retailPrice")) {
-        alert("请输入销售单价");
-        return false;
-      }
-      if (!formData.get("supplierId")) {
-        alert("请选择供应商");
-        return false;
-      }
-      if (!formData.get("unit")) {
-        alert("请输入单位");
-        return false;
-      }
-
-      const quantity = Number(formData.get("quantity"));
-      if (!Number.isInteger(quantity) || quantity <= 0) {
-        alert("请输入有效的数量");
-        return false;
-      }
-
-      const costPrice = Number(formData.get("costPrice"));
-      if (!Number.isFinite(costPrice) || costPrice < 0) {
-        alert("请输入有效的成本单价");
-        return false;
-      }
-
-      const retailPrice = Number(formData.get("retailPrice"));
-      if (!Number.isFinite(retailPrice) || retailPrice < 0) {
-        alert("请输入有效的销售单价");
-        return false;
-      }
-
-      const productData = {
-        name: normalizeTextValue(formData.get("name")),
-        category: normalizeTextValue(formData.get("category")),
-        unit: String(formData.get("unit") || "").trim(),
-        quantity,
-        costPrice,
-        retailPrice,
-        supplierId: normalizeTextValue(formData.get("supplierId")),
-        notes: formData.get("notes"),
-      };
-
-      addProduct(productData);
-    });
-
-    configureWideFormModal("创建");
-
-    const setHiddenValue = (inputId, value) => {
-      const input = document.getElementById(inputId);
-      if (input) {
-        input.value = value || "";
-      }
-    };
-
-    const setInputValue = (selector, value) => {
-      const input = document.querySelector(selector);
-      if (input) {
-        input.value = value ?? "";
-      }
-    };
-
-    const renderCategorySelect = (value = "") => {
-      renderAntdSelect(
-        "modal-category-container",
-        "modal-category-input",
-        categoryOptions,
-        {
-          placeholder: "请输入或搜索分类...",
-          mode: "tags",
-          controlSearchValue: true,
-          keepSearchTextOnBlur: true,
-          enableCreateOption: true,
-          createOptionLabel: (text) => `添加 ${text}`,
-          value: value || undefined,
-        },
-        (selectedValue) => {
-          setHiddenValue(
-            "modal-category-input",
-            String(selectedValue ?? "").trim(),
-          );
-        },
-      );
-      setHiddenValue("modal-category-input", value);
-    };
-
-    const renderSupplierSelect = (value = "") => {
-      renderAntdSelect(
-        "modal-supplier-container",
-        "modal-supplier-input",
-        supplierOptions,
-        {
-          placeholder: "请选择供应商",
-          value: value || undefined,
-        },
-      );
-      setHiddenValue("modal-supplier-input", value);
-    };
-
-    const clearAutofillFields = () => {
-      renderCategorySelect();
-      renderSupplierSelect();
-      setInputValue('#add-product-form input[name="unit"]', "");
-      setInputValue('#add-product-form input[name="costPrice"]', "");
-      setInputValue('#add-product-form input[name="retailPrice"]', "");
-    };
-
-    const applyProductDefaults = (product) => {
-      if (!product) return;
-      renderCategorySelect(product.category || "");
-      renderSupplierSelect(product.supplierId || "");
-      setInputValue('#add-product-form input[name="unit"]', product.unit || "");
-      setInputValue(
-        '#add-product-form input[name="costPrice"]',
-        product.costPrice ?? "",
-      );
-      setInputValue(
-        '#add-product-form input[name="retailPrice"]',
-        product.retailPrice ?? "",
-      );
-    };
-
-    renderAntdSelect(
-      "modal-product-name-container",
-      "modal-product-choice-input",
-      productOptions,
-      {
-        placeholder: "请输入或搜索商品名称...",
-        mode: "tags",
-        virtual: false,
-        popupClassName: "product-name-select-dropdown",
-        controlSearchValue: true,
-        keepSearchTextOnBlur: true,
-        enableCreateOption: true,
-        createOptionLabel: (text) => `添加 ${text}`,
-        listHeight: 160,
-        dropdownStyle: { maxHeight: 176, overflow: "hidden" },
-      },
-      (value) => {
-        const hiddenNameInput = document.getElementById(
-          "modal-product-name-input",
-        );
-        const selectedValue = String(value ?? "").trim();
-        const matchedProduct = mockData.products.find(
-          (item) => item.id === selectedValue,
-        );
-
-        if (!hiddenNameInput) return;
-
-        if (!selectedValue) {
-          hiddenNameInput.value = "";
-          lastLoadedProductId = "";
-          clearAutofillFields();
-          return;
-        }
-
-        if (matchedProduct) {
-          hiddenNameInput.value = matchedProduct.name || "";
-          lastLoadedProductId = matchedProduct.id;
-          applyProductDefaults(matchedProduct);
-          return;
-        }
-
-        hiddenNameInput.value = selectedValue;
-        if (lastLoadedProductId) {
-          clearAutofillFields();
-        }
-        lastLoadedProductId = "";
-      },
-    );
-
-    renderCategorySelect();
-    renderSupplierSelect();
-  }
-
-  function createProductInboundStockMovement(product, productData) {
-    const supplier = mockData.suppliers.find(
-      (item) => item.id === product.supplierId,
-    );
-    const now = new Date();
-
-    return {
-      id: createRuntimeId("SM"),
-      type: "inbound",
-      productId: product.id,
-      productName: product.name,
-      quantity: productData.quantity,
-      unit: product.unit || "",
-      supplierId: product.supplierId,
-      supplierName: supplier ? supplier.name : "-",
-      price: productData.costPrice,
-      priceType: "custom",
-      operator: currentUser.name,
-      remark: String(productData.notes || "").trim() || "-",
-      createdAt: now,
-      updatedAt: now,
-    };
-  }
-
-  function addProduct(productData) {
-    const existingProduct = mockData.products.find(
-      (product) =>
-        product.name === productData.name &&
-        product.supplierId === productData.supplierId,
-    );
-    let movementProduct = existingProduct;
-
-    if (existingProduct) {
-      const oldQuantity = existingProduct.stockQuantity;
-      existingProduct.stockQuantity += productData.quantity;
-      existingProduct.updatedAt = getLocalISOString();
-
-      alert(
-        `商品 "${productData.name}" 已存在，已将数量合并。当前库存：${existingProduct.stockQuantity}`,
-      );
-      addLog(
-        "edit",
-        "product",
-        productData.name,
-        `合并库存，原数量：${oldQuantity}，新增数量：${productData.quantity}，当前数量：${existingProduct.stockQuantity}`,
-      );
-    } else {
-      const newProduct = {
-        id: createSequentialId(mockData.products, "P"),
-        name: productData.name,
-        category: productData.category,
-        unit: productData.unit,
-        costPrice: productData.costPrice,
-        retailPrice: productData.retailPrice,
-        stockQuantity: productData.quantity,
-        minStock: 10,
-        maxStock: 100,
-        supplierId: productData.supplierId,
-        createdAt: getLocalISOString(),
-        updatedAt: getLocalISOString(),
-      };
-
-      mockData.products.push(newProduct);
-      movementProduct = newProduct;
-
-      alert(
-        `商品 "${productData.name}" 已成功添加，库存数量：${productData.quantity}`,
-      );
-      addLog(
-        "add",
-        "product",
-        productData.name,
-        `新增商品，数量：${productData.quantity}，成本单价：${productData.costPrice}`,
-      );
-    }
-
-    if (!Array.isArray(stockMovementData)) {
-      stockMovementData = [];
-    }
-    stockMovementData.unshift(
-      createProductInboundStockMovement(movementProduct, productData),
-    );
-
-    saveMockData();
-    updateInventoryTable();
-    refreshStockDependencies();
-  }
-
-  function showViewProductModal(productId) {
-    const product = mockData.products.find((item) => item.id === productId);
-    if (!product) {
-      alert("未找到对应的商品记录");
-      return;
-    }
-
-    const supplier = mockData.suppliers.find(
-      (item) => item.id === product.supplierId,
-    );
-    const statusMeta = getProductStatusMeta(product);
-    const stockValue =
-      (Number(product.costPrice) || 0) * (Number(product.stockQuantity) || 0);
-
-    const safeProductName = escapeHTML(product.name || "-");
-    const safeProductId = escapeHTML(product.id || "-");
-    const safeCategory = escapeHTML(product.category || "-");
-    const safeSupplierName = escapeHTML(supplier?.name || "未知供应商");
-    const safeUnit = escapeHTML(product.unit || "-");
-    const safeStatusLabel = escapeHTML(statusMeta.label);
-    const safeCreatedAt = escapeHTML(
-      formatDateTime(product.createdAt || new Date()),
-    );
-    const safeUpdatedAt = escapeHTML(
-      formatDateTime(product.updatedAt || new Date()),
-    );
-    const costPriceDisplay = escapeHTML(formatCurrencyValue(product.costPrice));
-    const retailPriceDisplay = escapeHTML(
-      formatCurrencyValue(product.retailPrice),
-    );
-    const stockValueDisplay = escapeHTML(formatCurrencyValue(stockValue));
-
-    const content = `
-            <div class="space-y-3">
-                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="flex items-center min-w-0">
-                            <div class="flex-shrink-0 h-10 w-10 bg-white rounded-lg border border-gray-200 flex items-center justify-center">
-                                <i class="fa fa-${getProductIcon(product.category)} text-gray-500 text-xl"></i>
-                            </div>
-                            <div class="ml-3 min-w-0">
-                                <div class="text-base font-semibold text-gray-900 truncate">${safeProductName}</div>
-                                <div class="text-xs text-gray-500">SKU: ${safeProductId}</div>
-                            </div>
-                        </div>
-                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusMeta.className}">${safeStatusLabel}</span>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                    <div class="rounded-lg border border-gray-200 p-3">
-                        <div class="text-xs text-gray-500 mb-1">商品分类</div>
-                        <div class="text-sm font-medium text-gray-900">${safeCategory}</div>
-                    </div>
-                    <div class="rounded-lg border border-gray-200 p-3">
-                        <div class="text-xs text-gray-500 mb-1">供应商</div>
-                        <div class="text-sm font-medium text-gray-900">${safeSupplierName}</div>
-                    </div>
-                    <div class="rounded-lg border border-gray-200 p-3">
-                        <div class="text-xs text-gray-500 mb-1">库存阈值</div>
-                        <div class="text-sm font-medium text-gray-900">最小 ${product.minStock} / 最大 ${product.maxStock}</div>
-                    </div>
-                    <div class="rounded-lg border border-gray-200 p-3">
-                        <div class="text-xs text-gray-500 mb-1">成本单价</div>
-                        <div class="text-sm font-medium text-gray-900">${costPriceDisplay}</div>
-                    </div>
-                    <div class="rounded-lg border border-gray-200 p-3">
-                        <div class="text-xs text-gray-500 mb-1">库存价值</div>
-                        <div class="text-sm font-semibold text-gray-900">${stockValueDisplay}</div>
-                    </div>
-                    <div class="rounded-lg border border-gray-200 p-3">
-                        <div class="text-xs text-gray-500 mb-1">销售单价</div>
-                        <div class="text-sm font-medium text-gray-900">${retailPriceDisplay}</div>
-                    </div>
-                    <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 lg:col-span-3 shadow-sm ring-1 ring-blue-100">
-                        <div class="text-sm font-extrabold text-blue-700 mb-1">当前库存</div>
-                        <div class="text-2xl font-bold text-blue-900 leading-none">${product.stockQuantity}<span class="ml-1 text-base font-semibold">${safeUnit}</span></div>
-                    </div>
-                </div>
-                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">编号</div>
-                            <div class="font-medium text-gray-800">${safeProductId}</div>
-                        </div>
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">创建时间</div>
-                            <div class="font-medium text-gray-800">${safeCreatedAt}</div>
-                        </div>
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">更新时间</div>
-                            <div class="font-medium text-gray-800">${safeUpdatedAt}</div>
-                        </div>
-                    </div>
-                </div>
-                <p class="text-xs text-gray-500">当前窗口为只读详情，仅用于查看商品库存信息。</p>
-            </div>
-        `;
-
-    showModal("查看商品详情", content);
-    configureReadonlyModal();
+  const {
+    DOMESTIC_PHONE_REGEX,
+    PAYMENT_OPTIONS,
+    formatDateTime,
+    normalizeTextValue,
+    getEditableFieldValue,
+    getStoredOptionalValue,
+    getStatusMeta,
+    buildRecordInfoCard,
+    ensureUniqueName,
+    ensureUniqueRecordId,
+    renderStatusSelect,
+    renderPaymentTermsSelect,
+    countMatchingItems,
+    requestDeleteConfirmation,
+    createMasterDataSnapshot,
+    persistMasterDataChanges,
+    refreshInventoryDependencies,
+    refreshStockDependencies,
+    refreshBillDependencies,
+    updateCustomerReferenceIds,
+    configureReadonlyModal,
+    getSafeDisplayValue,
+    buildReadonlySummaryCard,
+    buildReadonlyFieldCard,
+    buildEditableFieldCard,
+    buildFormIntroCard,
+    configureWideFormModal,
+  } = core;
+
+  function showBusinessEditor(title, content, onConfirm) {
+    const open = global.showBusinessFormPage || global.showModal;
+    return open?.(title, content, onConfirm);
   }
 
   function showViewCompanyModal(companyId) {
@@ -946,6 +129,8 @@
                     ${buildReadonlyFieldCard("联系电话", getSafeDisplayValue(customer.contactPhone))}
                     ${buildReadonlyFieldCard("电子邮箱", getSafeDisplayValue(customer.email))}
                     ${buildReadonlyFieldCard("付款条件", getSafeDisplayValue(customer.paymentTerms))}
+                    ${buildReadonlyFieldCard("默认税点", `${(Number(customer.defaultTaxRate || 0) * 100).toFixed(2).replace(/\.00$/, "")}%`)}
+                    ${buildReadonlyFieldCard("价格类型", customer.priceTaxMode === "inclusive" ? "含税价" : "未税价")}
                     ${buildReadonlyFieldCard("状态", statusBadge)}
                     ${buildReadonlyFieldCard("客户地址", getSafeDisplayValue(customer.address), "md:col-span-2")}
                 </div>
@@ -992,25 +177,27 @@
       }
 
       const previousId = customer.id;
+      const snapshot = createMasterDataSnapshot();
       customer.id = nextId;
       customer.updatedAt = getLocalISOString();
       updateCustomerReferenceIds(previousId, nextId);
 
-      await persistMasterDataChanges();
-      if (typeof addLog === "function") {
-        addLog(
-          "edit",
-          "customer",
-          customer.name,
-          `修改客户编号：${previousId} -> ${nextId}`,
-        );
+      const persisted = await persistMasterDataChanges(snapshot, "客户编号", {
+        actionType: "edit",
+        objectType: "customer",
+        objectName: customer.name,
+        details: `修改客户编号：${previousId} -> ${nextId}`,
+      });
+      if (!persisted) {
+        input.value = previousId;
+        return false;
       }
-
       updateCustomerTable();
       refreshBillDependencies();
       refreshStockDependencies();
       alert("客户编号已更新");
       showViewCustomerModal(nextId);
+      return true;
     };
 
     button.addEventListener("click", () => {
@@ -1022,223 +209,6 @@
         saveCustomerId();
       }
     });
-  }
-
-  function updateInventoryTable() {
-    const tbody = document.getElementById("inventory-table-body");
-    if (!tbody) return;
-
-    const companyFilterEl = document.getElementById("filter-company");
-    const companyFilter = companyFilterEl ? companyFilterEl.value : "";
-
-    const statusFilterEl = document.getElementById("filter-status");
-    const statusFilter = statusFilterEl ? statusFilterEl.value : "";
-
-    const supplierFilterEl = document.getElementById("filter-supplier");
-    const supplierFilter = supplierFilterEl ? supplierFilterEl.value : "";
-
-    const searchFilterEl = document.getElementById("filter-search");
-    const searchFilter = searchFilterEl
-      ? searchFilterEl.value.toLowerCase()
-      : "";
-
-    tbody.innerHTML = "";
-
-    let filteredProducts = mockData.products;
-    filteredProducts.sort(
-      (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt),
-    );
-
-    if (companyFilter) {
-      // 当前商品数据模型没有 company 字段，先保留筛选占位。
-    }
-
-    if (statusFilter) {
-      filteredProducts = filteredProducts.filter((product) => {
-        if (statusFilter === "normal")
-          return (
-            product.stockQuantity >= product.minStock &&
-            product.stockQuantity <= product.maxStock &&
-            product.stockQuantity > 0
-          );
-        if (statusFilter === "low")
-          return (
-            product.stockQuantity < product.minStock &&
-            product.stockQuantity > 0
-          );
-        if (statusFilter === "overstock")
-          return product.stockQuantity > product.maxStock;
-        if (statusFilter === "out") return product.stockQuantity === 0;
-        return true;
-      });
-    }
-
-    if (supplierFilter) {
-      filteredProducts = filteredProducts.filter(
-        (product) => product.supplierId === supplierFilter,
-      );
-    }
-
-    if (searchFilter) {
-      filteredProducts = filteredProducts.filter(
-        (product) =>
-          product.name.toLowerCase().includes(searchFilter) ||
-          product.id.toLowerCase().includes(searchFilter),
-      );
-    }
-
-    paginationState.inventory.total = filteredProducts.length;
-    let { page, pageSize } = paginationState.inventory;
-
-    const totalPages = Math.ceil(filteredProducts.length / pageSize);
-    if (page > totalPages && totalPages > 0) {
-      paginationState.inventory.page = totalPages;
-      page = totalPages;
-    }
-
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
-
-    if (paginatedProducts.length === 0) {
-      renderAntdEmptyTableRow(tbody, 7, "没有找到匹配的商品");
-      renderPaginationControl(
-        "inventory-pagination-container",
-        "inventory",
-        updateInventoryTable,
-      );
-      return;
-    }
-
-    paginatedProducts.forEach((product) => {
-      const supplier = mockData.suppliers.find(
-        (item) => item.id === product.supplierId,
-      );
-      const supplierName = supplier ? supplier.name : "未知供应商";
-
-      const safeProductName = escapeHTML(product.name || "-");
-      const safeProductId = escapeHTML(product.id || "-");
-      const safeProductCategory = escapeHTML(product.category || "-");
-      const safeSupplierName = escapeHTML(supplierName);
-
-      const statusMeta = getProductStatusMeta(product);
-
-      const formattedCreatedAt = formatDateTime(
-        product.createdAt || new Date(),
-      );
-      const formattedUpdatedAt = formatDateTime(
-        product.updatedAt || new Date(),
-      );
-
-      const row = document.createElement("tr");
-      row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap overflow-hidden">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-md flex items-center justify-center">
-                            <i class="fa fa-${getProductIcon(product.category)} text-gray-500 text-xl"></i>
-                        </div>
-                        <div class="ml-4 overflow-hidden">
-                            <div class="text-sm font-medium text-gray-900 truncate" title="${safeProductName}">${safeProductName}</div>
-                            <div class="text-sm text-gray-500 truncate">SKU: ${safeProductId}</div>
-                        </div>
-                    </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate" title="${safeProductCategory}">${safeProductCategory}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-left">${product.stockQuantity}</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusMeta.className}">${statusMeta.label}</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate" title="${safeSupplierName}">${safeSupplierName}</td>
-                <td class="px-6 py-4 text-sm text-gray-500 align-top min-w-[340px]">
-                    <div class="space-y-1">
-                        <div class="flex items-center">
-                            <span class="text-xs text-gray-500 mr-2 w-16 text-left flex-shrink-0">创建时间:</span>
-                            <span class="flex items-center overflow-hidden">
-                                <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2 flex-shrink-0">${getInitial(currentUser.name)}</span>
-                                <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full truncate">${formattedCreatedAt}</span>
-                            </span>
-                        </div>
-                        <div class="flex items-center">
-                            <span class="text-xs text-gray-500 mr-2 w-16 text-left flex-shrink-0">更新时间:</span>
-                            <span class="flex items-center overflow-hidden">
-                                <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2 flex-shrink-0">${getInitial(currentUser.name)}</span>
-                                <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full truncate">${formattedUpdatedAt}</span>
-                            </span>
-                        </div>
-                    </div>
-                </td>
-                <td class="px-6 py-4 text-sm font-medium text-left align-middle min-w-[190px]">
-                    <div class="flex items-center justify-start gap-4 whitespace-nowrap">
-                        <button type="button" class="inline-flex items-center justify-center text-blue-600 hover:text-blue-900" data-action="view">查看</button>
-                        <a href="#" class="inline-flex items-center justify-center text-primary hover:text-primary-dark">编辑</a>
-                        <button type="button" class="inline-flex items-center justify-center text-danger hover:text-danger-dark" data-action="delete">删除</button>
-                    </div>
-                </td>
-            `;
-
-      const viewButton = row.querySelector('[data-action="view"]');
-      const deleteButton = row.querySelector('[data-action="delete"]');
-      if (viewButton) {
-        viewButton.addEventListener("click", () =>
-          showViewProductModal(product.id),
-        );
-      }
-      if (deleteButton) {
-        deleteButton.addEventListener("click", () => deleteProduct(product.id));
-      }
-
-      tbody.appendChild(row);
-    });
-
-    renderPaginationControl(
-      "inventory-pagination-container",
-      "inventory",
-      updateInventoryTable,
-    );
-  }
-
-  async function deleteProduct(productId) {
-    const productIndex = mockData.products.findIndex(
-      (item) => item.id === productId,
-    );
-    if (productIndex === -1) {
-      alert("未找到对应的商品记录");
-      return false;
-    }
-
-    const product = mockData.products[productIndex];
-    const relatedStockCount = countMatchingItems(
-      stockMovementData,
-      (item) => item.productId === productId,
-    );
-    const relatedDeliveryCount = countMatchingItems(
-      mockData.deliveryNotes,
-      (note) =>
-        Array.isArray(note?.details) &&
-        note.details.some((detail) => detail.productId === productId),
-    );
-
-    const ok = await requestDeleteConfirmation("商品", product.name, [
-      relatedStockCount > 0
-        ? `已有 ${relatedStockCount} 条库存流水会保留这件商品的历史快照。`
-        : "",
-      relatedDeliveryCount > 0
-        ? `已有 ${relatedDeliveryCount} 张送货单会保留这件商品的历史快照。`
-        : "",
-    ]);
-    if (!ok) return false;
-
-    mockData.products.splice(productIndex, 1);
-    await persistMasterDataChanges();
-
-    if (typeof addLog === "function") {
-      addLog("delete", "product", product.name, "删除商品");
-    }
-
-    refreshInventoryDependencies();
-    refreshStockDependencies();
-    alert("商品已删除");
-    return true;
   }
 
   async function deleteCompany(companyId) {
@@ -1259,27 +229,49 @@
       mockData.deliveryNotes,
       (note) => note.companyId === companyId,
     );
+    const relatedStockCount = countMatchingItems(
+      stockMovementData,
+      (item) => item.companyId === companyId,
+    );
+    const hasReferences =
+      relatedBillCount + relatedDeliveryCount + relatedStockCount > 0;
 
-    const ok = await requestDeleteConfirmation("公司", company.name, [
-      relatedBillCount > 0
-        ? `已有 ${relatedBillCount} 张对账单会保留这家公司的历史快照。`
-        : "",
-      relatedDeliveryCount > 0
-        ? `已有 ${relatedDeliveryCount} 张送货单会保留这家公司的历史快照。`
-        : "",
-    ]);
+    const ok = await requestDeleteConfirmation(
+      "公司",
+      company.name,
+      [
+        relatedBillCount > 0
+          ? `已有 ${relatedBillCount} 张对账单会保留这家公司的历史快照。`
+          : "",
+        relatedDeliveryCount > 0
+          ? `已有 ${relatedDeliveryCount} 张送货单会保留这家公司的历史快照。`
+          : "",
+        relatedStockCount > 0
+          ? `已有 ${relatedStockCount} 条库存流水引用了这家公司。`
+          : "",
+      ],
+      hasReferences ? "deactivate" : "delete",
+    );
     if (!ok) return false;
 
-    mockData.companies.splice(companyIndex, 1);
-    await persistMasterDataChanges();
-
-    if (typeof addLog === "function") {
-      addLog("delete", "company", company.name, "删除公司");
+    const snapshot = createMasterDataSnapshot();
+    if (hasReferences) {
+      company.status = "inactive";
+      company.updatedAt = getLocalISOString();
+    } else {
+      mockData.companies.splice(companyIndex, 1);
     }
+    const persisted = await persistMasterDataChanges(snapshot, "公司", {
+      actionType: hasReferences ? "edit" : "delete",
+      objectType: "company",
+      objectName: company.name,
+      details: hasReferences ? "停用公司" : "删除公司",
+    });
+    if (!persisted) return false;
 
     updateCompanyTable();
     refreshInventoryDependencies();
-    alert("公司已删除");
+    alert(hasReferences ? "公司已停用，历史业务数据保持不变" : "公司已删除");
     return true;
   }
 
@@ -1310,35 +302,56 @@
       stockMovementData,
       (item) => item.supplierId === supplierId,
     );
+    const hasReferences =
+      relatedProductCount +
+        relatedBillCount +
+        relatedDeliveryCount +
+        relatedStockCount >
+      0;
 
-    const ok = await requestDeleteConfirmation("供应商", supplier.name, [
-      relatedProductCount > 0
-        ? `删除后，${relatedProductCount} 个商品会显示为“未知供应商”。`
-        : "",
-      relatedBillCount > 0
-        ? `已有 ${relatedBillCount} 张对账单会保留这家供应商的历史快照。`
-        : "",
-      relatedDeliveryCount > 0
-        ? `已有 ${relatedDeliveryCount} 张送货单会保留这家供应商的历史快照。`
-        : "",
-      relatedStockCount > 0
-        ? `已有 ${relatedStockCount} 条库存流水会保留这家供应商的历史快照。`
-        : "",
-    ]);
+    const ok = await requestDeleteConfirmation(
+      "供应商",
+      supplier.name,
+      [
+        relatedProductCount > 0
+          ? `已有 ${relatedProductCount} 个商品关联了这家供应商。`
+          : "",
+        relatedBillCount > 0
+          ? `已有 ${relatedBillCount} 张对账单会保留这家供应商的历史快照。`
+          : "",
+        relatedDeliveryCount > 0
+          ? `已有 ${relatedDeliveryCount} 张送货单会保留这家供应商的历史快照。`
+          : "",
+        relatedStockCount > 0
+          ? `已有 ${relatedStockCount} 条库存流水会保留这家供应商的历史快照。`
+          : "",
+      ],
+      hasReferences ? "deactivate" : "delete",
+    );
     if (!ok) return false;
 
-    mockData.suppliers.splice(supplierIndex, 1);
-    await persistMasterDataChanges();
-
-    if (typeof addLog === "function") {
-      addLog("delete", "supplier", supplier.name, "删除供应商");
+    const snapshot = createMasterDataSnapshot();
+    if (hasReferences) {
+      supplier.status = "inactive";
+      supplier.updatedAt = getLocalISOString();
+    } else {
+      mockData.suppliers.splice(supplierIndex, 1);
     }
+    const persisted = await persistMasterDataChanges(snapshot, "供应商", {
+      actionType: hasReferences ? "edit" : "delete",
+      objectType: "supplier",
+      objectName: supplier.name,
+      details: hasReferences ? "停用供应商" : "删除供应商",
+    });
+    if (!persisted) return false;
 
     updateSupplierTable();
     refreshInventoryDependencies();
     refreshBillDependencies();
     refreshStockDependencies();
-    alert("供应商已删除");
+    alert(
+      hasReferences ? "供应商已停用，历史业务数据保持不变" : "供应商已删除",
+    );
     return true;
   }
 
@@ -1365,31 +378,57 @@
       stockMovementData,
       (item) => item.customerId === customerId,
     );
+    const relatedPriceCount = countMatchingItems(
+      mockData.customerProductPrices,
+      (item) => item.customerId === customerId,
+    );
+    const hasReferences =
+      relatedBillCount +
+        relatedDeliveryCount +
+        relatedStockCount +
+        relatedPriceCount >
+      0;
 
-    const ok = await requestDeleteConfirmation("客户", customer.name, [
-      relatedBillCount > 0
-        ? `已有 ${relatedBillCount} 张对账单会保留这位客户的历史快照。`
-        : "",
-      relatedDeliveryCount > 0
-        ? `已有 ${relatedDeliveryCount} 张送货单会保留这位客户的历史快照。`
-        : "",
-      relatedStockCount > 0
-        ? `已有 ${relatedStockCount} 条库存流水会保留这位客户的历史快照。`
-        : "",
-    ]);
+    const ok = await requestDeleteConfirmation(
+      "客户",
+      customer.name,
+      [
+        relatedBillCount > 0
+          ? `已有 ${relatedBillCount} 张对账单会保留这位客户的历史快照。`
+          : "",
+        relatedDeliveryCount > 0
+          ? `已有 ${relatedDeliveryCount} 张送货单会保留这位客户的历史快照。`
+          : "",
+        relatedStockCount > 0
+          ? `已有 ${relatedStockCount} 条库存流水会保留这位客户的历史快照。`
+          : "",
+        relatedPriceCount > 0
+          ? `已有 ${relatedPriceCount} 条客户商品价目记录会继续保留。`
+          : "",
+      ],
+      hasReferences ? "deactivate" : "delete",
+    );
     if (!ok) return false;
 
-    mockData.customers.splice(customerIndex, 1);
-    await persistMasterDataChanges();
-
-    if (typeof addLog === "function") {
-      addLog("delete", "customer", customer.name, "删除客户");
+    const snapshot = createMasterDataSnapshot();
+    if (hasReferences) {
+      customer.status = "inactive";
+      customer.updatedAt = getLocalISOString();
+    } else {
+      mockData.customers.splice(customerIndex, 1);
     }
+    const persisted = await persistMasterDataChanges(snapshot, "客户", {
+      actionType: hasReferences ? "edit" : "delete",
+      objectType: "customer",
+      objectName: customer.name,
+      details: hasReferences ? "停用客户" : "删除客户",
+    });
+    if (!persisted) return false;
 
     updateCustomerTable();
     refreshBillDependencies();
     refreshStockDependencies();
-    alert("客户已删除");
+    alert(hasReferences ? "客户已停用，历史业务数据保持不变" : "客户已删除");
     return true;
   }
 
@@ -1425,7 +464,7 @@
             </form>
         `;
 
-    showModal("新增公司", content, function onConfirm() {
+    showBusinessEditor("新增公司", content, async function onConfirm() {
       const form = document.getElementById("add-company-form");
       const formData = new FormData(form);
       const name = formData.get("name").trim();
@@ -1467,9 +506,15 @@
         updatedAt: getLocalISOString(),
       };
 
+      const snapshot = createMasterDataSnapshot();
       mockData.companies.push(newCompany);
-      saveMockData();
-      addLog("add", "company", name, `新增公司，联系人：${contactPerson}`);
+      const persisted = await persistMasterDataChanges(snapshot, "公司", {
+        actionType: "add",
+        objectType: "company",
+        objectName: name,
+        details: `新增公司，联系人：${contactPerson}`,
+      });
+      if (!persisted) return false;
       updateCompanyTable();
       alert("公司添加成功");
       return true;
@@ -1528,7 +573,7 @@
             </form>
         `;
 
-    showModal("编辑公司", content, function onConfirm() {
+    showBusinessEditor("编辑公司", content, async function onConfirm() {
       const form = document.getElementById("edit-company-form");
       if (!form.reportValidity()) return false;
 
@@ -1566,6 +611,7 @@
         return false;
       }
 
+      const snapshot = createMasterDataSnapshot();
       Object.assign(company, {
         name,
         contactPerson,
@@ -1575,8 +621,13 @@
         updatedAt: getLocalISOString(),
       });
 
-      saveMockData();
-      addLog("edit", "company", name, `编辑公司信息，联系人：${contactPerson}`);
+      const persisted = await persistMasterDataChanges(snapshot, "公司", {
+        actionType: "edit",
+        objectType: "company",
+        objectName: name,
+        details: `编辑公司信息，联系人：${contactPerson}`,
+      });
+      if (!persisted) return false;
       updateCompanyTable();
       alert("公司信息已更新");
       return true;
@@ -1596,7 +647,8 @@
     tbody.innerHTML = "";
 
     const sortedCompanies = [...mockData.companies].sort(
-      (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt),
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
 
     paginationState.companies.total = sortedCompanies.length;
@@ -1634,26 +686,26 @@
 
       const row = document.createElement("tr");
       row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">${safeCompanyName}</div>
+                <td class="px-6 py-4 align-middle">
+                    <div class="table-long-text company-cell-wrap text-sm font-medium text-gray-900" title="${safeCompanyName}">${safeCompanyName}</div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeContactPerson}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeContactPhone}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeAddress}</td>
-                <td class="px-6 py-4 whitespace-nowrap">
+                <td class="px-6 py-4 align-middle whitespace-nowrap text-sm text-gray-500">${safeContactPerson}</td>
+                <td class="px-6 py-4 align-middle whitespace-nowrap text-sm text-gray-500">${safeContactPhone}</td>
+                <td class="px-6 py-4 align-middle text-sm text-gray-500"><div class="table-long-text company-cell-wrap" title="${safeAddress}">${safeAddress}</div></td>
+                <td class="px-6 py-4 align-middle whitespace-nowrap">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusMeta.className}">${safeStatusLabel}</span>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                <td class="px-6 py-4 align-middle text-sm text-gray-500 whitespace-nowrap">
                     <div class="space-y-1">
                         <div class="flex items-center">
-                            <span class="text-xs text-gray-500 mr-2 whitespace-nowrap">创建时间:</span>
+                            <span class="text-xs text-gray-500 whitespace-nowrap">创建时间:</span>
                             <span class="flex items-center whitespace-nowrap">
                                 <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
                                 <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedCreatedAt}</span>
                             </span>
                         </div>
                         <div class="flex items-center">
-                            <span class="text-xs text-gray-500 mr-2 whitespace-nowrap">更新时间:</span>
+                            <span class="text-xs text-gray-500 whitespace-nowrap">更新时间:</span>
                             <span class="flex items-center whitespace-nowrap">
                                 <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${getInitial(currentUser.name)}</span>
                                 <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formattedUpdatedAt}</span>
@@ -1661,10 +713,12 @@
                         </div>
                     </div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button type="button" class="text-blue-600 hover:text-blue-900 mr-3" data-action="view">查看</button>
-                    <button type="button" class="text-primary hover:text-primary-dark mr-3" data-action="edit">编辑</button>
-                    <button type="button" class="text-danger hover:text-danger-dark" data-action="delete">删除</button>
+                <td class="table-action-cell px-6 py-4 align-middle whitespace-nowrap text-left text-sm font-medium">
+                    <div class="table-action-links">
+                        <button type="button" class="text-blue-600 hover:text-blue-900" data-action="view">查看</button>
+                        <button type="button" class="text-primary hover:text-primary-dark" data-action="edit">编辑</button>
+                        <button type="button" class="text-danger hover:text-danger-dark" data-action="delete">删除</button>
+                    </div>
                 </td>
             `;
       const viewButton = row.querySelector('[data-action="view"]');
@@ -1725,7 +779,7 @@
             </form>
         `;
 
-    showModal("新增供应商", content, function onConfirm() {
+    showBusinessEditor("新增供应商", content, async function onConfirm() {
       const form = document.getElementById("add-supplier-form");
       const formData = new FormData(form);
       const name = formData.get("name").trim();
@@ -1767,9 +821,15 @@
         updatedAt: getLocalISOString(),
       };
 
+      const snapshot = createMasterDataSnapshot();
       mockData.suppliers.push(newSupplier);
-      saveMockData();
-      addLog("add", "supplier", name, `新增供应商，联系人：${contactPerson}`);
+      const persisted = await persistMasterDataChanges(snapshot, "供应商", {
+        actionType: "add",
+        objectType: "supplier",
+        objectName: name,
+        details: `新增供应商，联系人：${contactPerson}`,
+      });
+      if (!persisted) return false;
       updateSupplierTable();
       alert("供应商添加成功");
       return true;
@@ -1842,7 +902,7 @@
             </form>
         `;
 
-    showModal("编辑供应商", content, function onConfirm() {
+    showBusinessEditor("编辑供应商", content, async function onConfirm() {
       const form = document.getElementById("edit-supplier-form");
       if (!form.reportValidity()) return false;
 
@@ -1879,6 +939,7 @@
         return false;
       }
 
+      const snapshot = createMasterDataSnapshot();
       Object.assign(supplier, {
         name,
         contactPerson,
@@ -1892,13 +953,13 @@
         updatedAt: getLocalISOString(),
       });
 
-      saveMockData();
-      addLog(
-        "edit",
-        "supplier",
-        name,
-        `编辑供应商信息，联系人：${contactPerson}`,
-      );
+      const persisted = await persistMasterDataChanges(snapshot, "供应商", {
+        actionType: "edit",
+        objectType: "supplier",
+        objectName: name,
+        details: `编辑供应商信息，联系人：${contactPerson}`,
+      });
+      if (!persisted) return false;
       updateSupplierTable();
       alert("供应商信息已更新");
       return true;
@@ -1924,9 +985,7 @@
     const choiceContainer = document.getElementById(
       `${prefix}-choice-container`,
     );
-    const choiceInput = document.getElementById(
-      `${prefix}-choice-input`,
-    );
+    const choiceInput = document.getElementById(`${prefix}-choice-input`);
     const wrap = document.getElementById(`${prefix}-wrap`);
     const input = document.getElementById(`${prefix}-input`);
     if (!form || !choiceContainer || !choiceInput || !wrap || !input) return;
@@ -1972,15 +1031,11 @@
     }
 
     if (typeof renderAntdInput === "function") {
-      renderAntdInput(
-        `${prefix}-input-container`,
-        `${prefix}-input`,
-        {
-          placeholder: "请输入税率系数",
-          inputMode: "decimal",
-          defaultValue: initialCoefficient,
-        },
-      );
+      renderAntdInput(`${prefix}-input-container`, `${prefix}-input`, {
+        placeholder: "请输入税点，例如 7",
+        inputMode: "decimal",
+        defaultValue: initialCoefficient,
+      });
     }
 
     choiceInput.addEventListener("change", syncVisibility);
@@ -2009,7 +1064,7 @@
                       '<input type="tel" name="contactPhone" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入国内手机号或座机号">',
                     )}
                     ${buildEditableFieldCard(
-                      '税率系数 <span class="text-danger">*</span>',
+                      '默认税点 <span class="text-danger">*</span>',
                       `<div class="flex min-h-[40px] flex-col gap-2 sm:flex-row sm:items-center">
                           <div id="add-customer-tax-rate-choice-container" class="shrink-0"></div>
                           <input type="hidden" name="hasTaxRate" id="add-customer-tax-rate-choice-input" required>
@@ -2019,6 +1074,13 @@
                           </div>
                       </div>`,
                       "app-modal-two-thirds-row",
+                    )}
+                    ${buildEditableFieldCard(
+                      '价格类型 <span class="text-danger">*</span>',
+                      `<select name="priceTaxMode" required class="w-full border border-gray-300 rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                          <option value="exclusive" selected>未税价</option>
+                          <option value="inclusive">含税价</option>
+                      </select>`,
                     )}
                     ${buildEditableFieldCard(
                       '客户地址 <span class="text-danger">*</span>',
@@ -2035,7 +1097,7 @@
             </form>
         `;
 
-    showModal("新增客户", content, function onConfirm() {
+    showBusinessEditor("新增客户", content, async function onConfirm() {
       const form = document.getElementById("add-customer-form");
       const formData = new FormData(form);
 
@@ -2051,7 +1113,9 @@
       const paymentTerms = document.getElementById(
         "add-customer-payment-input",
       ).value;
+      const priceTaxMode = normalizeTextValue(formData.get("priceTaxMode"));
       let taxRateCoefficient = null;
+      let defaultTaxRate = 0;
 
       if (!id) {
         alert("请输入客户编号");
@@ -2078,20 +1142,22 @@
         return false;
       }
       if (!hasTaxRate) {
-        alert("请选择是否有税率系数");
+        alert("请选择是否有税点");
         return false;
       }
       if (hasTaxRate === "yes") {
         if (!taxRateCoefficientText) {
-          alert("请输入税率系数");
+          alert("请输入税点，例如 7");
           return false;
         }
 
-        taxRateCoefficient = Number(taxRateCoefficientText);
-        if (!Number.isFinite(taxRateCoefficient) || taxRateCoefficient <= 0) {
-          alert("请输入有效的税率系数");
+        const taxPoint = Number(taxRateCoefficientText);
+        if (!Number.isFinite(taxPoint) || taxPoint <= 0 || taxPoint > 100) {
+          alert("税点必须大于 0 且不超过 100");
           return false;
         }
+        defaultTaxRate = taxPoint / 100;
+        taxRateCoefficient = 1 + defaultTaxRate;
       }
       if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
         alert("请输入有效的国内联系电话（手机号或座机号）");
@@ -2111,15 +1177,23 @@
         paymentTerms,
         hasTaxRate: hasTaxRate === "yes",
         taxRateCoefficient,
+        defaultTaxRate,
+        priceTaxMode: priceTaxMode === "inclusive" ? "inclusive" : "exclusive",
         creditLimit: 0,
         status: "active",
         createdAt: getLocalISOString(),
         updatedAt: getLocalISOString(),
       };
 
+      const snapshot = createMasterDataSnapshot();
       mockData.customers.push(newCustomer);
-      saveMockData();
-      addLog("add", "customer", name, `新增客户，联系人：${contactPerson}`);
+      const persisted = await persistMasterDataChanges(snapshot, "客户", {
+        actionType: "add",
+        objectType: "customer",
+        objectName: name,
+        details: `新增客户，联系人：${contactPerson}`,
+      });
+      if (!persisted) return false;
       updateCustomerTable();
 
       alert("客户添加成功");
@@ -2175,7 +1249,7 @@
                       `<input type="tel" name="contactPhone" required value="${contactPhoneValue}" placeholder="请输入国内手机号或座机号" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">`,
                     )}
                     ${buildEditableFieldCard(
-                      '税率系数 <span class="text-danger">*</span>',
+                      '默认税点 <span class="text-danger">*</span>',
                       `<div class="flex min-h-[40px] flex-col gap-2 sm:flex-row sm:items-center">
                           <div id="edit-customer-tax-rate-choice-container" class="shrink-0"></div>
                           <input type="hidden" name="hasTaxRate" id="edit-customer-tax-rate-choice-input" required>
@@ -2184,6 +1258,13 @@
                               <input type="hidden" name="taxRateCoefficient" id="edit-customer-tax-rate-input">
                           </div>
                       </div>`,
+                    )}
+                    ${buildEditableFieldCard(
+                      '价格类型 <span class="text-danger">*</span>',
+                      `<select name="priceTaxMode" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                          <option value="exclusive" ${customer.priceTaxMode !== "inclusive" ? "selected" : ""}>未税价</option>
+                          <option value="inclusive" ${customer.priceTaxMode === "inclusive" ? "selected" : ""}>含税价</option>
+                      </select>`,
                     )}
                     ${buildEditableFieldCard(
                       '付款条件 <span class="text-danger">*</span>',
@@ -2203,7 +1284,7 @@
             </form>
         `;
 
-    showModal("编辑客户", content, function onConfirm() {
+    showBusinessEditor("编辑客户", content, async function onConfirm() {
       const form = document.getElementById("edit-customer-form");
       if (!form.reportValidity()) return false;
 
@@ -2219,7 +1300,9 @@
       const paymentTerms = normalizeTextValue(
         document.getElementById("edit-customer-payment-input").value,
       );
+      const priceTaxMode = normalizeTextValue(formData.get("priceTaxMode"));
       let taxRateCoefficient = null;
+      let defaultTaxRate = 0;
       const status =
         normalizeTextValue(
           document.getElementById("edit-customer-status-input").value,
@@ -2246,20 +1329,22 @@
         return false;
       }
       if (!hasTaxRate) {
-        alert("请选择是否有税率系数");
+        alert("请选择是否有税点");
         return false;
       }
       if (hasTaxRate === "yes") {
         if (!taxRateCoefficientText) {
-          alert("请输入税率系数");
+          alert("请输入税点，例如 7");
           return false;
         }
 
-        taxRateCoefficient = Number(taxRateCoefficientText);
-        if (!Number.isFinite(taxRateCoefficient) || taxRateCoefficient <= 0) {
-          alert("请输入有效的税率系数");
+        const taxPoint = Number(taxRateCoefficientText);
+        if (!Number.isFinite(taxPoint) || taxPoint <= 0 || taxPoint > 100) {
+          alert("税点必须大于 0 且不超过 100");
           return false;
         }
+        defaultTaxRate = taxPoint / 100;
+        taxRateCoefficient = 1 + defaultTaxRate;
       }
       if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
         alert("请输入有效的国内联系电话（手机号或座机号）");
@@ -2269,6 +1354,7 @@
         return false;
       }
 
+      const snapshot = createMasterDataSnapshot();
       Object.assign(customer, {
         name,
         contactPerson,
@@ -2277,17 +1363,19 @@
         paymentTerms,
         hasTaxRate: hasTaxRate === "yes",
         taxRateCoefficient,
+        defaultTaxRate,
+        priceTaxMode: priceTaxMode === "inclusive" ? "inclusive" : "exclusive",
         status,
         updatedAt: getLocalISOString(),
       });
 
-      saveMockData();
-      addLog(
-        "edit",
-        "customer",
-        name,
-        `编辑客户信息，联系人：${contactPerson}`,
-      );
+      const persisted = await persistMasterDataChanges(snapshot, "客户", {
+        actionType: "edit",
+        objectType: "customer",
+        objectName: name,
+        details: `编辑客户信息，联系人：${contactPerson}`,
+      });
+      if (!persisted) return false;
       updateCustomerTable();
       alert("客户信息已更新");
       return true;
@@ -2307,7 +1395,11 @@
     );
     bindCustomerTaxRateControls("edit", {
       choice: customer.hasTaxRate ? "yes" : "no",
-      coefficient: customer.taxRateCoefficient,
+      coefficient: Number.isFinite(Number(customer.defaultTaxRate))
+        ? Number(customer.defaultTaxRate) * 100
+        : Number(customer.taxRateCoefficient) > 1
+          ? (Number(customer.taxRateCoefficient) - 1) * 100
+          : Number(customer.taxRateCoefficient || 0) * 100,
     });
   }
 
@@ -2318,7 +1410,8 @@
     tbody.innerHTML = "";
 
     const sortedCustomers = [...mockData.customers].sort(
-      (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt),
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
 
     paginationState.customers.total = sortedCustomers.length;
@@ -2358,18 +1451,18 @@
 
       const row = document.createElement("tr");
       row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${safeCustomerId}</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">${safeCustomerName}</div>
+                <td class="px-6 py-4 align-middle whitespace-nowrap text-sm font-medium text-gray-900">${safeCustomerId}</td>
+                <td class="px-6 py-4 align-middle">
+                    <div class="table-long-text customer-cell-wrap text-sm font-medium text-gray-900" title="${safeCustomerName}">${safeCustomerName}</div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeContactPerson}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeContactPhone}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeAddress}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safePaymentTerms}</td>
-                <td class="px-6 py-4 whitespace-nowrap">
+                <td class="px-6 py-4 align-middle whitespace-nowrap text-sm text-gray-500">${safeContactPerson}</td>
+                <td class="px-6 py-4 align-middle whitespace-nowrap text-sm text-gray-500">${safeContactPhone}</td>
+                <td class="px-6 py-4 align-middle text-sm text-gray-500"><div class="table-long-text customer-cell-wrap" title="${safeAddress}">${safeAddress}</div></td>
+                <td class="px-6 py-4 align-middle text-sm text-gray-500"><div class="table-long-text customer-cell-wrap" title="${safePaymentTerms}">${safePaymentTerms}</div></td>
+                <td class="px-6 py-4 align-middle whitespace-nowrap">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusMeta.className}">${safeStatusLabel}</span>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                <td class="px-6 py-4 align-middle text-sm text-gray-500 whitespace-nowrap">
                     <div class="space-y-1">
                         <div class="flex items-center">
                             <span class="text-xs text-gray-500 mr-2 whitespace-nowrap">创建时间:</span>
@@ -2387,18 +1480,27 @@
                         </div>
                     </div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button type="button" class="text-blue-600 hover:text-blue-900 mr-3" data-action="view">查看</button>
-                    <button type="button" class="text-primary hover:text-primary-dark mr-3" data-action="edit">编辑</button>
-                    <button type="button" class="text-danger hover:text-danger-dark" data-action="delete">删除</button>
+                <td class="table-action-cell px-6 py-4 align-middle whitespace-nowrap text-left text-sm font-medium">
+                    <div class="table-action-links customer-row-actions">
+                        <button type="button" class="text-blue-600 hover:text-blue-900" data-action="view">查看</button>
+                        <button type="button" class="text-emerald-600 hover:text-emerald-800" data-action="prices">价目表</button>
+                        <button type="button" class="text-primary hover:text-primary-dark" data-action="edit">编辑</button>
+                        <button type="button" class="text-danger hover:text-danger-dark" data-action="delete">删除</button>
+                    </div>
                 </td>
             `;
       const viewButton = row.querySelector('[data-action="view"]');
+      const pricesButton = row.querySelector('[data-action="prices"]');
       const editButton = row.querySelector('[data-action="edit"]');
       const deleteButton = row.querySelector('[data-action="delete"]');
       if (viewButton) {
         viewButton.addEventListener("click", () =>
           showViewCustomerModal(customer.id),
+        );
+      }
+      if (pricesButton) {
+        pricesButton.addEventListener("click", () =>
+          global.showCustomerPriceListModal?.(customer.id),
         );
       }
       if (editButton) {
@@ -2428,7 +1530,8 @@
     tbody.innerHTML = "";
 
     const sortedSuppliers = [...mockData.suppliers].sort(
-      (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt),
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
 
     paginationState.suppliers.total = sortedSuppliers.length;
@@ -2466,16 +1569,16 @@
 
       const row = document.createElement("tr");
       row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">${safeSupplierName}</div>
+                <td class="px-6 py-4 align-middle">
+                    <div class="table-long-text supplier-cell-wrap text-sm font-medium text-gray-900" title="${safeSupplierName}">${safeSupplierName}</div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeContactPerson}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safeContactPhone}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${safePaymentTerms}</td>
-                <td class="px-6 py-4 whitespace-nowrap">
+                <td class="px-6 py-4 align-middle whitespace-nowrap text-sm text-gray-500">${safeContactPerson}</td>
+                <td class="px-6 py-4 align-middle whitespace-nowrap text-sm text-gray-500">${safeContactPhone}</td>
+                <td class="px-6 py-4 align-middle text-sm text-gray-500"><div class="table-long-text supplier-cell-wrap" title="${safePaymentTerms}">${safePaymentTerms}</div></td>
+                <td class="px-6 py-4 align-middle whitespace-nowrap">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusMeta.className}">${safeStatusLabel}</span>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                <td class="px-6 py-4 align-middle text-sm text-gray-500 whitespace-nowrap">
                     <div class="space-y-1">
                         <div class="flex items-center">
                             <span class="text-xs text-gray-500 mr-2 whitespace-nowrap">创建时间:</span>
@@ -2493,10 +1596,12 @@
                         </div>
                     </div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button type="button" class="text-blue-600 hover:text-blue-900 mr-3" data-action="view">查看</button>
-                    <button type="button" class="text-primary hover:text-primary-dark mr-3" data-action="edit">编辑</button>
-                    <button type="button" class="text-danger hover:text-danger-dark" data-action="delete">删除</button>
+                <td class="table-action-cell px-6 py-4 align-middle whitespace-nowrap text-left text-sm font-medium">
+                    <div class="table-action-links">
+                        <button type="button" class="text-blue-600 hover:text-blue-900" data-action="view">查看</button>
+                        <button type="button" class="text-primary hover:text-primary-dark" data-action="edit">编辑</button>
+                        <button type="button" class="text-danger hover:text-danger-dark" data-action="delete">删除</button>
+                    </div>
                 </td>
             `;
       const viewButton = row.querySelector('[data-action="view"]');
@@ -2527,12 +1632,6 @@
     );
   }
 
-  global.getProductIcon = getProductIcon;
-  global.showAddProductModal = showAddProductModal;
-  global.showViewProductModal = showViewProductModal;
-  global.deleteProduct = deleteProduct;
-  global.addProduct = addProduct;
-  global.updateInventoryTable = updateInventoryTable;
   global.showAddCompanyModal = showAddCompanyModal;
   global.showViewCompanyModal = showViewCompanyModal;
   global.showEditCompanyModal = showEditCompanyModal;
@@ -2549,13 +1648,7 @@
   global.updateCustomerTable = updateCustomerTable;
   global.updateSupplierTable = updateSupplierTable;
 
-  global.AppMasterDataModule = Object.freeze({
-    getProductIcon,
-    showAddProductModal,
-    showViewProductModal,
-    deleteProduct,
-    addProduct,
-    updateInventoryTable,
+  const partners = Object.freeze({
     showAddCompanyModal,
     showViewCompanyModal,
     showEditCompanyModal,
@@ -2571,5 +1664,10 @@
     deleteCustomer,
     updateCustomerTable,
     updateSupplierTable,
+  });
+  global.AppMasterDataPartners = partners;
+  global.AppMasterDataModule = Object.freeze({
+    ...(global.AppMasterDataProducts || {}),
+    ...partners,
   });
 })(window);

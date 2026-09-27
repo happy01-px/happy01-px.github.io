@@ -1,0 +1,334 @@
+#bills .bills-table-scroll {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none;
+}
+#bills .bills-table-scroll::-webkit-scrollbar {
+  display: none;
+}
+#bills .bills-action-header,
+#bills .bills-action-cell {
+  text-align: left !important;
+}
+#bills .bills-list-header {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+#bills .bills-list-header > div:first-child {
+  flex: 1 1 auto;
+}
+#bills .bills-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-left: auto;
+}
+#bills #add-bill-btn {
+  padding: 0.5rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+#bills .bills-action-links {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+#bills .bills-action-links a,
+#bills .bills-action-links button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+#bills .bills-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+}
+#bills .bills-empty-state {
+  padding: 1rem 1.5rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+.bills-modal-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+.bills-modal-summary-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: #fff;
+}
+.bills-modal-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #fff;
+  overflow: hidden;
+}
+.bills-modal-section-title {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  background: #f9fafb;
+}
+.bills-modal-section-body {
+  padding: 1rem;
+}
+.bills-modal-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.bills-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.bills-field > label {
+  font-size: 0.875rem;
+  color: #374151;
+  font-weight: 600;
+}
+.bills-inline-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.bills-inline-table th,
+.bills-inline-table td {
+  border: 1px solid #e5e7eb;
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+  font-size: 0.875rem;
+}
+.bills-inline-table th {
+  background: #f9fafb;
+  color: #374151;
+  font-weight: 600;
+}
+.bills-muted-note {
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+.bills-outline-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #d1d5db;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  background: #fff;
+  cursor: pointer;
+}
+.bills-outline-button:hover {
+  background: #f9fafb;
+}
+.bills-route-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.bills-route-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.bills-route-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.bills-route-title h2 {
+  margin: 0;
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+}
+.bills-route-title p {
+  font-size: 0.875rem;
+  color: #4b5563;
+  margin: 0;
+}
+.bills-route-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.bills-route-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  overflow: hidden;
+}
+.bills-route-card-body {
+  padding: 1rem;
+}
+.bills-route-card + .bills-route-card {
+  margin-top: 1rem;
+}
+.bills-route-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.bills-route-empty {
+  padding: 2rem 1.5rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+.bills-route-card .bills-modal-form-grid > .bills-field {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  padding: 0.75rem;
+  gap: 0;
+}
+.bills-route-card .bills-modal-form-grid > .bills-field > label {
+  margin-bottom: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+.bills-route-card .bills-modal-form-grid > .bills-field.justify-center {
+  justify-content: flex-start;
+}
+.bills-route-card .bills-modal-form-grid input[type="number"] {
+  background: #fff;
+  border-radius: 0.375rem;
+  border: 1px solid #d1d5db;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+.bills-route-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #374151;
+  line-height: 1.5;
+}
+.bills-route-note {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.6;
+}
+.bills-route-intro {
+  border: 1px solid #dbeafe;
+  border-radius: 0.75rem;
+  background: #eff6ff;
+  padding: 0.875rem 1rem;
+}
+.bills-route-intro-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.bills-route-intro-icon {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid #dbeafe;
+  background: #fff;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+.bills-route-intro-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+}
+.bills-route-intro-desc {
+  margin-top: 0.125rem;
+  font-size: 0.875rem;
+  color: #4b5563;
+  line-height: 1.6;
+}
+.bills-modal-summary-card {
+  border-radius: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: #f9fafb;
+}
+.bills-modal-summary-card .text-sm {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+.bills-modal-summary-card .text-xl {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+.bills-modal-summary-card .text-base {
+  font-size: 0.9375rem;
+  line-height: 1.5rem;
+}
+.bills-modal-section {
+  border-radius: 0.75rem;
+}
+.bills-modal-section-title {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.bills-modal-section-body {
+  padding: 0.875rem 1rem;
+}
+.bills-inline-table th,
+.bills-inline-table td {
+  font-size: 0.875rem;
+  padding: 0.75rem 0.875rem;
+}
+.bills-inline-table th {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+@media (max-width: 1024px) {
+  .bills-modal-summary-grid,
+  .bills-modal-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

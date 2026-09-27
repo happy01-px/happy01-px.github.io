@@ -4,6 +4,8 @@ const path = require("path");
 const os = require("os");
 const { execFile } = require("child_process");
 const { pathToFileURL } = require("url");
+const AppDataSchema = require("./js/modules/data-schema.js");
+const { SQLiteInventoryStore } = require("./server/sqlite-store.js");
 
 const PORT = 8080;
 const HOST = "127.0.0.1";
@@ -14,20 +16,13 @@ const LOCAL_REMOTE_ADDRESSES = new Set([
   "::1",
   "::ffff:127.0.0.1",
 ]);
-const SPLIT_DATA_TABLES = Object.freeze([
-  "products",
-  "suppliers",
-  "customers",
-  "companies",
-  "bills",
-  "deliveryNotes",
-  "stockMovements",
-  "logs",
-]);
+const SPLIT_DATA_TABLES = AppDataSchema.DATA_TABLES;
 let currentPort = PORT;
 const shouldOpenBrowser =
-  process.argv.includes("--open") || process.env.INVENTORY_OPEN === "1";
+  process.env.INVENTORY_DESKTOP !== "1" &&
+  (process.argv.includes("--open") || process.env.INVENTORY_OPEN === "1");
 let browserOpened = false;
+let startPromise = null;
 
 // Determine paths for packaged executable vs development
 const isPkg =
@@ -37,14 +32,27 @@ const isPkg =
 // staticBase: Immutable application files (HTML, JS, CSS)
 // In development: current directory
 // In pkg: snapshot filesystem (inside the exe)
-const staticBase = __dirname;
+const staticBase = process.env.INVENTORY_STATIC_DIR
+  ? path.resolve(process.env.INVENTORY_STATIC_DIR)
+  : __dirname;
 
-// dataBase: Mutable user data
-// In development: current directory
-// In pkg: The directory where the executable is located (external to the exe)
-const dataBase = isPkg ? path.dirname(process.execPath) : __dirname;
+// dataBase: Mutable user data. Packaged applications must not write next to the
+// executable because that directory can be read-only and can be replaced by an
+// upgrade. Development keeps data in the repository for compatibility.
+const packagedDataBase = path.join(
+  process.env.LOCALAPPDATA || os.homedir(),
+  "Happy01Inventory",
+);
+const dataBase = process.env.INVENTORY_DATA_DIR
+  ? path.resolve(process.env.INVENTORY_DATA_DIR)
+  : isPkg
+    ? packagedDataBase
+    : __dirname;
+const legacyDataBase = isPkg ? path.dirname(process.execPath) : __dirname;
 const runtimeDir = path.join(dataBase, ".runtime");
 const serverInfoPath = path.join(runtimeDir, "server-info.json");
+const sqlitePath = path.join(dataBase, "data", "inventory.sqlite");
+let sqliteStore;
 
 console.log(`Server starting...`);
 console.log(`Static Base (App): ${staticBase}`);
@@ -84,7 +92,10 @@ function removeServerInfo() {
   }
 }
 
-process.on("exit", removeServerInfo);
+process.on("exit", () => {
+  sqliteStore?.close();
+  removeServerInfo();
+});
 ["SIGINT", "SIGTERM"].forEach((signal) => {
   process.on(signal, () => {
     removeServerInfo();
@@ -268,145 +279,118 @@ function cleanupTempDir(tempDir) {
   fs.rm(tempDir, { recursive: true, force: true }, () => {});
 }
 
-const fileWriteQueue = new Map();
-
-function createBackupStamp() {
-  return new Date().toISOString().replace(/[:.]/g, "-");
+function validateDatasetPayload(dataset) {
+  return AppDataSchema.validateDataset(dataset);
 }
 
-function buildBackupFilePath(targetFile) {
-  const extension = path.extname(targetFile);
-  const baseName = path.basename(targetFile, extension);
-  const backupDir = path.join(path.dirname(targetFile), ".backups");
-  return path.join(backupDir, `${baseName}.${createBackupStamp()}${extension}`);
+function parseSnapshotRevision(fileName) {
+  const match = /^dataset\.(\d{12})\..+\.json$/.exec(fileName);
+  return match ? Number(match[1]) : null;
 }
 
-function queueFileOperation(targetFile, task, callback) {
-  const previous = fileWriteQueue.get(targetFile) || Promise.resolve();
-  const current = previous
-    .catch(() => {})
-    .then(
-      () =>
-        new Promise((resolve, reject) => {
-          task((error, value) => {
-            if (error) {
-              reject(error);
-              return;
-            }
+async function readLegacySplitDataset() {
+  const rawDataset = {};
+  for (const tableName of SPLIT_DATA_TABLES) {
+    const relativePath = path.join("data", `${tableName}.json`);
+    const candidates = [dataBase, legacyDataBase, staticBase]
+      .map((basePath) => path.join(basePath, relativePath))
+      .filter((candidate, index, all) => all.indexOf(candidate) === index);
+    let raw = null;
+    let lastError = null;
+    for (const candidate of candidates) {
+      try {
+        raw = await fs.promises.readFile(candidate, "utf8");
+        break;
+      } catch (error) {
+        lastError = error;
+        if (error.code !== "ENOENT") throw error;
+      }
+    }
+    if (raw === null) throw lastError || new Error(`Missing ${relativePath}`);
+    rawDataset[tableName] = JSON.parse(raw);
+  }
+  const dataset = AppDataSchema.migrateDataset(rawDataset);
+  const validationError = validateDatasetPayload(dataset);
+  if (validationError) throw new Error(validationError);
+  return {
+    formatVersion: AppDataSchema.DATA_FORMAT_VERSION,
+    revision: 0,
+    updatedAt: null,
+    dataset,
+  };
+}
 
-            resolve(value);
-          });
-        }),
+async function readLatestLegacyDatasetSnapshot() {
+  const snapshotDirs = [dataBase, legacyDataBase]
+    .map((basePath) => path.join(basePath, "data", ".snapshots"))
+    .filter((candidate, index, all) => all.indexOf(candidate) === index);
+  const candidates = [];
+
+  for (const snapshotsDir of snapshotDirs) {
+    let entries = [];
+    try {
+      entries = await fs.promises.readdir(snapshotsDir);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    entries.forEach((fileName) => {
+      candidates.push({
+        snapshotsDir,
+        fileName,
+        revision: parseSnapshotRevision(fileName),
+      });
+    });
+  }
+
+  const sortedCandidates = candidates
+    .filter((entry) => Number.isInteger(entry.revision))
+    .sort(
+      (a, b) => b.revision - a.revision || b.fileName.localeCompare(a.fileName),
     );
 
-  fileWriteQueue.set(targetFile, current);
-
-  current
-    .then((value) => callback(null, value))
-    .catch((error) => callback(error))
-    .finally(() => {
-      if (fileWriteQueue.get(targetFile) === current) {
-        fileWriteQueue.delete(targetFile);
-      }
-    });
-}
-
-function writeJsonFileAtomicallyUnqueued(targetFile, data, callback) {
-  const targetDir = path.dirname(targetFile);
-  const serialized = JSON.stringify(data, null, 4);
-  const tempFile = path.join(
-    targetDir,
-    `.${path.basename(targetFile)}.${process.pid}.${Date.now()}.tmp`,
-  );
-
-  fs.mkdir(targetDir, { recursive: true }, (mkdirError) => {
-    if (mkdirError) {
-      callback(mkdirError);
-      return;
-    }
-
-    fs.readFile(targetFile, "utf8", (readError, currentContent) => {
-      if (readError && readError.code !== "ENOENT") {
-        callback(readError);
-        return;
-      }
-
-      const finishWithCleanup = (error) => {
-        if (!error) {
-          callback(null);
-          return;
-        }
-
-        fs.rm(tempFile, { force: true }, () => callback(error));
-      };
-
-      const writeTempFile = () => {
-        fs.writeFile(tempFile, serialized, "utf8", (writeError) => {
-          if (writeError) {
-            finishWithCleanup(writeError);
-            return;
-          }
-
-          fs.rename(tempFile, targetFile, (renameError) => {
-            if (!renameError) {
-              callback(null);
-              return;
-            }
-
-            if (renameError.code === "EEXIST" || renameError.code === "EPERM") {
-              fs.rm(targetFile, { force: true }, (removeError) => {
-                if (removeError) {
-                  finishWithCleanup(removeError);
-                  return;
-                }
-
-                fs.rename(tempFile, targetFile, finishWithCleanup);
-              });
-              return;
-            }
-
-            finishWithCleanup(renameError);
-          });
-        });
-      };
-
-      if (readError) {
-        writeTempFile();
-        return;
-      }
-
-      const backupFile = buildBackupFilePath(targetFile);
-      fs.mkdir(
-        path.dirname(backupFile),
-        { recursive: true },
-        (backupDirError) => {
-          if (backupDirError) {
-            callback(backupDirError);
-            return;
-          }
-
-          fs.writeFile(backupFile, currentContent, "utf8", (backupError) => {
-            if (backupError) {
-              callback(backupError);
-              return;
-            }
-
-            writeTempFile();
-          });
-        },
+  for (const candidate of sortedCandidates) {
+    try {
+      const raw = await fs.promises.readFile(
+        path.join(candidate.snapshotsDir, candidate.fileName),
+        "utf8",
       );
-    });
-  });
+      const snapshot = JSON.parse(raw);
+      if (snapshot.revision !== candidate.revision) {
+        throw new Error("Snapshot revision does not match its filename");
+      }
+      const migratedDataset = AppDataSchema.migrateDataset(snapshot.dataset);
+      const validationError = validateDatasetPayload(migratedDataset);
+      if (validationError) throw new Error(validationError);
+      return {
+        ...snapshot,
+        formatVersion: AppDataSchema.DATA_FORMAT_VERSION,
+        dataset: migratedDataset,
+      };
+    } catch (error) {
+      console.warn(
+        `Ignoring invalid dataset snapshot ${candidate.fileName}:`,
+        error.message,
+      );
+    }
+  }
+
+  return readLegacySplitDataset();
 }
 
-function writeJsonFileAtomically(targetFile, data, callback) {
-  queueFileOperation(
-    targetFile,
-    (done) => {
-      writeJsonFileAtomicallyUnqueued(targetFile, data, done);
-    },
-    callback,
-  );
+async function readLatestDatasetSnapshot() {
+  if (!sqliteStore) {
+    throw new Error("SQLite inventory store is not initialized");
+  }
+  return sqliteStore.readSnapshot();
+}
+
+function writeDatasetAtomically(dataset, expectedRevision, callback) {
+  try {
+    const snapshot = sqliteStore.replaceDataset(dataset, expectedRevision);
+    callback(null, snapshot);
+  } catch (error) {
+    callback(error);
+  }
 }
 
 function runBrowserPdfExport(
@@ -606,8 +590,31 @@ const server = http.createServer(function (request, response) {
     return;
   }
 
-  // Handle data saving endpoint
-  if (request.url.startsWith("/api/save") && request.method === "POST") {
+  if (request.url === "/api/data-all" && request.method === "GET") {
+    readLatestDatasetSnapshot()
+      .then((snapshot) => {
+        response.writeHead(200, {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+        });
+        response.end(JSON.stringify(snapshot));
+      })
+      .catch((error) => {
+        console.error("Error reading dataset:", error);
+        response.writeHead(500, {
+          "Content-Type": "application/json; charset=utf-8",
+        });
+        response.end(
+          JSON.stringify({
+            success: false,
+            error: error.message || "Failed to read dataset",
+          }),
+        );
+      });
+    return;
+  }
+
+  if (request.url === "/api/transactions" && request.method === "POST") {
     let body = "";
     let bodyTooLarge = false;
     request.on("data", (chunk) => {
@@ -626,61 +633,163 @@ const server = http.createServer(function (request, response) {
     });
     request.on("end", () => {
       if (bodyTooLarge) return;
-
       try {
-        const data = JSON.parse(body);
-
-        const parts = request.url.split("/");
-
-        if (parts.length <= 3) {
+        const payload = JSON.parse(body || "{}");
+        const expectedRevision = Number(payload.expectedRevision);
+        if (
+          payload.formatVersion !== AppDataSchema.DATA_FORMAT_VERSION ||
+          !Number.isInteger(expectedRevision) ||
+          expectedRevision < 0
+        ) {
           response.writeHead(400, {
             "Content-Type": "application/json; charset=utf-8",
           });
           response.end(
-            JSON.stringify({ success: false, error: "Missing table name" }),
+            JSON.stringify({
+              success: false,
+              error:
+                "A supported formatVersion and expectedRevision are required",
+            }),
           );
           return;
         }
 
-        const tableName = parts[3];
-        if (!SPLIT_DATA_TABLES.includes(tableName)) {
+        const snapshot = sqliteStore.commitChanges(
+          payload.changes,
+          expectedRevision,
+        );
+        response.writeHead(200, {
+          "Content-Type": "application/json; charset=utf-8",
+        });
+        response.end(
+          JSON.stringify({
+            success: true,
+            revision: snapshot.revision,
+            updatedAt: snapshot.updatedAt,
+          }),
+        );
+      } catch (error) {
+        const status = error.code === "REVISION_CONFLICT" ? 409 : 400;
+        if (status === 409) {
+          console.warn("SQLite transaction revision conflict:", error.message);
+        } else {
+          console.error("SQLite transaction rejected:", error);
+        }
+        response.writeHead(status, {
+          "Content-Type": "application/json; charset=utf-8",
+        });
+        response.end(
+          JSON.stringify({
+            success: false,
+            error: error.message || "Failed to commit transaction",
+            currentRevision: error.currentRevision,
+          }),
+        );
+      }
+    });
+    return;
+  }
+
+  if (request.url === "/api/save-all" && request.method === "POST") {
+    let body = "";
+    let bodyTooLarge = false;
+    request.on("data", (chunk) => {
+      if (bodyTooLarge) return;
+      body += chunk.toString();
+      if (body.length > MAX_BODY_SIZE) {
+        bodyTooLarge = true;
+        response.writeHead(413, {
+          "Content-Type": "application/json; charset=utf-8",
+        });
+        response.end(
+          JSON.stringify({ success: false, error: "Payload too large" }),
+        );
+        request.destroy();
+      }
+    });
+    request.on("end", () => {
+      if (bodyTooLarge) return;
+      try {
+        const payload = JSON.parse(body || "{}");
+        const dataset = payload.dataset;
+        const expectedRevision = Number(payload.expectedRevision);
+        if (
+          payload.formatVersion !== AppDataSchema.DATA_FORMAT_VERSION ||
+          !Number.isInteger(expectedRevision) ||
+          expectedRevision < 0
+        ) {
           response.writeHead(400, {
             "Content-Type": "application/json; charset=utf-8",
           });
           response.end(
-            JSON.stringify({ success: false, error: "Invalid table name" }),
+            JSON.stringify({
+              success: false,
+              error:
+                "A supported formatVersion and expectedRevision are required",
+            }),
+          );
+          return;
+        }
+        const validationError = validateDatasetPayload(dataset);
+        if (validationError) {
+          response.writeHead(400, {
+            "Content-Type": "application/json; charset=utf-8",
+          });
+          response.end(
+            JSON.stringify({ success: false, error: validationError }),
           );
           return;
         }
 
-        const targetFile = path.join(dataBase, "data", `${tableName}.json`);
-
-        writeJsonFileAtomically(targetFile, data, (err) => {
-          if (err) {
-            console.error(`Error writing to ${targetFile}:`, err);
-            response.writeHead(500, {
+        writeDatasetAtomically(dataset, expectedRevision, (error, snapshot) => {
+          if (error) {
+            console.error("Error writing dataset:", error);
+            response.writeHead(error.code === "REVISION_CONFLICT" ? 409 : 500, {
               "Content-Type": "application/json; charset=utf-8",
             });
             response.end(
-              JSON.stringify({ success: false, error: err.message }),
+              JSON.stringify({
+                success: false,
+                error: error.message || "Failed to save dataset",
+                currentRevision: error.currentRevision,
+              }),
             );
             return;
           }
 
-          console.log(`Successfully saved data to ${targetFile}`);
           response.writeHead(200, {
             "Content-Type": "application/json; charset=utf-8",
           });
-          response.end(JSON.stringify({ success: true }));
+          response.end(
+            JSON.stringify({
+              success: true,
+              revision: snapshot.revision,
+              updatedAt: snapshot.updatedAt,
+            }),
+          );
         });
-      } catch (e) {
-        console.error("Invalid JSON received:", e);
+      } catch {
         response.writeHead(400, {
           "Content-Type": "application/json; charset=utf-8",
         });
         response.end(JSON.stringify({ success: false, error: "Invalid JSON" }));
       }
     });
+    return;
+  }
+
+  // Per-table writes are disabled because they bypass cross-table validation
+  // and cannot provide a consistent business transaction.
+  if (request.url.startsWith("/api/save") && request.method === "POST") {
+    response.writeHead(410, {
+      "Content-Type": "application/json; charset=utf-8",
+    });
+    response.end(
+      JSON.stringify({
+        success: false,
+        error: "Per-table save endpoints are disabled; use /api/transactions",
+      }),
+    );
     return;
   }
 
@@ -747,19 +856,90 @@ const server = http.createServer(function (request, response) {
   });
 });
 
-server.listen(currentPort, HOST, onServerListening);
+async function initializePersistence() {
+  sqliteStore = new SQLiteInventoryStore({
+    filePath: sqlitePath,
+    dataTables: SPLIT_DATA_TABLES,
+    formatVersion: AppDataSchema.DATA_FORMAT_VERSION,
+    validateDataset: validateDatasetPayload,
+  });
 
-server.on(
-  "error",
-  /** @param {NodeJS.ErrnoException} e */ (e) => {
-    if (e.code === "EADDRINUSE") {
-      const nextPort = currentPort + 1;
-      console.log(`Port ${currentPort} is in use, retrying on ${nextPort}...`);
-      server.close();
-      currentPort = nextPort;
-      server.listen(currentPort, HOST, onServerListening);
-    } else {
-      console.error(e);
-    }
-  },
-);
+  const seedSnapshot = sqliteStore.isInitialized()
+    ? undefined
+    : await readLatestLegacyDatasetSnapshot();
+  const snapshot = sqliteStore.initialize(seedSnapshot);
+  console.log(`SQLite database: ${sqlitePath}`);
+  console.log(`SQLite dataset revision: ${snapshot.revision}`);
+}
+
+function listenOnAvailablePort() {
+  return new Promise((resolve, reject) => {
+    const attempt = () => {
+      const onListening = () => {
+        server.removeListener("error", onError);
+        onServerListening();
+        resolve({
+          server,
+          host: HOST,
+          port: currentPort,
+          url: `http://${HOST}:${currentPort}/`,
+          dataBase,
+          sqlitePath,
+        });
+      };
+      const onError = /** @param {NodeJS.ErrnoException} error */ (error) => {
+        server.removeListener("listening", onListening);
+        if (error.code === "EADDRINUSE") {
+          const nextPort = currentPort + 1;
+          console.log(
+            `Port ${currentPort} is in use, retrying on ${nextPort}...`,
+          );
+          currentPort = nextPort;
+          attempt();
+          return;
+        }
+        reject(error);
+      };
+
+      server.once("listening", onListening);
+      server.once("error", onError);
+      server.listen(currentPort, HOST);
+    };
+
+    attempt();
+  });
+}
+
+function startInventoryServer() {
+  if (startPromise) return startPromise;
+  startPromise = initializePersistence()
+    .then(() => listenOnAvailablePort())
+    .catch((error) => {
+      startPromise = null;
+      throw error;
+    });
+  return startPromise;
+}
+
+async function stopInventoryServer() {
+  if (server.listening) {
+    await new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
+  sqliteStore?.close();
+  sqliteStore = null;
+  removeServerInfo();
+}
+
+if (require.main === module) {
+  startInventoryServer().catch((error) => {
+    console.error("Failed to initialize SQLite persistence:", error);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  startInventoryServer,
+  stopInventoryServer,
+};

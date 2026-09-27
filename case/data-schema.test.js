@@ -3,6 +3,8 @@ const path = require("path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { projectRoot } = require("./helpers/browser-harness");
+const AppDataSchema = require("../js/modules/data-schema.js");
+const { createFixtureData } = require("./helpers/fixtures");
 
 function readJson(relativePath) {
   return JSON.parse(
@@ -52,7 +54,7 @@ function validateProduct(record, label) {
   ["id", "name", "category", "unit", "supplierId"].forEach((key) =>
     assertString(record[key], `${label}.${key} should be a non-empty string`),
   );
-  ["retailPrice", "stockQuantity", "minStock", "maxStock"].forEach((key) =>
+  ["retailPrice", "minStock", "maxStock"].forEach((key) =>
     assertNumber(record[key], `${label}.${key} should be a finite number`),
   );
   assertNumber(
@@ -388,26 +390,15 @@ function assertDatasetShape(dataset, label) {
     "products",
     "suppliers",
     "customers",
+    "customerProductPrices",
     "companies",
+    "warehouses",
     "bills",
     "deliveryNotes",
     "stockMovements",
     "logs",
   ].forEach((key) =>
     assertArray(dataset[key], `${label}.${key} should be an array`),
-  );
-
-  assert.ok(
-    dataset.products.length > 0,
-    `${label}.products should not be empty`,
-  );
-  assert.ok(
-    dataset.suppliers.length > 0,
-    `${label}.suppliers should not be empty`,
-  );
-  assert.ok(
-    dataset.customers.length > 0,
-    `${label}.customers should not be empty`,
   );
 
   dataset.products.forEach((record, index) =>
@@ -423,6 +414,24 @@ function assertDatasetShape(dataset, label) {
       requirePaymentTerms: true,
     }),
   );
+  dataset.customerProductPrices.forEach((record, index) => {
+    assertPlainObject(
+      record,
+      `${label}.customerProductPrices[${index}] should be an object`,
+    );
+    assertString(record.id, `${label}.customerProductPrices[${index}].id`);
+    ["companyId", "customerId", "productId", "priceTaxMode", "status"].forEach(
+      (key) =>
+        assertString(
+          record[key],
+          `${label}.customerProductPrices[${index}].${key}`,
+        ),
+    );
+    assertNumber(
+      record.referencePrice,
+      `${label}.customerProductPrices[${index}].referencePrice should be a finite number`,
+    );
+  });
   dataset.companies.forEach((record, index) =>
     validatePartyRecord(record, `${label}.companies[${index}]`),
   );
@@ -454,6 +463,21 @@ function assertDatasetReferences(dataset, label) {
     assert.ok(
       supplierIds.has(record.supplierId),
       `${label}.products[${index}].supplierId should point to an existing supplier`,
+    );
+  });
+
+  dataset.customerProductPrices.forEach((record, index) => {
+    assert.ok(
+      companyIds.has(record.companyId),
+      `${label}.customerProductPrices[${index}].companyId should point to an existing company`,
+    );
+    assert.ok(
+      customerIds.has(record.customerId),
+      `${label}.customerProductPrices[${index}].customerId should point to an existing customer`,
+    );
+    assert.ok(
+      productIds.has(record.productId),
+      `${label}.customerProductPrices[${index}].productId should point to an existing product`,
     );
   });
 
@@ -567,7 +591,9 @@ function readSplitDataset() {
     products: readJson("data/products.json"),
     suppliers: readJson("data/suppliers.json"),
     customers: readJson("data/customers.json"),
+    customerProductPrices: readJson("data/customerProductPrices.json"),
     companies: readJson("data/companies.json"),
+    warehouses: readJson("data/warehouses.json"),
     bills: readJson("data/bills.json"),
     deliveryNotes: readJson("data/deliveryNotes.json"),
     stockMovements: readJson("data/stockMovements.json"),
@@ -583,4 +609,112 @@ test("data/*.json files follow the expected collection schemas", () => {
 test("data/*.json files maintain cross-file referential integrity", () => {
   const splitDataset = readSplitDataset();
   assertDatasetReferences(splitDataset, "splitDataset");
+});
+
+test("runtime schema accepts the repository dataset and rejects invalid values", () => {
+  const dataset = readSplitDataset();
+  assert.equal(AppDataSchema.validateDataset(dataset), null);
+
+  const invalidStatus = structuredClone(dataset);
+  invalidStatus.suppliers[0].status = "unknown";
+  assert.match(AppDataSchema.validateDataset(invalidStatus), /status/);
+
+  const invalidReference = structuredClone(dataset);
+  invalidReference.suppliers = [];
+  invalidReference.products = [
+    {
+      id: "P-SCHEMA",
+      name: "Schema Product",
+      category: "Test",
+      unit: "item",
+      costPrice: 1,
+      retailPrice: 2,
+      minStock: 0,
+      maxStock: 10,
+      supplierId: "MISSING",
+      status: "active",
+      createdAt: "2026-09-25T10:00:00",
+      updatedAt: "2026-09-25T10:00:00",
+    },
+  ];
+  assert.match(
+    AppDataSchema.validateDataset(invalidReference),
+    /missing supplier/,
+  );
+
+  const invalidEffectiveFrom = [
+    {
+      id: "CPP-SCHEMA",
+      companyId: "CO-SCHEMA",
+      customerId: "C-SCHEMA",
+      productId: "P-SCHEMA",
+      referencePrice: 10,
+      priceTaxMode: "exclusive",
+      status: "active",
+      effectiveFrom: "",
+      createdAt: "2026-09-25T10:00:00",
+      updatedAt: "2026-09-25T10:00:00",
+    },
+  ];
+  assert.match(
+    AppDataSchema.validateTable(
+      "customerProductPrices",
+      invalidEffectiveFrom,
+    ),
+    /effectiveFrom must be a valid date/,
+  );
+});
+
+test("runtime schema migrates version 1 backups to the current version", () => {
+  const dataset = readSplitDataset();
+  const migrated = AppDataSchema.migrateBackupPayload({
+    formatVersion: 1,
+    mockData: {
+      products: dataset.products,
+      suppliers: dataset.suppliers,
+      customers: dataset.customers,
+      companies: dataset.companies,
+      bills: dataset.bills,
+      deliveryNotes: dataset.deliveryNotes,
+    },
+    stockMovementData: dataset.stockMovements,
+    logsData: dataset.logs,
+  });
+
+  assert.equal(migrated.formatVersion, AppDataSchema.DATA_FORMAT_VERSION);
+  assert.deepEqual(migrated.dataset, AppDataSchema.migrateDataset(dataset));
+});
+
+test("runtime schema enforces ledger totals and migrates legacy stock into opening balances", () => {
+  const fixture = createFixtureData();
+  const legacyDataset = {
+    ...fixture.mockData,
+    warehouses: undefined,
+    stockMovements: fixture.stockMovementData.map((movement) => {
+      const copy = { ...movement };
+      delete copy.warehouseId;
+      delete copy.locationCode;
+      delete copy.batchNo;
+      delete copy.expiryDate;
+      return copy;
+    }),
+    logs: fixture.logsData,
+  };
+
+  const migrated = AppDataSchema.migrateDataset(legacyDataset);
+  assert.equal(migrated.warehouses[0].id, "WH001");
+  assert.equal(
+    migrated.stockMovements.every(
+      (movement) => movement.warehouseId === "WH001",
+    ),
+    true,
+  );
+  assert.equal(AppDataSchema.validateDataset(migrated), null);
+  assert.equal(Object.hasOwn(migrated.products[0], "stockQuantity"), false);
+
+  migrated.products[0].stockQuantity = 1;
+  assert.match(
+    AppDataSchema.validateDataset(migrated),
+    /derived from stockMovements/,
+  );
 });

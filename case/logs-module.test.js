@@ -28,13 +28,16 @@ test("addLog prepends a record and re-renders the visible logs table", () => {
   loadScripts(harness.window, [
     "js/modules/app-utils.js",
     "js/modules/app-state.js",
+    "js/modules/data-schema.js",
     "js/modules/data-store.js",
     "js/modules/stock-module.js",
     "js/modules/logs-module.js",
   ]);
   applyFixtureState(harness.window, fixture);
 
-  harness.window.addLog("delete", "product", "Widget", "Removed one widget");
+  harness.window.addLog("delete", "product", "Widget", "Removed one widget", {
+    persist: false,
+  });
 
   assert.equal(harness.window.logsData[0].actionType, "delete");
   assert.equal(harness.window.logsData[0].details, "Removed one widget");
@@ -46,6 +49,30 @@ test("addLog prepends a record and re-renders the visible logs table", () => {
   harness.close();
 });
 
+test("addLog removes an audit record when standalone persistence fails", async () => {
+  const harness = createWindow({ markup: createLogsMarkup() });
+  const fixture = createFixtureData();
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/data-schema.js",
+    "js/modules/data-store.js",
+    "js/modules/stock-module.js",
+    "js/modules/logs-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.persistLogsData = async () => false;
+  harness.window.console.error = () => {};
+
+  const initialCount = harness.window.logsData.length;
+  harness.window.addLog("export", "system", "Backup", "Exported data");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(harness.window.logsData.length, initialCount);
+  harness.close();
+});
+
 test("renderLogsTable supports filters and empty states", () => {
   const harness = createWindow({ markup: createLogsMarkup() });
   const fixture = createFixtureData();
@@ -53,6 +80,7 @@ test("renderLogsTable supports filters and empty states", () => {
   loadScripts(harness.window, [
     "js/modules/app-utils.js",
     "js/modules/app-state.js",
+    "js/modules/data-schema.js",
     "js/modules/data-store.js",
     "js/modules/stock-module.js",
     "js/modules/logs-module.js",

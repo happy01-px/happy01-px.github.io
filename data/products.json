@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "id": "P001",
+    "name": "示例商品",
+    "category": "示例分类",
+    "unit": "件",
+    "costPrice": 0,
+    "retailPrice": 0,
+    "minStock": 0,
+    "maxStock": 100,
+    "supplierId": "S001",
+    "status": "active",
+    "createdAt": "2026-01-01T00:00:00",
+    "updatedAt": "2026-01-01T00:00:00"
+  }
+]

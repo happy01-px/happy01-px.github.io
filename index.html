@@ -23,6 +23,7 @@
     <link href="lib/reset.min.css" rel="stylesheet" />
     <link href="css/style.css" rel="stylesheet" />
     <link href="css/design-preview.css" rel="stylesheet" />
+    <link href="css/bills.css" rel="stylesheet" />
   </head>
 
   <body class="m-0 bg-gray-100 font-sans antialiased">
@@ -68,6 +69,16 @@
               >
                 <i class="fa fa-exchange w-6"></i>
                 <span>进出货管理</span>
+              </a>
+            </li>
+            <li>
+              <a
+                href="#price-management"
+                class="flex items-center px-6 py-3 text-gray-300 hover:bg-gray-800 hover:text-white transition-all-300 nav-link"
+                data-target="price-management"
+              >
+                <i class="fa fa-tags w-6"></i>
+                <span>价格管理</span>
               </a>
             </li>
             <li class="nav-dropdown">
@@ -151,6 +162,16 @@
                 <span>系统设置</span>
               </a>
             </li>
+            <li>
+              <a
+                href="#usage-guide"
+                class="flex items-center px-6 py-3 text-gray-300 hover:bg-gray-800 hover:text-white transition-all-300 nav-link"
+                data-target="usage-guide"
+              >
+                <i class="fa fa-book w-6"></i>
+                <span>使用说明</span>
+              </a>
+            </li>
           </ul>
         </nav>
         <div class="border-t border-gray-700 p-3">
@@ -183,7 +204,7 @@
       </aside>
 
       <!-- 主内容区 -->
-      <div class="flex-1 flex flex-col overflow-hidden">
+      <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
         <!-- 顶部导航栏 -->
         <header class="bg-white shadow-sm z-10">
           <div class="flex items-center justify-between p-4">
@@ -201,8 +222,18 @@
                 <i class="fa fa-bars text-lg"></i>
               </button>
               <div class="design-preview-only ml-3">
-                <p class="design-preview-header-title">仓储运营中心</p>
-                <p class="design-preview-header-subtitle">库存与供应链管理</p>
+                <p
+                  id="app-page-header-title"
+                  class="design-preview-header-title"
+                >
+                  仪表盘
+                </p>
+                <p
+                  id="app-page-header-subtitle"
+                  class="design-preview-header-subtitle"
+                >
+                  欢迎回来，管理员！这是您的库存管理概览。
+                </p>
               </div>
             </div>
             <div class="flex items-center">
@@ -306,6 +337,16 @@
                     <span>进出货管理</span>
                   </a>
                 </li>
+                <li>
+                  <a
+                    href="#price-management"
+                    class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-800 hover:text-white transition-all-300 mobile-nav-link"
+                    data-target="price-management"
+                  >
+                    <i class="fa fa-tags w-6"></i>
+                    <span>价格管理</span>
+                  </a>
+                </li>
                 <li class="nav-dropdown">
                   <a
                     href="#"
@@ -385,6 +426,16 @@
                   >
                     <i class="fa fa-cog w-6"></i>
                     <span>系统设置</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#usage-guide"
+                    class="flex items-center px-4 py-3 text-gray-300 hover:bg-gray-800 hover:text-white transition-all-300 mobile-nav-link"
+                    data-target="usage-guide"
+                  >
+                    <i class="fa fa-book w-6"></i>
+                    <span>使用说明</span>
                   </a>
                 </li>
               </ul>
@@ -669,7 +720,7 @@
                 id="add-product-btn"
                 class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg flex items-center transition-all-300"
               >
-                <i class="fa fa-plus mr-2"></i> 新增商品
+                <i class="fa fa-plus mr-2"></i> 新增进货 / 商品
               </button>
             </div>
 
@@ -677,14 +728,7 @@
             <div
               class="filter-toolbar bg-white rounded-lg shadow-card p-4 mb-6"
             >
-              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1"
-                    >出货公司</label
-                  >
-                  <div id="filter-company-container" class="w-full"></div>
-                  <input type="hidden" id="filter-company" />
-                </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1"
                     >库存状态</label
@@ -710,7 +754,9 @@
             </div>
 
             <!-- 库存列表 -->
-            <div class="bg-white rounded-lg shadow-card overflow-hidden">
+            <div
+              class="data-table-card bg-white rounded-lg shadow-card overflow-hidden"
+            >
               <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 table-fixed">
                   <thead>
@@ -726,7 +772,7 @@
                         分类
                       </th>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24"
+                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32"
                       >
                         当前库存
                       </th>
@@ -746,8 +792,7 @@
                         创建与更新
                       </th>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40"
-                        style="text-align: left"
+                        class="table-action-header px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48"
                       >
                         操作
                       </th>
@@ -771,8 +816,249 @@
           </section>
 
           <!-- 新增出货页面 (Sales Order Page) -->
+          <section id="price-management" class="page-section hidden">
+            <div class="mb-6">
+              <div>
+                <h2 class="text-2xl font-bold text-gray-800">
+                  采购与客户价格表
+                </h2>
+                <p class="mt-1 text-gray-600">
+                  查看每次进货成本，并按“公司 + 客户”维护独立商品参考价。
+                </p>
+              </div>
+            </div>
+
+            <div
+              class="mb-5 flex gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-card"
+            >
+              <button
+                id="price-management-tab-purchase"
+                type="button"
+                class="rounded-lg bg-primary px-5 py-2.5 font-medium text-white"
+              >
+                进货价格表
+              </button>
+              <button
+                id="price-management-tab-customer"
+                type="button"
+                class="rounded-lg px-5 py-2.5 font-medium text-gray-600 hover:bg-gray-100"
+              >
+                客户商品价格表
+              </button>
+            </div>
+
+            <div id="price-management-purchase-panel" class="space-y-4">
+              <div
+                class="grid grid-cols-1 gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-card md:grid-cols-2"
+              >
+                <label class="text-sm font-medium text-gray-700">
+                  入库公司
+                  <select
+                    id="purchase-price-company-filter"
+                    class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5"
+                  ></select>
+                </label>
+                <label class="text-sm font-medium text-gray-700">
+                  供应商
+                  <select
+                    id="purchase-price-supplier-filter"
+                    class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5"
+                  ></select>
+                </label>
+              </div>
+              <div
+                class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-card"
+              >
+                <div class="overflow-x-auto">
+                  <table
+                    class="purchase-price-history-table min-w-full divide-y divide-gray-200"
+                  >
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th
+                          class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500"
+                        >
+                          进货时间
+                        </th>
+                        <th
+                          class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500"
+                        >
+                          进货单号
+                        </th>
+                        <th
+                          class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500"
+                        >
+                          入库公司
+                        </th>
+                        <th
+                          class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500"
+                        >
+                          供应商
+                        </th>
+                        <th
+                          class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500"
+                        >
+                          商品
+                        </th>
+                        <th
+                          class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500"
+                        >
+                          数量
+                        </th>
+                        <th
+                          class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500"
+                        >
+                          进货单价
+                        </th>
+                        <th
+                          class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500"
+                        >
+                          进货金额
+                        </th>
+                        <th
+                          class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500"
+                        >
+                          备注
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      id="purchase-price-table-body"
+                      class="divide-y divide-gray-100"
+                    ></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div id="price-management-customer-panel" class="hidden space-y-4">
+              <div
+                class="customer-price-pair-selector rounded-xl border border-gray-200 bg-white p-4 shadow-card"
+              >
+                <label class="text-sm font-medium text-gray-700">
+                  我方公司 <span class="text-danger">*</span>
+                  <select
+                    id="customer-price-company-select"
+                    class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                  ></select>
+                </label>
+                <label class="text-sm font-medium text-gray-700">
+                  客户 <span class="text-danger">*</span>
+                  <select
+                    id="customer-price-customer-select"
+                    class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                  ></select>
+                </label>
+                <div
+                  class="customer-price-pair-actions flex flex-wrap justify-end gap-2"
+                  id="customer-price-pair-actions"
+                >
+                  <button
+                    id="reset-customer-price-pair"
+                    type="button"
+                    class="rounded-lg border border-gray-300 bg-white px-5 py-2.5 font-medium text-gray-700 transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled
+                  >
+                    重置
+                  </button>
+                  <button
+                    id="confirm-customer-price-pair"
+                    type="button"
+                    class="rounded-lg bg-primary px-5 py-2.5 font-medium text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    确认
+                  </button>
+                </div>
+                <div
+                  id="customer-price-pair-summary"
+                  class="customer-price-pair-summary rounded-lg bg-purple-50 px-4 py-3 text-sm text-purple-800"
+                >
+                  请先选择我方公司和客户，再点击“确认”。
+                </div>
+              </div>
+              <div
+                id="customer-pair-price-content"
+                class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-card"
+                hidden
+              >
+                <div class="overflow-x-auto">
+                  <table
+                    class="w-full min-w-[1050px] table-fixed divide-y divide-gray-200"
+                  >
+                    <colgroup>
+                      <col style="width: 18%" />
+                      <col style="width: 10%" />
+                      <col style="width: 13%" />
+                      <col style="width: 12%" />
+                      <col style="width: 13%" />
+                      <col style="width: 20%" />
+                      <col style="width: 14%" />
+                    </colgroup>
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th
+                          class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500"
+                        >
+                          商品
+                        </th>
+                        <th
+                          class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500"
+                        >
+                          当前库存
+                        </th>
+                        <th
+                          class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500"
+                        >
+                          最近进价
+                        </th>
+                        <th
+                          class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500"
+                        >
+                          通用售价
+                        </th>
+                        <th
+                          class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500"
+                        >
+                          上次成交价
+                        </th>
+                        <th
+                          class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500"
+                        >
+                          客户参考价
+                        </th>
+                        <th
+                          class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500"
+                        >
+                          价格类型
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      id="customer-pair-price-table-body"
+                      class="divide-y divide-gray-100"
+                    ></tbody>
+                  </table>
+                </div>
+                <div
+                  class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-4 py-3"
+                >
+                  <p class="text-xs text-gray-500">
+                    保存会生成新价格版本，不会修改历史送货单。
+                  </p>
+                  <button
+                    id="save-customer-pair-prices"
+                    type="button"
+                    class="rounded-lg bg-primary px-5 py-2.5 font-medium text-white hover:bg-primary-dark"
+                  >
+                    保存商品价格表
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section id="sales-order" class="page-section hidden">
-            <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div class="flex items-center">
                 <button
                   onclick="showSection('stock-movement')"
@@ -798,7 +1084,7 @@
             </div>
 
             <div
-              class="mb-6 rounded-2xl border border-gray-200 bg-white px-4 py-3 md:px-5"
+              class="mb-4 rounded-2xl border border-gray-200 bg-white px-3 py-2.5 md:px-4"
             >
               <div
                 class="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_1fr_auto_1fr]"
@@ -877,9 +1163,12 @@
 
             <div
               id="sales-order-form-panel"
-              class="rounded-xl border border-gray-200 bg-white p-4 shadow-card md:p-6"
+              class="rounded-xl border border-gray-200 bg-white p-3 shadow-card md:p-4"
             >
-              <div class="overflow-x-auto">
+              <div
+                id="sales-order-paper-viewport"
+                class="sales-order-paper-viewport"
+              >
                 <div
                   class="mx-auto min-w-[1220px] max-w-[1220px] border border-gray-300 bg-white text-[15px]"
                   id="sales-order-paper"
@@ -1051,6 +1340,49 @@
                     </div>
                   </div>
 
+                  <div
+                    class="grid grid-cols-[100px_210px_100px_210px_1fr] border-b border-gray-300 text-[15px]"
+                  >
+                    <div
+                      class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900"
+                    >
+                      税点
+                    </div>
+                    <div
+                      class="flex items-center border-r border-gray-300 px-3 py-2"
+                    >
+                      <input
+                        id="sales-order-tax-rate-input"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value="0"
+                        class="w-full border-0 bg-transparent px-0 py-0 text-center text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0"
+                      />
+                      <span class="ml-1 text-gray-500">%</span>
+                    </div>
+                    <div
+                      class="flex items-center justify-center border-r border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-900"
+                    >
+                      价格类型
+                    </div>
+                    <div class="border-r border-gray-300 px-3 py-2">
+                      <select
+                        id="sales-order-price-tax-mode-input"
+                        class="w-full border-0 bg-transparent px-0 py-0 text-center text-[15px] leading-6 text-gray-900 focus:outline-none focus:ring-0"
+                      >
+                        <option value="exclusive">未税价</option>
+                        <option value="inclusive">含税价</option>
+                      </select>
+                    </div>
+                    <div
+                      class="flex items-center px-4 py-2 text-sm text-gray-500"
+                    >
+                      税点和价格类型将在提交后锁定为送货单快照
+                    </div>
+                  </div>
+
                   <div class="overflow-hidden">
                     <table
                       class="w-full table-fixed border-collapse text-[15px]"
@@ -1085,6 +1417,7 @@
                           </th>
                           <th
                             class="w-[170px] border-b border-r border-gray-300 px-3 py-3 text-center font-semibold"
+                            id="sales-order-price-label"
                           >
                             未税单价(RMB)
                           </th>
@@ -1102,6 +1435,24 @@
                       </thead>
                       <tbody id="sales-order-table-body"></tbody>
                       <tfoot>
+                        <tr class="bg-white text-sm text-gray-700">
+                          <td
+                            colspan="4"
+                            class="border-t border-r border-gray-300 px-4 py-2 text-right"
+                          >
+                            未税金额：<span id="sales-order-subtotal-display"
+                              >¥0.00</span
+                            >
+                          </td>
+                          <td
+                            colspan="4"
+                            class="border-t border-gray-300 px-4 py-2 text-center"
+                          >
+                            税额：<span id="sales-order-tax-amount-display"
+                              >¥0.00</span
+                            >
+                          </td>
+                        </tr>
                         <tr class="bg-gray-50">
                           <td
                             colspan="2"
@@ -1197,7 +1548,7 @@
 
             <div
               id="sales-order-preview-panel"
-              class="hidden rounded-xl border border-gray-200 bg-white p-4 shadow-card md:p-6"
+              class="hidden rounded-xl border border-gray-200 bg-white p-3 shadow-card md:p-4"
             >
               <div class="mb-4 flex items-center justify-between gap-4">
                 <div>
@@ -1215,8 +1566,11 @@
                 </div>
               </div>
 
-              <div class="border-y border-gray-100 py-5">
-                <div class="overflow-x-auto">
+              <div class="border-y border-gray-100 py-3">
+                <div
+                  id="sales-order-preview-viewport"
+                  class="sales-order-paper-viewport"
+                >
                   <div
                     id="sales-order-preview-content"
                     class="mx-auto min-w-[1220px] max-w-[1220px]"
@@ -1241,6 +1595,59 @@
                 </button>
               </div>
             </div>
+
+            <div
+              id="sales-order-print-panel"
+              class="hidden rounded-xl border border-gray-200 bg-white p-3 shadow-card md:p-4"
+            >
+              <div
+                class="mb-4 flex flex-wrap items-center justify-between gap-4"
+              >
+                <div>
+                  <h3 class="text-xl font-semibold text-gray-900">
+                    出库成功，送货单已保存
+                  </h3>
+                  <p class="text-sm text-gray-500">
+                    请打印本次确认后的送货单；稍后也可以在“送货单记录”中再次打印。
+                  </p>
+                </div>
+                <div
+                  class="rounded-full bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700"
+                >
+                  已确认 · 待打印
+                </div>
+              </div>
+
+              <div class="border-y border-gray-100 py-3">
+                <div
+                  id="sales-order-print-viewport"
+                  class="sales-order-paper-viewport"
+                >
+                  <div
+                    id="sales-order-print-content"
+                    class="mx-auto min-w-[1220px] max-w-[1220px]"
+                  ></div>
+                </div>
+              </div>
+
+              <div class="mt-5 flex flex-wrap items-center justify-end gap-3">
+                <button
+                  type="button"
+                  class="rounded-lg bg-gray-200 px-4 py-2 text-gray-800 transition-all-300 hover:bg-gray-300"
+                  onclick="finishSalesOrderPrint()"
+                >
+                  完成并查看记录
+                </button>
+                <button
+                  id="sales-order-print-button"
+                  type="button"
+                  class="rounded-lg bg-primary px-5 py-2 text-white transition-all-300 hover:bg-primary-dark"
+                  onclick="printCurrentSalesOrder()"
+                >
+                  <i class="fa fa-print mr-2"></i>打印送货单
+                </button>
+              </div>
+            </div>
           </section>
 
           <!-- 供应商管理 -->
@@ -1260,19 +1667,21 @@
             </div>
 
             <!-- 供应商列表 -->
-            <div class="bg-white rounded-lg shadow-card overflow-hidden">
+            <div
+              class="data-table-card bg-white rounded-lg shadow-card overflow-hidden"
+            >
               <div class="business-table-scroll overflow-x-auto">
                 <table
                   class="business-data-table business-data-table--supplier min-w-full divide-y divide-gray-200"
                 >
                   <colgroup>
-                    <col style="width: 14%" />
-                    <col style="width: 13%" />
-                    <col style="width: 15%" />
-                    <col style="width: 12%" />
+                    <col style="width: 20%" />
                     <col style="width: 9%" />
+                    <col style="width: 12%" />
+                    <col style="width: 12%" />
+                    <col style="width: 7%" />
                     <col style="width: 24%" />
-                    <col style="width: 13%" />
+                    <col style="width: 16%" />
                   </colgroup>
                   <thead>
                     <tr>
@@ -1307,7 +1716,7 @@
                         创建与更新
                       </th>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        class="table-action-header px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         操作
                       </th>
@@ -1346,19 +1755,21 @@
             </div>
 
             <!-- 公司列表 -->
-            <div class="bg-white rounded-lg shadow-card overflow-hidden">
+            <div
+              class="data-table-card bg-white rounded-lg shadow-card overflow-hidden"
+            >
               <div class="business-table-scroll overflow-x-auto">
                 <table
                   class="business-data-table business-data-table--company min-w-full divide-y divide-gray-200"
                 >
                   <colgroup>
-                    <col style="width: 12%" />
-                    <col style="width: 12%" />
+                    <col style="width: 18%" />
+                    <col style="width: 8%" />
+                    <col style="width: 11%" />
+                    <col style="width: 18%" />
+                    <col style="width: 7%" />
+                    <col style="width: 23%" />
                     <col style="width: 15%" />
-                    <col style="width: 14%" />
-                    <col style="width: 9%" />
-                    <col style="width: 24%" />
-                    <col style="width: 14%" />
                   </colgroup>
                   <thead>
                     <tr>
@@ -1393,7 +1804,7 @@
                         创建与更新
                       </th>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        class="table-action-header px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         操作
                       </th>
@@ -1414,7 +1825,7 @@
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
                       >
-                        13800138001
+                        未提供
                       </td>
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
@@ -1462,7 +1873,7 @@
                         </div>
                       </td>
                       <td
-                        class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
+                        class="table-action-cell px-6 py-4 whitespace-nowrap text-left text-sm font-medium"
                       >
                         <a
                           href="#"
@@ -1488,7 +1899,7 @@
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
                       >
-                        13900139001
+                        未提供
                       </td>
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
@@ -1536,7 +1947,7 @@
                         </div>
                       </td>
                       <td
-                        class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
+                        class="table-action-cell px-6 py-4 whitespace-nowrap text-left text-sm font-medium"
                       >
                         <a
                           href="#"
@@ -1576,21 +1987,23 @@
             </div>
 
             <!-- 客户列表 -->
-            <div class="bg-white rounded-lg shadow-card overflow-hidden">
+            <div
+              class="data-table-card bg-white rounded-lg shadow-card overflow-hidden"
+            >
               <div class="business-table-scroll overflow-x-auto">
                 <table
                   class="business-data-table business-data-table--customer min-w-full divide-y divide-gray-200"
                 >
                   <colgroup>
                     <col style="width: 7%" />
+                    <col style="width: 16%" />
+                    <col style="width: 6%" />
                     <col style="width: 9%" />
-                    <col style="width: 11%" />
-                    <col style="width: 13%" />
-                    <col style="width: 10%" />
-                    <col style="width: 10%" />
-                    <col style="width: 8%" />
-                    <col style="width: 20%" />
-                    <col style="width: 12%" />
+                    <col style="width: 15%" />
+                    <col style="width: 6%" />
+                    <col style="width: 6%" />
+                    <col style="width: 18%" />
+                    <col style="width: 17%" />
                   </colgroup>
                   <thead>
                     <tr>
@@ -1635,7 +2048,7 @@
                         创建与更新
                       </th>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        class="table-action-header px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         操作
                       </th>
@@ -1656,7 +2069,7 @@
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
                       >
-                        13600136000
+                        未提供
                       </td>
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
@@ -1666,7 +2079,7 @@
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
                       >
-                        zhao@jd.com
+                        contact1@example.com
                       </td>
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
@@ -1714,7 +2127,7 @@
                         </div>
                       </td>
                       <td
-                        class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
+                        class="table-action-cell px-6 py-4 whitespace-nowrap text-left text-sm font-medium"
                       >
                         <a
                           href="#"
@@ -1740,7 +2153,7 @@
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
                       >
-                        13500135000
+                        未提供
                       </td>
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
@@ -1750,7 +2163,7 @@
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
                       >
-                        qian@tmall.com
+                        contact2@example.com
                       </td>
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
@@ -1798,7 +2211,7 @@
                         </div>
                       </td>
                       <td
-                        class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
+                        class="table-action-cell px-6 py-4 whitespace-nowrap text-left text-sm font-medium"
                       >
                         <a
                           href="#"
@@ -1824,7 +2237,7 @@
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
                       >
-                        13400134000
+                        未提供
                       </td>
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
@@ -1834,7 +2247,7 @@
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
                       >
-                        sun@suning.com
+                        contact3@example.com
                       </td>
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
@@ -1882,7 +2295,7 @@
                         </div>
                       </td>
                       <td
-                        class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
+                        class="table-action-cell px-6 py-4 whitespace-nowrap text-left text-sm font-medium"
                       >
                         <a
                           href="#"
@@ -1914,7 +2327,7 @@
             </div>
 
             <!-- 操作按钮 -->
-            <div class="flex space-x-4 mb-6">
+            <div class="flex flex-wrap items-center gap-3 mb-6">
               <button
                 id="add-inbound-btn"
                 class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg flex items-center transition-all-300"
@@ -1974,9 +2387,13 @@
             </div>
 
             <!-- 记录列表 -->
-            <div class="bg-white rounded-lg shadow-card overflow-hidden">
+            <div
+              class="data-table-card bg-white rounded-lg shadow-card overflow-hidden"
+            >
               <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
+                <table
+                  class="stock-movement-table min-w-full divide-y divide-gray-200"
+                >
                   <thead>
                     <tr id="stock-movement-table-head">
                       <th
@@ -2005,7 +2422,7 @@
                         创建与更新
                       </th>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        class="table-action-header px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         操作
                       </th>
@@ -2073,7 +2490,9 @@
             </div>
 
             <!-- 日志列表 -->
-            <div class="bg-white rounded-lg shadow-card overflow-hidden">
+            <div
+              class="data-table-card bg-white rounded-lg shadow-card overflow-hidden"
+            >
               <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                   <thead>
@@ -2217,7 +2636,9 @@
               </div>
             </div>
 
-            <div class="bg-white rounded-lg shadow-card overflow-hidden">
+            <div
+              class="data-table-card bg-white rounded-lg shadow-card overflow-hidden"
+            >
               <div class="overflow-x-auto overflow-y-hidden scrollbar-hide">
                 <table class="min-w-full divide-y divide-gray-200">
                   <thead>
@@ -2254,8 +2675,7 @@
                         创建与更新
                       </th>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        style="text-align: left"
+                        class="table-action-header px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         操作
                       </th>
@@ -2648,7 +3068,7 @@
           <section id="settings" class="page-section hidden">
             <div class="mb-6">
               <h2 class="text-2xl font-bold text-gray-800">系统设置</h2>
-              <p class="text-gray-600">配置系统参数和用户权限</p>
+              <p class="text-gray-600">管理库存规则、历史业务导入与数据备份</p>
             </div>
 
             <!-- 标签页 -->
@@ -2664,26 +3084,18 @@
                 </li>
                 <li class="mr-2">
                   <button
-                    data-target="settings-user"
-                    class="inline-block p-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 rounded-t-lg"
-                  >
-                    用户管理
-                  </button>
-                </li>
-                <li class="mr-2">
-                  <button
-                    data-target="settings-permission"
-                    class="inline-block p-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 rounded-t-lg"
-                  >
-                    权限设置
-                  </button>
-                </li>
-                <li class="mr-2">
-                  <button
                     data-target="settings-backup"
                     class="inline-block p-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 rounded-t-lg"
                   >
                     数据备份
+                  </button>
+                </li>
+                <li class="mr-2">
+                  <button
+                    data-target="settings-history-import"
+                    class="inline-block p-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 rounded-t-lg"
+                  >
+                    历史业务导入
                   </button>
                 </li>
               </ul>
@@ -2694,135 +3106,29 @@
               id="settings-basic"
               class="bg-white rounded-lg shadow-card p-6 settings-content"
             >
-              <form>
-                <div class="mb-6">
-                  <h3 class="text-lg font-semibold text-gray-800 mb-4">
-                    库存预警设置
+              <div class="space-y-5">
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-800 mb-2">
+                    库存预警规则
                   </h3>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                        >库存预警阈值（百分比）</label
-                      >
-                      <input
-                        type="number"
-                        value="20"
-                        min="0"
-                        max="100"
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                      />
-                      <p class="text-xs text-gray-500 mt-1">
-                        当库存低于最小库存的百分比时触发预警
-                      </p>
-                    </div>
-                    <div>
-                      <label
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                        >库存过剩阈值（百分比）</label
-                      >
-                      <input
-                        type="number"
-                        value="80"
-                        min="0"
-                        max="100"
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                      />
-                      <p class="text-xs text-gray-500 mt-1">
-                        当库存高于最大库存的百分比时触发预警
-                      </p>
-                    </div>
-                  </div>
+                  <p class="text-sm text-gray-600 leading-6">
+                    当前系统按每件商品自己的最小库存和最大库存判断“库存不足”与“库存过剩”，不再展示未生效的全局百分比和智能预测设置。
+                  </p>
                 </div>
-
-                <div class="mb-6">
-                  <h3 class="text-lg font-semibold text-gray-800 mb-4">
-                    智能预警设置
-                  </h3>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                        >历史数据分析周期（月）</label
-                      >
-                      <input
-                        type="number"
-                        value="3"
-                        min="1"
-                        max="12"
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                      />
-                      <p class="text-xs text-gray-500 mt-1">
-                        智能预警系统分析的历史数据周期
-                      </p>
-                    </div>
-                    <div>
-                      <label
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                        >预测提前期（天）</label
-                      >
-                      <input
-                        type="number"
-                        value="15"
-                        min="1"
-                        max="90"
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                      />
-                      <p class="text-xs text-gray-500 mt-1">
-                        智能预警系统提前多少天预测库存需求
-                      </p>
-                    </div>
-                  </div>
-                  <div class="mt-4">
-                    <label class="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked
-                        class="rounded text-primary focus:ring-primary"
-                      />
-                      <span class="ml-2 text-sm text-gray-700"
-                        >启用智能预警系统</span
-                      >
-                    </label>
-                  </div>
+                <div
+                  class="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800"
+                >
+                  可在库存管理中新增或编辑商品时维护库存上下限；库存数量仍需通过进货、出货流程调整。
                 </div>
-
                 <div class="flex justify-end">
                   <button
+                    id="settings-go-inventory-btn"
                     type="button"
-                    class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2 transition-all-300"
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="submit"
                     class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg transition-all-300"
                   >
-                    保存设置
+                    前往库存管理
                   </button>
                 </div>
-              </form>
-            </div>
-
-            <!-- 用户管理 (Placeholder) -->
-            <div
-              id="settings-user"
-              class="bg-white rounded-lg shadow-card p-6 settings-content hidden"
-            >
-              <div class="text-center py-10 text-gray-500">
-                <i class="fa fa-users text-4xl mb-4"></i>
-                <p>用户管理功能开发中...</p>
-              </div>
-            </div>
-
-            <!-- 权限设置 (Placeholder) -->
-            <div
-              id="settings-permission"
-              class="bg-white rounded-lg shadow-card p-6 settings-content hidden"
-            >
-              <div class="text-center py-10 text-gray-500">
-                <i class="fa fa-lock text-4xl mb-4"></i>
-                <p>权限设置功能开发中...</p>
               </div>
             </div>
 
@@ -2871,6 +3177,438 @@
                 </div>
               </div>
             </div>
+
+            <!-- 历史业务导入 -->
+            <div
+              id="settings-history-import"
+              class="bg-white rounded-lg shadow-card p-6 settings-content hidden"
+            >
+              <div class="space-y-5">
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-800 mb-2">
+                    Excel 历史送货单解析
+                  </h3>
+                  <p class="text-sm text-gray-600 leading-6">
+                    批量解析旧送货单，并同步建立或关联我方公司、客户公司、商品、销售送货单及客户商品价格版本。解析后会进入独立核对页面，不会直接写入。
+                  </p>
+                </div>
+                <div
+                  class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4"
+                >
+                  <div
+                    class="rounded-xl border border-purple-100 bg-purple-50 p-4"
+                  >
+                    <i class="fa fa-building-o text-primary"></i>
+                    <div class="mt-2 font-semibold text-gray-800">公司资料</div>
+                    <div class="mt-1 text-xs leading-5 text-gray-600">
+                      识别发货公司并关联或新建
+                    </div>
+                  </div>
+                  <div
+                    class="rounded-xl border border-purple-100 bg-purple-50 p-4"
+                  >
+                    <i class="fa fa-users text-primary"></i>
+                    <div class="mt-2 font-semibold text-gray-800">客户资料</div>
+                    <div class="mt-1 text-xs leading-5 text-gray-600">
+                      录入客户公司、地址及联系方式
+                    </div>
+                  </div>
+                  <div
+                    class="rounded-xl border border-purple-100 bg-purple-50 p-4"
+                  >
+                    <i class="fa fa-cube text-primary"></i>
+                    <div class="mt-2 font-semibold text-gray-800">商品资料</div>
+                    <div class="mt-1 text-xs leading-5 text-gray-600">
+                      识别商品、规格、单位和成交数量
+                    </div>
+                  </div>
+                  <div
+                    class="rounded-xl border border-purple-100 bg-purple-50 p-4"
+                  >
+                    <i class="fa fa-tags text-primary"></i>
+                    <div class="mt-2 font-semibold text-gray-800">
+                      客户价格表
+                    </div>
+                    <div class="mt-1 text-xs leading-5 text-gray-600">
+                      按公司、客户和商品保存价格版本
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="rounded-lg border border-amber-100 bg-amber-50 p-4 text-sm leading-6 text-amber-800"
+                >
+                  支持历史送货单和客户对账单。对账单会按送货单号拆分明细，并保存本期金额、税率和往期余额。历史导入不会生成出库流水，也不会扣减当前库存；未匹配的新商品会先归入“历史送货单导入”供应商，之后可在商品管理中调整。
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                  <button
+                    id="historical-business-import-btn"
+                    type="button"
+                    class="bg-primary hover:bg-primary-dark text-white px-5 py-2.5 rounded-lg flex items-center transition-all-300"
+                  >
+                    <i class="fa fa-file-excel-o mr-2"></i>
+                    选择历史送货单 / 对账单 Excel
+                  </button>
+                  <span class="text-xs text-gray-500"
+                    >支持 .xlsx / .xls，可一次选择多个文件</span
+                  >
+                  <input
+                    id="historical-business-import-input"
+                    class="hidden"
+                    type="file"
+                    accept=".xlsx,.xls"
+                    multiple
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 通用业务表单工作流 -->
+          <section id="business-form-workflow" class="page-section hidden">
+            <div class="mb-5">
+              <button
+                id="business-form-back"
+                type="button"
+                class="mb-3 inline-flex items-center text-sm text-gray-500 transition-colors hover:text-primary"
+              >
+                <i class="fa fa-angle-left mr-2"></i>返回上一页
+              </button>
+              <h2
+                id="business-form-workflow-title"
+                class="text-2xl font-bold text-gray-800"
+              >
+                业务资料维护
+              </h2>
+              <p
+                id="business-form-workflow-subtitle"
+                class="mt-1 text-sm text-gray-600"
+              >
+                填写并检查资料，确认后保存。
+              </p>
+            </div>
+
+            <div class="business-form-workflow-card">
+              <div id="business-form-workflow-content"></div>
+              <div class="business-form-workflow-actions">
+                <button
+                  id="business-form-workflow-cancel"
+                  type="button"
+                  class="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-gray-700 transition-colors hover:border-primary hover:text-primary"
+                >
+                  取消
+                </button>
+                <button
+                  id="business-form-workflow-confirm"
+                  type="button"
+                  class="rounded-lg bg-primary px-5 py-2.5 font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- 历史业务导入工作流 -->
+          <section id="history-import-workflow" class="page-section hidden">
+            <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <button
+                  id="history-import-back-to-settings"
+                  type="button"
+                  class="mb-3 inline-flex items-center text-sm text-gray-500 transition-colors hover:text-primary"
+                >
+                  <i class="fa fa-angle-left mr-2"></i>返回历史业务导入
+                </button>
+                <h2
+                  id="delivery-import-workflow-title"
+                  class="text-2xl font-bold text-gray-800"
+                >
+                  历史送货单 / 对账单导入
+                </h2>
+                <p
+                  id="delivery-import-workflow-subtitle"
+                  class="mt-1 text-sm text-gray-600"
+                >
+                  请选择 Excel 文件后开始核对。
+                </p>
+              </div>
+              <div
+                id="delivery-import-workflow-steps"
+                class="delivery-import-workflow-steps"
+                aria-label="导入进度"
+              >
+                <span data-step="review">1 核对解析</span>
+                <i class="fa fa-angle-right"></i>
+                <span data-step="preview">2 预览变更</span>
+                <i class="fa fa-angle-right"></i>
+                <span data-step="commit">3 完成导入</span>
+              </div>
+            </div>
+
+            <div class="delivery-import-workflow-card">
+              <div id="delivery-import-workflow-content">
+                <div class="py-16 text-center text-gray-500">
+                  当前没有正在处理的导入任务。
+                </div>
+              </div>
+              <div
+                id="delivery-import-workflow-actions"
+                class="delivery-import-workflow-actions hidden"
+              >
+                <button
+                  id="delivery-import-workflow-secondary"
+                  type="button"
+                  class="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-gray-700 transition-colors hover:border-primary hover:text-primary"
+                >
+                  取消
+                </button>
+                <button
+                  id="delivery-import-workflow-primary"
+                  type="button"
+                  class="rounded-lg bg-primary px-5 py-2.5 font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  继续
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- 使用说明 -->
+          <section id="usage-guide" class="page-section hidden">
+            <div class="usage-guide-heading">
+              <div>
+                <span class="usage-guide-eyebrow">SYSTEM HANDBOOK</span>
+                <h2>系统使用说明</h2>
+                <p>
+                  按业务发生顺序建档，系统会自动校验前置数据并保护历史记录。
+                </p>
+              </div>
+              <div class="usage-guide-version">
+                <i class="fa fa-desktop"></i>
+                <span>电脑端操作规范</span>
+              </div>
+            </div>
+
+            <div class="usage-guide-notice">
+              <i class="fa fa-lightbulb-o"></i>
+              <div>
+                <strong>第一次使用，从“公司管理”开始。</strong>
+                <span
+                  >如果直接创建商品、进货、出货或对账单，系统会提示缺少的前置数据；选择“去创建”即可跳转到对应页面。</span
+                >
+              </div>
+            </div>
+
+            <div class="usage-guide-card">
+              <div class="usage-guide-card-title">
+                <span class="usage-guide-title-icon"
+                  ><i class="fa fa-sitemap"></i
+                ></span>
+                <div>
+                  <h3>推荐建档顺序</h3>
+                  <p>从基础资料到业务单据，按以下顺序可避免数据缺失。</p>
+                </div>
+              </div>
+              <ol class="usage-guide-flow">
+                <li>
+                  <b>1</b
+                  ><span
+                    ><strong>公司</strong
+                    ><small>维护我方开票与发货主体</small></span
+                  >
+                </li>
+                <li>
+                  <b>2</b
+                  ><span
+                    ><strong>客户 / 供应商</strong
+                    ><small>建立业务往来对象</small></span
+                  >
+                </li>
+                <li>
+                  <b>3</b
+                  ><span
+                    ><strong>商品</strong
+                    ><small>关联供应商并设置价格、库存上下限</small></span
+                  >
+                </li>
+                <li>
+                  <b>4</b
+                  ><span
+                    ><strong>进货入库</strong
+                    ><small>形成已确认流水并增加库存</small></span
+                  >
+                </li>
+                <li>
+                  <b>5</b
+                  ><span
+                    ><strong>销售出库</strong
+                    ><small>选择客户、商品，生成送货单并扣减库存</small></span
+                  >
+                </li>
+                <li>
+                  <b>6</b
+                  ><span
+                    ><strong>对账与报表</strong
+                    ><small>按已发生单据生成对账结果</small></span
+                  >
+                </li>
+              </ol>
+            </div>
+
+            <div class="usage-guide-grid">
+              <article class="usage-guide-card">
+                <div class="usage-guide-card-title">
+                  <span class="usage-guide-title-icon is-green"
+                    ><i class="fa fa-cubes"></i
+                  ></span>
+                  <div>
+                    <h3>日常进出货</h3>
+                    <p>库存数量以已确认的业务记录为准。</p>
+                  </div>
+                </div>
+                <ul class="usage-guide-list">
+                  <li>
+                    <strong>进货：</strong
+                    >进入“库存管理”或“进出货管理”，点击“新增进货 /
+                    商品”。选择已有商品可补货，输入新名称则会同时建档并入库。
+                  </li>
+                  <li>
+                    <strong>出货：</strong
+                    >点击“新增出货”，仅可选择有效且有库存的商品。
+                  </li>
+                  <li>
+                    <strong>销售送货单：</strong
+                    >选择公司、客户和商品，提交后自动扣减库存并生成出库流水。
+                  </li>
+                  <li>
+                    <strong>库存不足：</strong
+                    >先完成进货，再创建出货；系统不会允许库存变为负数。
+                  </li>
+                </ul>
+              </article>
+
+              <article class="usage-guide-card">
+                <div class="usage-guide-card-title">
+                  <span class="usage-guide-title-icon is-blue"
+                    ><i class="fa fa-file-text-o"></i
+                  ></span>
+                  <div>
+                    <h3>对账单与状态</h3>
+                    <p>对账数据来源于已发生的进货或送货记录。</p>
+                  </div>
+                </div>
+                <ul class="usage-guide-list">
+                  <li>
+                    <strong>客户对账：</strong
+                    >先有客户送货记录，再按公司、客户和日期范围创建。
+                  </li>
+                  <li>
+                    <strong>供应商对账：</strong
+                    >先有供应商进货记录，再选择对应期间生成。
+                  </li>
+                  <li>
+                    <strong>单据来源：</strong
+                    >草稿或作废记录不会进入新的对账范围。
+                  </li>
+                  <li>
+                    <strong>避免重复：</strong
+                    >已被有效对账单占用的来源单据不会再次计入。
+                  </li>
+                </ul>
+              </article>
+
+              <article class="usage-guide-card">
+                <div class="usage-guide-card-title">
+                  <span class="usage-guide-title-icon is-orange"
+                    ><i class="fa fa-shield"></i
+                  ></span>
+                  <div>
+                    <h3>资料停用与历史保护</h3>
+                    <p>有历史业务的数据不会被直接物理删除。</p>
+                  </div>
+                </div>
+                <ul class="usage-guide-list">
+                  <li>
+                    <strong>未被引用：</strong
+                    >公司、客户、供应商或商品可以直接删除。
+                  </li>
+                  <li>
+                    <strong>已被引用：</strong
+                    >删除操作会改为“停用”，历史单据与流水保持不变。
+                  </li>
+                  <li>
+                    <strong>停用后：</strong
+                    >资料仍可在历史列表中查看，但不会出现在新增业务的选择框中。
+                  </li>
+                  <li>
+                    <strong>重新启用：</strong
+                    >公司、客户、供应商和商品均可通过编辑将状态恢复为“活跃”。
+                  </li>
+                </ul>
+              </article>
+
+              <article class="usage-guide-card">
+                <div class="usage-guide-card-title">
+                  <span class="usage-guide-title-icon is-purple"
+                    ><i class="fa fa-database"></i
+                  ></span>
+                  <div>
+                    <h3>数据维护与备份</h3>
+                    <p>重要操作前先备份，减少误操作风险。</p>
+                  </div>
+                </div>
+                <ul class="usage-guide-list">
+                  <li>
+                    <strong>导出：</strong>在“系统设置 → 数据备份”下载 JSON
+                    备份文件。
+                  </li>
+                  <li>
+                    <strong>导入：</strong
+                    >导入会覆盖当前数据，操作前请再次导出最新备份。
+                  </li>
+                  <li>
+                    <strong>测试数据：</strong
+                    >“写入测试”仅用于演示；“清空数据”为不可恢复的危险操作。
+                  </li>
+                  <li>
+                    <strong>操作追溯：</strong
+                    >新增、编辑、停用和删除动作可在“日志系统”查看。
+                  </li>
+                </ul>
+              </article>
+            </div>
+
+            <div class="usage-guide-card usage-guide-faq">
+              <div class="usage-guide-card-title">
+                <span class="usage-guide-title-icon is-gray"
+                  ><i class="fa fa-question"></i
+                ></span>
+                <div>
+                  <h3>常见问题</h3>
+                  <p>遇到无法创建或选不到数据时，优先检查以下项目。</p>
+                </div>
+              </div>
+              <div class="usage-guide-faq-grid">
+                <div>
+                  <strong>选择框里没有资料</strong
+                  ><span>确认资料已经创建，并且状态为“活跃”。</span>
+                </div>
+                <div>
+                  <strong>无法创建出货</strong
+                  ><span>确认已有客户、有效商品，并且商品当前库存大于 0。</span>
+                </div>
+                <div>
+                  <strong>对账单没有来源记录</strong
+                  ><span
+                    >确认对应期间已有进货或送货记录，且尚未被其他有效对账单占用。</span
+                  >
+                </div>
+                <div>
+                  <strong>误停用了资料</strong
+                  ><span>进入对应管理页面编辑资料，将状态恢复为“活跃”。</span>
+                </div>
+              </div>
+            </div>
           </section>
         </main>
       </div>
@@ -2891,7 +3629,12 @@
           <h3 class="text-lg font-semibold text-gray-800" id="modal-title">
             模态框标题
           </h3>
-          <button id="close-modal" class="text-gray-400 hover:text-gray-500">
+          <button
+            id="close-modal"
+            type="button"
+            aria-label="关闭弹窗"
+            class="text-gray-400 hover:text-gray-500"
+          >
             <i class="fa fa-times text-xl"></i>
           </button>
         </div>
@@ -2901,12 +3644,14 @@
         <div class="flex justify-end p-4 border-t border-gray-200">
           <button
             id="modal-cancel"
+            type="button"
             class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2 transition-all-300"
           >
             取消
           </button>
           <button
             id="modal-confirm"
+            type="button"
             class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg transition-all-300"
           >
             确认
@@ -2915,19 +3660,33 @@
       </div>
     </div>
 
+    <script src="lib/xlsx.full.min.js" defer></script>
     <script src="js/modules/app-utils.js" defer></script>
     <script src="js/modules/app-state.js" defer></script>
+    <script src="js/modules/inventory-core.js" defer></script>
+    <script src="js/modules/data-schema.js" defer></script>
     <script src="js/modules/data-store.js" defer></script>
+    <script src="js/modules/inventory-ledger.js" defer></script>
+    <script src="js/modules/master-data-core.js" defer></script>
+    <script src="js/modules/master-data-products.js" defer></script>
     <script src="js/modules/master-data-module.js" defer></script>
+    <script src="js/modules/customer-price-module.js" defer></script>
+    <script src="js/modules/price-management-module.js" defer></script>
+    <script src="js/modules/delivery-note-import.js" defer></script>
     <script src="js/modules/stock-module.js" defer></script>
     <script src="js/modules/logs-module.js" defer></script>
     <script src="js/modules/settings-module.js" defer></script>
     <script src="js/script.js" defer></script>
+    <script src="js/app/app-shell.js" defer></script>
     <script src="js/ui/antd-bridge.js" defer></script>
     <script src="js/app/navigation.js" defer></script>
     <script src="js/app/router.js" defer></script>
     <script src="js/app/charts.js" defer></script>
     <script src="js/modules/bills-core.js" defer></script>
+    <script src="js/modules/bills-state.js" defer></script>
+    <script src="js/modules/bills-data.js" defer></script>
+    <script src="js/modules/bills-statements.js" defer></script>
+    <script src="js/modules/bills-list.js" defer></script>
     <script src="js/modules/bills-module.js" defer></script>
     <script src="js/sales-order.js" defer></script>
     <script src="js/app/bootstrap.js" defer></script>

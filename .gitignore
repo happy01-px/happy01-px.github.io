@@ -1,6 +1,13 @@
 node_modules/
 .codex-temp/
 .npm-cache/
+.electron-cache/
 coverage/
+dist/
+desktop-dist/
 data/.backups/
+data/.snapshots/
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
 .runtime/

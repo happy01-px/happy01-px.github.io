@@ -25,22 +25,53 @@ const MODAL_MARKUP = `
 const APP_SHELL_SCRIPT_PATHS = Object.freeze([
   "js/modules/app-utils.js",
   "js/script.js",
+  "js/app/app-shell.js",
   "js/ui/antd-bridge.js",
   "js/app/navigation.js",
   "js/app/router.js",
   "js/app/charts.js",
 ]);
 
+const SCRIPT_DEPENDENCIES = Object.freeze({
+  "js/modules/master-data-products.js": ["js/modules/master-data-core.js"],
+  "js/modules/master-data-module.js": [
+    "js/modules/master-data-core.js",
+    "js/modules/master-data-products.js",
+  ],
+  "js/modules/bills-data.js": ["js/modules/bills-core.js"],
+  "js/modules/bills-statements.js": [
+    "js/modules/bills-core.js",
+    "js/modules/bills-data.js",
+  ],
+  "js/modules/bills-list.js": [
+    "js/modules/bills-core.js",
+    "js/modules/bills-state.js",
+    "js/modules/bills-data.js",
+  ],
+  "js/modules/bills-module.js": [
+    "js/modules/bills-list.js",
+    "js/modules/bills-statements.js",
+  ],
+});
+
 function readProjectFile(relativePath) {
   return fs.readFileSync(path.join(projectRoot, relativePath), "utf8");
 }
 
 function loadScripts(window, relativePaths) {
-  relativePaths.forEach((relativePath) => {
+  const loadedPaths = new Set();
+
+  function loadScript(relativePath) {
+    if (loadedPaths.has(relativePath)) return;
+    (SCRIPT_DEPENDENCIES[relativePath] || []).forEach(loadScript);
+
     const absolutePath = path.join(projectRoot, relativePath);
     const sourceUrl = pathToFileURL(absolutePath).href;
     window.eval(`${readProjectFile(relativePath)}\n//# sourceURL=${sourceUrl}`);
-  });
+    loadedPaths.add(relativePath);
+  }
+
+  relativePaths.forEach(loadScript);
 }
 
 function buildDocumentHtml(options = {}) {
@@ -621,6 +652,19 @@ function installAntdComponentStubs(window) {
         },
         props.icon,
         props.children,
+      );
+    },
+    Switch(props) {
+      return React.createElement(
+        "button",
+        {
+          type: "button",
+          role: "switch",
+          "aria-checked": String(Boolean(props.checked)),
+          "data-role": "antd-switch",
+          onClick: () => props.onChange?.(!props.checked),
+        },
+        props.checked ? props.checkedChildren : props.unCheckedChildren,
       );
     },
     Flex(props) {

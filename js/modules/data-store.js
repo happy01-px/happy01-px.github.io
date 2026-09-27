@@ -1,14 +1,18 @@
 (function initDataStore(global) {
   const STORAGE_MODES = Object.freeze({
     remote: "remote",
+    local: "local",
     memory: "memory",
   });
+  const LOCAL_STORAGE_KEY = "inventory-system.dataset.v4";
 
   const REMOTE_TABLES = Object.freeze([
     "products",
     "suppliers",
     "customers",
+    "customerProductPrices",
     "companies",
+    "warehouses",
     "bills",
     "deliveryNotes",
     "stockMovements",
@@ -18,6 +22,8 @@
   const storeState = global.AppDataStoreState || {
     mode: STORAGE_MODES.memory,
     source: "fallback",
+    revision: 0,
+    lastSyncedDataset: null,
   };
 
   global.AppDataStoreState = storeState;
@@ -27,7 +33,9 @@
       products: [],
       suppliers: [],
       customers: [],
+      customerProductPrices: [],
       companies: [],
+      warehouses: [deepClone(global.AppDataSchema.DEFAULT_WAREHOUSE)],
       bills: [],
       deliveryNotes: [],
       stockMovements: [],
@@ -36,12 +44,17 @@
   }
 
   function normalizeDataset(data = {}) {
-    return {
+    const normalized = {
       ...createEmptyDataset(),
       ...normalizeMockData(data),
       stockMovements: normalizeList(data.stockMovements),
       logs: normalizeList(data.logs),
     };
+    normalized.products = global.InventoryCore.hydrateProductStock(
+      normalized.products,
+      normalized.stockMovements,
+    );
+    return normalized;
   }
 
   function createRuntimeDatasetSnapshot() {
@@ -50,6 +63,60 @@
       stockMovements: normalizeList(stockMovementData),
       logs: normalizeList(logsData),
     });
+  }
+
+  function createPersistedDatasetSnapshot(sourceDataset) {
+    const source = sourceDataset || createRuntimeDatasetSnapshot();
+    const report = global.InventoryCore.createConsistencyReport(
+      source.products,
+      source.stockMovements,
+    );
+    const cachedProductIds = new Set(
+      normalizeList(source.products)
+        .filter((product) =>
+          Object.prototype.hasOwnProperty.call(product, "stockQuantity"),
+        )
+        .map((product) => String(product.id)),
+    );
+    if (report.negativeLedgers.length > 0) {
+      throw new Error("Stock movement ledger contains negative inventory");
+    }
+    const persistedMismatches = report.mismatches.filter((row) =>
+      cachedProductIds.has(String(row.productId)),
+    );
+    if (persistedMismatches.length > 0) {
+      throw new Error(
+        `Runtime inventory cache is inconsistent for ${persistedMismatches.length} product(s)`,
+      );
+    }
+    const runtimeDataset = normalizeDataset(source);
+    return {
+      ...runtimeDataset,
+      products: global.InventoryCore.stripDerivedStock(runtimeDataset.products),
+    };
+  }
+
+  function restoreRuntimeDataset(dataset) {
+    const normalizedDataset = normalizeDataset(dataset);
+    mockData = normalizeMockData(normalizedDataset);
+    stockMovementData = restoreStockMovementDates(
+      normalizedDataset.stockMovements,
+    );
+    logsData = restoreLogDates(normalizedDataset.logs);
+  }
+
+  function validateImportPayload(data) {
+    try {
+      return {
+        error: null,
+        migrated: global.AppDataSchema.migrateBackupPayload(data),
+      };
+    } catch (error) {
+      return {
+        error: error?.message || "备份数据校验失败",
+        migrated: null,
+      };
+    }
   }
 
   function applyDefaultDataset(dataset) {
@@ -64,6 +131,144 @@
     storeState.source = source;
     global.__appDataPersistenceMode = mode;
     global.__appDataPersistenceSource = source;
+  }
+
+  function getBrowserStorage() {
+    try {
+      return global.localStorage || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function parseLocalSnapshot(rawSnapshot) {
+    if (!rawSnapshot) return null;
+    const snapshot = JSON.parse(rawSnapshot);
+    if (
+      snapshot.formatVersion !== global.AppDataSchema.DATA_FORMAT_VERSION ||
+      !Number.isInteger(snapshot.revision) ||
+      snapshot.revision < 0 ||
+      !snapshot.dataset
+    ) {
+      throw new Error("Browser dataset snapshot metadata is invalid");
+    }
+    const migratedDataset = global.AppDataSchema.migrateDataset(
+      snapshot.dataset,
+    );
+    const validationError =
+      global.AppDataSchema.validateDataset(migratedDataset);
+    if (validationError) throw new Error(validationError);
+    return { ...snapshot, dataset: migratedDataset };
+  }
+
+  function loadLocalDatasetSnapshot() {
+    const storage = getBrowserStorage();
+    if (!storage) return null;
+    const snapshot = parseLocalSnapshot(storage.getItem(LOCAL_STORAGE_KEY));
+    if (!snapshot) return null;
+    storeState.revision = snapshot.revision;
+    return normalizeDataset(snapshot.dataset);
+  }
+
+  function saveLocalDatasetSnapshot(dataset) {
+    const storage = getBrowserStorage();
+    if (!storage) {
+      throw new Error("浏览器本地存储不可用");
+    }
+    let currentRevision = 0;
+    try {
+      currentRevision =
+        parseLocalSnapshot(storage.getItem(LOCAL_STORAGE_KEY))?.revision || 0;
+    } catch (error) {
+      console.warn("Ignoring an invalid browser dataset snapshot.", error);
+    }
+    if (currentRevision !== getDataRevision()) {
+      const conflict = /** @type {Error & {code?: string}} */ (
+        new Error(
+          `Browser dataset revision conflict: expected ${getDataRevision()}, current ${currentRevision}`,
+        )
+      );
+      conflict.code = "REVISION_CONFLICT";
+      throw conflict;
+    }
+    const revision = currentRevision + 1;
+    storage.setItem(
+      LOCAL_STORAGE_KEY,
+      JSON.stringify({
+        formatVersion: global.AppDataSchema.DATA_FORMAT_VERSION,
+        revision,
+        updatedAt: new Date().toISOString(),
+        dataset,
+      }),
+    );
+    storeState.revision = revision;
+  }
+
+  function getDataRevision() {
+    return Number(storeState.revision) || 0;
+  }
+
+  function clonePersistedValue(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function buildTransactionChanges(previousDataset, nextDataset) {
+    const changes = {};
+
+    REMOTE_TABLES.forEach((tableName) => {
+      const previousRecords = normalizeList(previousDataset?.[tableName]);
+      const nextRecords = normalizeList(nextDataset?.[tableName]);
+      const previousById = new Map(
+        previousRecords.map((record) => [String(record.id), record]),
+      );
+      const nextIds = new Set(nextRecords.map((record) => String(record.id)));
+      const upsert = nextRecords.filter((record) => {
+        const previous = previousById.get(String(record.id));
+        return !previous || JSON.stringify(previous) !== JSON.stringify(record);
+      });
+      const remove = previousRecords
+        .map((record) => String(record.id))
+        .filter((id) => !nextIds.has(id));
+      const previousOrder = previousRecords
+        .map((record) => String(record.id))
+        .join("\u0000");
+      const nextOrderIds = nextRecords.map((record) => String(record.id));
+      const nextOrder = nextOrderIds.join("\u0000");
+
+      if (upsert.length || remove.length || previousOrder !== nextOrder) {
+        changes[tableName] = {
+          upsert: clonePersistedValue(upsert),
+          delete: remove,
+          order: previousOrder === nextOrder ? undefined : nextOrderIds,
+        };
+      }
+    });
+
+    return changes;
+  }
+
+  async function loadDatasetSnapshot() {
+    const response = await fetch("/api/data-all", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Failed to load dataset snapshot: ${response.status}`);
+    }
+    const snapshot = await response.json();
+    if (
+      snapshot.formatVersion !== global.AppDataSchema.DATA_FORMAT_VERSION ||
+      !Number.isInteger(snapshot.revision) ||
+      snapshot.revision < 0
+    ) {
+      throw new Error("Dataset snapshot metadata is invalid");
+    }
+    const migratedDataset = global.AppDataSchema.migrateDataset(
+      snapshot.dataset,
+    );
+    const validationError =
+      global.AppDataSchema.validateDataset(migratedDataset);
+    if (validationError) throw new Error(validationError);
+    storeState.revision = snapshot.revision;
+    storeState.lastSyncedDataset = clonePersistedValue(migratedDataset);
+    return normalizeDataset(migratedDataset);
   }
 
   function getDataPersistenceMode() {
@@ -86,57 +291,125 @@
       }),
     );
 
-    return normalizeDataset({
-      products: results[0],
-      suppliers: results[1],
-      customers: results[2],
-      companies: results[3],
-      bills: results[4],
-      deliveryNotes: results[5],
-      stockMovements: results[6],
-      logs: results[7],
-    });
+    return normalizeDataset(
+      global.AppDataSchema.migrateDataset(
+        Object.fromEntries(
+          REMOTE_TABLES.map((tableName, index) => [tableName, results[index]]),
+        ),
+      ),
+    );
   }
 
   async function resolveAuthoritativeDataset() {
     try {
-      const splitDataset = await loadSplitDataset();
-      setStorageState(STORAGE_MODES.remote, "split-files");
-      return splitDataset;
-    } catch (error) {
+      const snapshotDataset = await loadDatasetSnapshot();
+      setStorageState(STORAGE_MODES.remote, "dataset-snapshot");
+      return snapshotDataset;
+    } catch (snapshotError) {
       console.warn(
-        "Failed to load split data files, using in-memory fallback.",
-        error,
+        "Failed to load the dataset API; trying browser storage.",
+        snapshotError,
       );
-      setStorageState(STORAGE_MODES.memory, "fallback");
-      return createEmptyDataset();
-    }
-  }
-
-  async function saveRemoteTables(dataset, tables = REMOTE_TABLES) {
-    for (const table of tables) {
-      const response = await fetch(`/api/save/${table}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dataset[table]),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to save ${table}: ${response.statusText || response.status}`,
+      try {
+        const localDataset = loadLocalDatasetSnapshot();
+        if (localDataset) {
+          setStorageState(STORAGE_MODES.local, "local-storage");
+          return localDataset;
+        }
+      } catch (localError) {
+        console.warn(
+          "Failed to load browser storage; trying static split files.",
+          localError,
         );
+      }
+      try {
+        const splitDataset = await loadSplitDataset();
+        storeState.revision = 0;
+        setStorageState(
+          getBrowserStorage() ? STORAGE_MODES.local : STORAGE_MODES.memory,
+          "static-split-files",
+        );
+        return splitDataset;
+      } catch (splitError) {
+        console.warn(
+          "Failed to load split data files, preserving current in-memory data.",
+          splitError,
+        );
+        setStorageState(STORAGE_MODES.memory, "load-error");
+        alert(
+          "数据文件读取失败。系统已进入不持久化的内存模式，请检查本地服务和 data 目录后再操作。",
+        );
+        return createRuntimeDatasetSnapshot();
       }
     }
   }
 
+  async function saveRemoteTables(dataset) {
+    const changes = buildTransactionChanges(
+      storeState.lastSyncedDataset,
+      dataset,
+    );
+    let response = await fetch("/api/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        formatVersion: global.AppDataSchema.DATA_FORMAT_VERSION,
+        expectedRevision: getDataRevision(),
+        changes,
+      }),
+    });
+
+    // Older desktop/server builds predate the incremental transaction route,
+    // but still expose the revision-checked atomic dataset endpoint. Keep the
+    // new route as the default and only use the compatibility path when the
+    // server explicitly reports that the route is unavailable.
+    if (response.status === 404 || response.status === 405) {
+      response = await fetch("/api/save-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formatVersion: global.AppDataSchema.DATA_FORMAT_VERSION,
+          expectedRevision: getDataRevision(),
+          dataset,
+        }),
+      });
+    }
+
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      // Preserve the HTTP status as the fallback error when no JSON body exists.
+    }
+    if (!response.ok) {
+      const error = /** @type {Error & {code?: string}} */ (
+        new Error(
+          result?.error ||
+            `Failed to save dataset: ${response.statusText || response.status}`,
+        )
+      );
+      error.code =
+        response.status === 409 ? "REVISION_CONFLICT" : "SAVE_FAILED";
+      throw error;
+    }
+    if (!Number.isInteger(result?.revision)) {
+      throw new Error("Save response did not include a valid revision");
+    }
+    storeState.revision = result.revision;
+    storeState.lastSyncedDataset = clonePersistedValue(dataset);
+  }
+
   async function persistDataset(options = {}) {
-    const dataset = normalizeDataset(
+    const dataset = createPersistedDatasetSnapshot(
       options.dataset || createRuntimeDatasetSnapshot(),
     );
-    const tables =
-      Array.isArray(options.tables) && options.tables.length > 0
-        ? options.tables
-        : REMOTE_TABLES;
+    const validationError = global.AppDataSchema.validateDataset(dataset);
+    if (validationError) throw new Error(validationError);
+
+    if (storeState.mode === STORAGE_MODES.local) {
+      saveLocalDatasetSnapshot(dataset);
+      return true;
+    }
 
     if (storeState.mode !== STORAGE_MODES.remote) {
       console.warn(
@@ -145,19 +418,25 @@
       return false;
     }
 
-    await saveRemoteTables(dataset, tables);
+    await saveRemoteTables(dataset);
     return true;
   }
 
   async function loadMockData() {
     const dataset = await resolveAuthoritativeDataset();
     applyDefaultDataset(dataset);
-    mockData = deepClone(defaultMockData);
+    mockData = normalizeMockData(
+      normalizeDataset({
+        ...deepClone(defaultMockData),
+        stockMovements: defaultStockMovementData,
+      }),
+    );
 
     if (!mockData.products) mockData.products = [];
     if (!mockData.suppliers) mockData.suppliers = [];
     if (!mockData.customers) mockData.customers = [];
     if (!mockData.companies) mockData.companies = [];
+    if (!mockData.warehouses) mockData.warehouses = [];
     if (!mockData.bills) mockData.bills = [];
     if (!mockData.deliveryNotes) mockData.deliveryNotes = [];
   }
@@ -176,7 +455,11 @@
       return await persistDataset();
     } catch (error) {
       console.error("Failed to persist dataset to split files.", error);
-      alert("保存失败：无法写入数据目录，请确认正在通过预览服务器运行。");
+      alert(
+        error?.code === "REVISION_CONFLICT"
+          ? "保存失败：数据已被其他窗口更新，请刷新页面后重试。"
+          : `保存失败：${error?.message || "无法写入数据目录"}`,
+      );
       return false;
     }
   }
@@ -198,17 +481,6 @@
       return persisted;
     } catch (error) {
       console.error("Failed to clear all system data.", error);
-
-      if (storeState.mode === STORAGE_MODES.remote) {
-        try {
-          await saveRemoteTables(previousDataset);
-        } catch (rollbackError) {
-          console.error(
-            "Failed to restore dataset after clear failure.",
-            rollbackError,
-          );
-        }
-      }
 
       mockData = normalizeMockData(previousDataset);
       stockMovementData = restoreStockMovementDates(
@@ -264,13 +536,13 @@
       {
         name: "化工",
         contactPerson: "雪王",
-        contactPhone: "13333333333",
+        contactPhone: "未提供",
         address: "东莞",
       },
       {
         name: "劳保",
         contactPerson: "孙悟空",
-        contactPhone: "16666666666",
+        contactPhone: "未提供",
         address: "虎门",
       },
     ];
@@ -298,7 +570,7 @@
     const supplier = {
       name: "供应商",
       contactPerson: "供应商联系人",
-      contactPhone: "15555555555",
+      contactPhone: "未提供",
     };
     if (hasRecordWithName(mockData.suppliers, supplier.name)) {
       skippedCount += 1;
@@ -324,7 +596,7 @@
       id: "KH",
       name: "客户",
       contactPerson: "客户联系人",
-      contactPhone: "17777777777",
+      contactPhone: "未提供",
       address: "深圳",
       email: "-",
       paymentTerms: "Net 30",
@@ -341,8 +613,9 @@
     );
     const customerWithSameId = normalizeList(mockData.customers).find(
       (record) =>
-        String(record?.id || "").trim().toLocaleLowerCase() ===
-        customer.id.toLocaleLowerCase(),
+        String(record?.id || "")
+          .trim()
+          .toLocaleLowerCase() === customer.id.toLocaleLowerCase(),
     );
 
     if (customerWithSameName) {
@@ -384,17 +657,6 @@
     } catch (error) {
       console.error("Failed to write preset test data.", error);
 
-      if (storeState.mode === STORAGE_MODES.remote) {
-        try {
-          await saveRemoteTables(previousDataset);
-        } catch (rollbackError) {
-          console.error(
-            "Failed to restore dataset after test data write failure.",
-            rollbackError,
-          );
-        }
-      }
-
       mockData = normalizeMockData(previousDataset);
       stockMovementData = restoreStockMovementDates(
         previousDataset.stockMovements,
@@ -425,9 +687,7 @@
 
   async function persistStockMovementData() {
     try {
-      return await persistDataset({
-        tables: ["stockMovements"],
-      });
+      return await persistDataset();
     } catch (error) {
       console.error("Failed to persist stock movement data.", error);
       return false;
@@ -436,9 +696,7 @@
 
   async function persistLogsData() {
     try {
-      return await persistDataset({
-        tables: ["logs"],
-      });
+      return await persistDataset();
     } catch (error) {
       console.error("Failed to persist log data.", error);
       return false;
@@ -449,9 +707,8 @@
     mockData = normalizeMockData(mockData);
 
     const data = {
-      mockData,
-      stockMovementData,
-      logsData,
+      formatVersion: global.AppDataSchema.DATA_FORMAT_VERSION,
+      dataset: createPersistedDatasetSnapshot(),
       persistenceMode: getDataPersistenceMode(),
       exportTime: new Date().toISOString(),
     };
@@ -476,39 +733,40 @@
   function importData(file) {
     const reader = new FileReader();
     reader.onload = async function onLoad(event) {
+      const previousDataset = createRuntimeDatasetSnapshot();
       try {
-        const data = JSON.parse(event.target.result);
-
-        if (data.mockData) {
-          mockData = normalizeMockData(data.mockData);
-          defaultMockData = deepClone(mockData);
+        const data = JSON.parse(String(event.target?.result || ""));
+        const validation = validateImportPayload(data);
+        if (validation.error) {
+          throw new Error(validation.error);
         }
 
-        if (data.stockMovementData) {
-          stockMovementData = restoreStockMovementDates(data.stockMovementData);
-          defaultStockMovementData = normalizeList(data.stockMovementData);
-        }
-
-        if (data.logsData) {
-          logsData = restoreLogDates(data.logsData);
-          defaultLogsData = normalizeList(data.logsData);
-        }
+        const importedDataset = normalizeDataset(validation.migrated.dataset);
+        restoreRuntimeDataset(importedDataset);
+        const auditLogs = global.stageAuditLogs({
+          actionType: "import",
+          objectType: "system",
+          objectName: "数据恢复",
+          details: "从备份文件导入数据",
+        });
 
         const saved = await saveMockData();
         if (!saved) {
-          alert("导入已加载到当前页面，但未能保存到数据目录。");
+          restoreRuntimeDataset(previousDataset);
+          applyDefaultDataset(previousDataset);
+          alert("导入失败：未能保存到数据目录，原数据已恢复。");
           return;
         }
 
-        if (typeof global.addLog === "function") {
-          global.addLog("import", "system", "数据恢复", "从备份文件导入数据");
-        }
+        applyDefaultDataset(createRuntimeDatasetSnapshot());
+        global.finalizeStagedAuditLogs(auditLogs);
 
         alert("数据导入成功，页面将刷新以应用更新。");
         location.reload();
       } catch (error) {
         console.error("Import failed:", error);
-        alert("导入失败：文件格式不正确或已损坏。");
+        restoreRuntimeDataset(previousDataset);
+        alert(`导入失败：${error.message || "文件格式不正确或已损坏。"}`);
       }
     };
     reader.readAsText(file);
@@ -526,6 +784,7 @@
   global.importData = importData;
   global.getDataPersistenceMode = getDataPersistenceMode;
   global.getDataPersistenceSource = getDataPersistenceSource;
+  global.getDataRevision = getDataRevision;
 
   global.AppDataStore = Object.freeze({
     loadMockData,
@@ -540,5 +799,7 @@
     importData,
     getDataPersistenceMode,
     getDataPersistenceSource,
+    getDataRevision,
+    buildTransactionChanges,
   });
 })(window);

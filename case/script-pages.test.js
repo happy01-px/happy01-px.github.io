@@ -33,6 +33,10 @@ function createScriptPageMarkup() {
         </aside>
         <button id="mobile-menu-button" type="button">open mobile</button>
         <button id="sidebar-toggle-button" type="button">toggle sidebar</button>
+        <div class="design-preview-only">
+            <p id="app-page-header-title" class="design-preview-header-title">仪表盘</p>
+            <p id="app-page-header-subtitle" class="design-preview-header-subtitle">dashboard subtitle</p>
+        </div>
         <button id="close-mobile-menu" type="button">close mobile</button>
         <button id="user-menu-button" type="button">user</button>
         <div id="user-menu" class="hidden"></div>
@@ -50,8 +54,12 @@ function createScriptPageMarkup() {
         <button id="mobile-seed-test-data-button" type="button">mobile seed test data</button>
         <button id="clear-all-data-button" type="button">clear all</button>
         <button id="mobile-clear-all-data-button" type="button">mobile clear all</button>
-        <section id="dashboard" class="page-section"></section>
-        <section id="inventory" class="page-section hidden"></section>
+        <section id="dashboard" class="page-section">
+            <div><h2>仪表盘</h2><p>dashboard subtitle</p></div>
+        </section>
+        <section id="inventory" class="page-section hidden">
+            <div><div><h2>库存管理</h2><p>inventory subtitle</p></div><button id="inventory-heading-action">add</button></div>
+        </section>
         <section id="stock-movement" class="page-section hidden">
             <ul id="stock-tabs">
                 <li><button type="button" class="active" data-tab="all">all</button></li>
@@ -66,7 +74,9 @@ function createScriptPageMarkup() {
         <section id="bills" class="page-section hidden"></section>
         <section id="reports" class="page-section hidden"></section>
         <section id="settings" class="page-section hidden"></section>
-        <section id="sales-order" class="page-section hidden"></section>
+        <section id="sales-order" class="page-section hidden">
+            <div><div><button id="sales-order-back">back</button><div><h2>新增出货</h2><p>sales subtitle</p></div></div><span id="sales-order-number">XS001</span></div>
+        </section>
         <span id="dashboard-total-inventory-value"></span>
         <span id="dashboard-total-inventory-value-caption"></span>
         <span id="dashboard-stock-warning-count"></span>
@@ -165,6 +175,27 @@ test("showSection switches pages, syncs hash and triggers page-specific refreshe
       .classList.contains("active"),
   );
   assert.equal(harness.window.location.hash, "#sales-order");
+  assert.equal(
+    harness.window.document.getElementById("app-page-header-title").textContent,
+    "新增出货",
+  );
+  assert.equal(
+    harness.window.document.getElementById("app-page-header-subtitle")
+      .textContent,
+    "按销售出库单格式填写公司、客户和商品信息。",
+  );
+  assert.ok(
+    harness.window.document
+      .querySelector("#dashboard > :first-child")
+      .classList.contains("page-heading-shell-empty"),
+  );
+  assert.ok(
+    harness.window.document
+      .querySelector("#sales-order h2")
+      .parentElement.classList.contains("page-heading-copy"),
+  );
+  assert.ok(harness.window.document.getElementById("sales-order-back"));
+  assert.ok(harness.window.document.getElementById("sales-order-number"));
 
   harness.close();
 });
@@ -279,6 +310,19 @@ test("bindMobileEvents handles mobile sidebar, desktop toggle and user menu dism
 
   Object.defineProperty(harness.window, "innerWidth", {
     configurable: true,
+    value: 850,
+  });
+  harness.window.document.getElementById("sidebar-toggle-button").click();
+  assert.equal(
+    harness.window.document
+      .getElementById("mobile-sidebar")
+      .classList.contains("hidden"),
+    false,
+  );
+  harness.window.document.getElementById("close-mobile-menu").click();
+
+  Object.defineProperty(harness.window, "innerWidth", {
+    configurable: true,
     value: 1200,
   });
   harness.window.document.getElementById("sidebar-toggle-button").click();
@@ -389,10 +433,10 @@ test("bindActionButtons routes button clicks to the expected handlers", async ()
 
   assert.deepEqual(calls, {
     addSupplier: 1,
-    addProduct: 1,
+    addProduct: 0,
     addCustomer: 1,
     addCompany: 1,
-    addInbound: 1,
+    addInbound: 2,
     initSalesOrder: 1,
   });
   assert.ok(
@@ -400,6 +444,106 @@ test("bindActionButtons routes button clicks to the expected handlers", async ()
       .getElementById("sales-order")
       .classList.contains("hidden"),
   );
+
+  harness.close();
+});
+
+test("workflow prerequisites resolve the earliest missing business data", () => {
+  const harness = createWindow({ markup: createScriptPageMarkup() });
+  loadScripts(harness.window, getAppShellScriptPaths());
+
+  harness.window.mockData = {
+    companies: [],
+    suppliers: [],
+    customers: [],
+    products: [],
+    bills: [],
+    deliveryNotes: [],
+  };
+  harness.window.stockMovementData = [];
+
+  assert.equal(
+    harness.window.resolveWorkflowPrerequisite("addCustomer").targetKey,
+    "company",
+  );
+
+  harness.window.mockData.companies.push({ id: "CO001", status: "active" });
+  assert.equal(
+    harness.window.resolveWorkflowPrerequisite("addProduct").targetKey,
+    "supplier",
+  );
+
+  harness.window.mockData.suppliers.push({ id: "S001", status: "active" });
+  assert.equal(harness.window.resolveWorkflowPrerequisite("addInbound"), null);
+
+  harness.window.mockData.customers.push({ id: "C001", status: "active" });
+  harness.window.mockData.products.push({
+    id: "P001",
+    status: "active",
+    stockQuantity: 0,
+  });
+  assert.equal(
+    harness.window.resolveWorkflowPrerequisite("addOutbound").targetKey,
+    "inbound",
+  );
+
+  harness.window.mockData.products[0].stockQuantity = 5;
+  assert.equal(harness.window.resolveWorkflowPrerequisite("addOutbound"), null);
+  assert.equal(
+    harness.window.resolveWorkflowPrerequisite("addBill", {
+      statementType: "customer",
+    }).targetKey,
+    "outbound",
+  );
+
+  harness.close();
+});
+
+test("workflow prerequisite prompt lets the user go create the missing data", async () => {
+  const harness = createWindow({ markup: createScriptPageMarkup() });
+  const calls = { sections: [], companies: 0, products: 0 };
+  loadScripts(harness.window, getAppShellScriptPaths());
+
+  harness.window.mockData = {
+    companies: [],
+    suppliers: [],
+    customers: [],
+    products: [],
+    bills: [],
+    deliveryNotes: [],
+  };
+  harness.window.stockMovementData = [];
+  harness.window.showSection = (sectionId) => calls.sections.push(sectionId);
+  harness.window.showAddCompanyModal = () => {
+    calls.companies += 1;
+  };
+  harness.window.showAddProductModal = () => {
+    calls.products += 1;
+  };
+
+  harness.window.bindActionButtons();
+  harness.window.document.getElementById("add-product-btn").click();
+
+  assert.equal(calls.products, 0);
+  assert.equal(
+    harness.window.document.getElementById("modal-title").textContent,
+    "先完成前置数据",
+  );
+  assert.equal(
+    harness.window.document.getElementById("modal-confirm").textContent,
+    "去创建公司",
+  );
+  assert.equal(
+    harness.window.document.getElementById("modal-cancel").textContent,
+    "暂不处理",
+  );
+
+  harness.window.document.getElementById("modal-confirm").click();
+  await flushAsyncTasks(2);
+
+  assert.deepEqual(calls.sections, ["companies"]);
+  assert.equal(calls.companies, 1);
+  assert.equal(calls.products, 0);
 
   harness.close();
 });
@@ -517,6 +661,24 @@ test("applyHashDrivenSectionRoute honors page hashes and ignores nested bill rou
 
   harness.window.location.hash = "#/bills/create";
   assert.equal(harness.window.applyHashDrivenSectionRoute(), false);
+
+  harness.close();
+});
+
+test("hash routing initializes the sales order once when it becomes visible", () => {
+  const harness = createWindow({ markup: createScriptPageMarkup() });
+  loadScripts(harness.window, getAppShellScriptPaths());
+  let initCalls = 0;
+  harness.window.initSalesOrder = () => {
+    initCalls += 1;
+  };
+
+  harness.window.location.hash = "#sales-order";
+  assert.equal(harness.window.applyHashDrivenSectionRoute(), true);
+  assert.equal(initCalls, 1);
+
+  harness.window.showSection("sales-order");
+  assert.equal(initCalls, 1, "an already-visible form must not be reset");
 
   harness.close();
 });

@@ -1,19 +1,5 @@
 (function initBillsModule(global) {
-  const state = global.BillsModuleState || {
-    activeTab: "customer",
-    filtersBound: false,
-    tableEventsBound: false,
-    addButtonBound: false,
-    modalLifecycleBound: false,
-    routeBound: false,
-    pendingDraft: null,
-    modalCloseHandler: null,
-    activeViewStatementId: "",
-    activeViewReturnTab: "",
-    previousBillsRoute: null,
-    currentBillsRoute: null,
-  };
-  global.BillsModuleState = state;
+  const state = global.BillsModuleState;
 
   if (!global.BillsCore) {
     throw new Error("BillsCore must be loaded before bills-module.js");
@@ -23,1656 +9,56 @@
     BILL_STATUS_META,
     formatBillCurrency,
     formatBillDateOnly,
-    formatBillDateTime,
     formatStatementPeriod,
     getBillsMeta,
     getStatusBadgeHtml,
-    normalizeBillDate,
     normalizeBillStatus,
     roundCurrency,
     convertAmountToChineseUpperForBills,
   } = global.BillsCore;
 
-  function injectBillsModuleStyles() {
-    if (document.getElementById("bills-module-style")) return;
-
-    const style = document.createElement("style");
-    style.id = "bills-module-style";
-    style.textContent = `
-            #bills .bills-table-scroll {
-                overflow-x: auto !important;
-                overflow-y: hidden !important;
-                scrollbar-width: none;
-            }
-            #bills .bills-table-scroll::-webkit-scrollbar {
-                display: none;
-            }
-            #bills .bills-action-header,
-            #bills .bills-action-cell {
-                text-align: left !important;
-            }
-            #bills .bills-list-header {
-                display: flex;
-                flex-direction: row;
-                align-items: flex-start;
-                justify-content: space-between;
-                flex-wrap: wrap;
-                gap: 1rem;
-                margin-bottom: 1.5rem;
-            }
-            #bills .bills-list-header > div:first-child {
-                flex: 1 1 auto;
-            }
-            #bills .bills-list-toolbar {
-                display: flex;
-                align-items: center;
-                justify-content: flex-end;
-                gap: 1rem;
-                margin-left: auto;
-            }
-            #bills #add-bill-btn {
-                padding: 0.5rem 1.5rem;
-                font-size: 1rem;
-                font-weight: 600;
-            }
-            #bills .bills-action-links {
-                display: flex;
-                align-items: center;
-                justify-content: flex-start;
-                gap: 0.75rem;
-                white-space: nowrap;
-                font-size: 0.875rem;
-                font-weight: 500;
-            }
-            #bills .bills-action-links a,
-            #bills .bills-action-links button {
-                background: transparent;
-                border: none;
-                padding: 0;
-                cursor: pointer;
-                font-size: 0.875rem;
-                font-weight: 500;
-            }
-            #bills .bills-status-badge {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                padding: 0.125rem 0.5rem;
-                border-radius: 9999px;
-                font-size: 0.75rem;
-                font-weight: 600;
-                line-height: 1.25rem;
-            }
-            #bills .bills-empty-state {
-                padding: 1rem 1.5rem;
-                text-align: center;
-                color: #6b7280;
-                font-size: 0.875rem;
-            }
-            .bills-modal-summary-grid {
-                display: grid;
-                grid-template-columns: repeat(4, minmax(0, 1fr));
-                gap: 1rem;
-            }
-            .bills-modal-summary-card {
-                border: 1px solid #e5e7eb;
-                border-radius: 0.75rem;
-                padding: 1rem;
-                background: #fff;
-            }
-            .bills-modal-section {
-                border: 1px solid #e5e7eb;
-                border-radius: 0.75rem;
-                background: #fff;
-                overflow: hidden;
-            }
-            .bills-modal-section-title {
-                padding: 0.9rem 1rem;
-                border-bottom: 1px solid #e5e7eb;
-                font-size: 1rem;
-                font-weight: 600;
-                color: #111827;
-                background: #f9fafb;
-            }
-            .bills-modal-section-body {
-                padding: 1rem;
-            }
-            .bills-modal-form-grid {
-                display: grid;
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: 1rem;
-            }
-            .bills-field {
-                display: flex;
-                flex-direction: column;
-                gap: 0.375rem;
-            }
-            .bills-field > label {
-                font-size: 0.875rem;
-                color: #374151;
-                font-weight: 600;
-            }
-            .bills-inline-table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-            .bills-inline-table th,
-            .bills-inline-table td {
-                border: 1px solid #e5e7eb;
-                padding: 0.625rem 0.75rem;
-                text-align: left;
-                vertical-align: top;
-                font-size: 0.875rem;
-            }
-            .bills-inline-table th {
-                background: #f9fafb;
-                color: #374151;
-                font-weight: 600;
-            }
-            .bills-muted-note {
-                font-size: 0.875rem;
-                color: #6b7280;
-                line-height: 1.5;
-            }
-            .bills-outline-button {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                gap: 0.5rem;
-                border-radius: 0.5rem;
-                border: 1px solid #d1d5db;
-                padding: 0.5rem 0.875rem;
-                font-size: 0.875rem;
-                font-weight: 600;
-                color: #374151;
-                background: #fff;
-                cursor: pointer;
-            }
-            .bills-outline-button:hover {
-                background: #f9fafb;
-            }
-            .bills-route-shell {
-                display: flex;
-                flex-direction: column;
-                gap: 1rem;
-            }
-            .bills-route-header {
-                display: flex;
-                align-items: flex-start;
-                justify-content: space-between;
-                gap: 1rem;
-                flex-wrap: wrap;
-            }
-            .bills-route-title {
-                display: flex;
-                flex-direction: column;
-                gap: 0.25rem;
-            }
-            .bills-route-title h2 {
-                margin: 0;
-                font-size: 1.875rem;
-                line-height: 2.25rem;
-            }
-            .bills-route-title p {
-                font-size: 0.875rem;
-                color: #4b5563;
-                margin: 0;
-            }
-            .bills-route-actions {
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-                flex-wrap: wrap;
-            }
-            .bills-route-card {
-                background: #fff;
-                border: 1px solid #e5e7eb;
-                border-radius: 0.75rem;
-                box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-                overflow: hidden;
-            }
-            .bills-route-card-body {
-                padding: 1rem;
-            }
-            .bills-route-card + .bills-route-card {
-                margin-top: 1rem;
-            }
-            .bills-route-toolbar {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 1rem;
-                flex-wrap: wrap;
-                margin-bottom: 1rem;
-            }
-            .bills-route-empty {
-                padding: 2rem 1.5rem;
-                text-align: center;
-                color: #6b7280;
-                font-size: 0.875rem;
-            }
-            .bills-route-card .bills-modal-form-grid > .bills-field {
-                border: 1px solid #e5e7eb;
-                border-radius: 0.75rem;
-                background: #f9fafb;
-                padding: 0.75rem;
-                gap: 0;
-            }
-            .bills-route-card .bills-modal-form-grid > .bills-field > label {
-                margin-bottom: 0.375rem;
-                font-size: 0.75rem;
-                font-weight: 600;
-                color: #6b7280;
-            }
-            .bills-route-card .bills-modal-form-grid > .bills-field.justify-center {
-                justify-content: flex-start;
-            }
-            .bills-route-card .bills-modal-form-grid input[type="number"] {
-                background: #fff;
-                border-radius: 0.375rem;
-                border: 1px solid #d1d5db;
-                padding: 0.375rem 0.75rem;
-                font-size: 0.875rem;
-                line-height: 1.25rem;
-            }
-            .bills-route-checkbox {
-                display: flex;
-                align-items: flex-start;
-                gap: 0.5rem;
-                font-size: 0.875rem;
-                color: #374151;
-                line-height: 1.5;
-            }
-            .bills-route-note {
-                border: 1px solid #e5e7eb;
-                border-radius: 0.75rem;
-                background: #f9fafb;
-                padding: 0.75rem 1rem;
-                font-size: 0.875rem;
-                color: #6b7280;
-                line-height: 1.6;
-            }
-            .bills-route-intro {
-                border: 1px solid #dbeafe;
-                border-radius: 0.75rem;
-                background: #eff6ff;
-                padding: 0.875rem 1rem;
-            }
-            .bills-route-intro-body {
-                display: flex;
-                align-items: flex-start;
-                gap: 0.75rem;
-            }
-            .bills-route-intro-icon {
-                flex-shrink: 0;
-                width: 2.5rem;
-                height: 2.5rem;
-                border-radius: 0.75rem;
-                border: 1px solid #dbeafe;
-                background: #fff;
-                color: #2563eb;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 1rem;
-            }
-            .bills-route-intro-title {
-                font-size: 1rem;
-                font-weight: 600;
-                color: #111827;
-            }
-            .bills-route-intro-desc {
-                margin-top: 0.125rem;
-                font-size: 0.875rem;
-                color: #4b5563;
-                line-height: 1.6;
-            }
-            .bills-modal-summary-card {
-                border-radius: 0.75rem;
-                padding: 0.875rem 1rem;
-                background: #f9fafb;
-            }
-            .bills-modal-summary-card .text-sm {
-                font-size: 0.75rem;
-                color: #6b7280;
-            }
-            .bills-modal-summary-card .text-xl {
-                font-size: 1.125rem;
-                line-height: 1.75rem;
-            }
-            .bills-modal-summary-card .text-base {
-                font-size: 0.9375rem;
-                line-height: 1.5rem;
-            }
-            .bills-modal-section {
-                border-radius: 0.75rem;
-            }
-            .bills-modal-section-title {
-                padding: 0.75rem 1rem;
-                font-size: 0.875rem;
-                font-weight: 600;
-            }
-            .bills-modal-section-body {
-                padding: 0.875rem 1rem;
-            }
-            .bills-inline-table th,
-            .bills-inline-table td {
-                font-size: 0.875rem;
-                padding: 0.75rem 0.875rem;
-            }
-            .bills-inline-table th {
-                font-size: 0.75rem;
-                font-weight: 500;
-                letter-spacing: 0.05em;
-                text-transform: uppercase;
-                color: #6b7280;
-            }
-            @media (max-width: 1024px) {
-                .bills-modal-summary-grid,
-                .bills-modal-form-grid {
-                    grid-template-columns: 1fr;
-                }
-            }
-        `;
-    document.head.appendChild(style);
+  if (!global.AppBillsData) {
+    throw new Error("bills-data.js must be loaded before bills-module.js");
   }
 
-  function buildBillsEmptyHostMarkup(description, options = {}) {
-    const safeDescription = global.escapeHTML(description || "暂无数据");
-    const safeWrapperClass = global.escapeHTML(
-      options.wrapperClassName || "py-4",
-    );
-    const safeFallbackClass = global.escapeHTML(
-      options.fallbackClassName || "text-center text-sm text-gray-400",
-    );
+  const {
+    getStatementRecords,
+    getOutstandingAmount,
+    ensureBillsSeedData,
+  } = global.AppBillsData;
 
-    return `
-            <div
-                class="bills-empty-host"
-                data-bills-empty-description="${safeDescription}"
-                data-bills-empty-wrapper-class="${safeWrapperClass}"
-            >
-                <div class="${safeFallbackClass}">${safeDescription}</div>
-            </div>
-        `;
-  }
-
-  function buildBillsEmptyTableRow(description, colspan, options = {}) {
-    const safeColspan = Number(colspan) || 1;
-    const safeCellClass = global.escapeHTML(
-      options.cellClassName || "px-6 py-4",
-    );
-
-    return `
-            <tr>
-                <td colspan="${safeColspan}" class="${safeCellClass}">
-                    ${buildBillsEmptyHostMarkup(description, {
-                      wrapperClassName: options.wrapperClassName || "py-2",
-                      fallbackClassName:
-                        options.fallbackClassName ||
-                        "text-center text-sm text-gray-400",
-                    })}
-                </td>
-            </tr>
-        `;
-  }
-
-  function hydrateBillsEmptyStates(root = document) {
-    if (!root || typeof global.renderAntdEmptyState !== "function") {
-      return;
-    }
-
-    root.querySelectorAll("[data-bills-empty-description]").forEach((host) => {
-      if (!host || host.dataset.rendered === "true") {
-        return;
-      }
-
-      global.renderAntdEmptyState(host, host.dataset.billsEmptyDescription, {
-        wrapperClassName:
-          host.getAttribute("data-bills-empty-wrapper-class") || "py-4",
-      });
-    });
-  }
-
-  function ensureBillsPaginationState() {
-    if (!global.paginationState) {
-      global.paginationState = {};
-    }
-
-    if (!global.paginationState.bills) {
-      global.paginationState.bills = {
-        page: 1,
-        pageSize: 10,
-        total: 0,
-      };
-    }
-
-    return global.paginationState.bills;
-  }
-
-  function getCurrentUserInitialForBills() {
-    const name = String(global.currentUser?.name || "张三").trim();
-    return global.escapeHTML
-      ? global.escapeHTML(name.charAt(0) || "张")
-      : name.charAt(0) || "张";
-  }
-
-  function getStatementRecords() {
-    return (
-      global.normalizeList ? global.normalizeList(global.mockData?.bills) : []
-    ).filter((record) => record?.recordType === "statement-v1");
-  }
-
-  function getOutstandingAmount(statement) {
-    const totalAmount = Number(statement?.totalAmount) || 0;
-    const paidAmount = (
-      global.normalizeList ? global.normalizeList(statement?.payments) : []
-    ).reduce((sum, payment) => sum + (Number(payment?.payAmount) || 0), 0);
-    return Math.max(0, roundCurrency(totalAmount - paidAmount));
-  }
-
-  function isSalesDeliveryNote(note) {
-    return (
-      Boolean(note) &&
-      (String(note.type || "").toLowerCase() === "sales" ||
-        note.customerId ||
-        note.customerName ||
-        note.customerNo)
+  if (!state || !global.AppBillsList) {
+    throw new Error(
+      "bills-state.js and bills-list.js must load before bills-module.js",
     );
   }
 
-  function isPurchaseDeliveryNote(note) {
-    return (
-      Boolean(note) &&
-      !isSalesDeliveryNote(note) &&
-      (note.supplierId || note.orderId)
-    );
+  const {
+    buildBillsEmptyHostMarkup,
+    buildBillsEmptyTableRow,
+    hydrateBillsEmptyStates,
+    normalizeBillsSectionCopy,
+    closeBillsModal,
+    bindBillsModalLifecycle,
+    openBillsModal,
+    initBillFiltersOverride,
+    updateBillsTableOverride,
+    updateActiveBillTabUI,
+    bindBillTabEventsOverride,
+  } = global.AppBillsList;
+
+  if (!global.AppBillsStatements) {
+    throw new Error("bills-statements.js must load before bills-module.js");
   }
 
-  function parseLegacyStatementPeriod(period, fallbackDate) {
-    const matches =
-      String(period || "").match(/\d{4}[-/]\d{2}[-/]\d{2}/g) || [];
-    if (matches.length >= 2) {
-      return {
-        periodStart: matches[0].replace(/\//g, "-"),
-        periodEnd: matches[1].replace(/\//g, "-"),
-      };
-    }
-
-    const fallback = formatBillDateOnly(fallbackDate);
-    return {
-      periodStart: fallback,
-      periodEnd: fallback,
-    };
-  }
-
-  function getStatementPartyFilterValue(statement) {
-    return String(
-      statement?.partyId || statement?.partyNameSnapshot || "",
-    ).trim();
-  }
-
-  function findSupplierRecord(reference) {
-    const normalizedReference = String(reference || "")
-      .trim()
-      .toLowerCase();
-    if (!normalizedReference) return null;
-
-    return (
-      global.normalizeList(global.mockData?.suppliers).find(
-        (supplier) =>
-          String(supplier.id || "")
-            .trim()
-            .toLowerCase() === normalizedReference ||
-          String(supplier.name || "")
-            .trim()
-            .toLowerCase() === normalizedReference,
-      ) || null
-    );
-  }
-
-  function getActiveSourceDocumentIdSet(statementType) {
-    return new Set(
-      getStatementRecords()
-        .filter((record) => record.statementType === statementType)
-        .filter((record) => normalizeBillStatus(record.status) !== "cancelled")
-        .flatMap((record) => global.normalizeList(record.sourceDocumentIds))
-        .map((id) => String(id || "").trim())
-        .filter(Boolean),
-    );
-  }
-
-  function mapLegacySupplierBillToStructured(record, existingStatements) {
-    const amount =
-      Number(String(record.amount || "").replace(/[^\d.-]/g, "")) || 0;
-    const createdAt = record.createdAt || global.getLocalISOString();
-    const period = parseLegacyStatementPeriod(record.period, createdAt);
-    const supplier = findSupplierRecord(
-      record.supplierId || record.supplierName,
-    );
-    return {
-      id: global.createSequentialId(existingStatements, "SST", 4),
-      recordType: "statement-v1",
-      statementType: "supplier",
-      partyId: supplier?.id || record.supplierId || "",
-      partyNameSnapshot:
-        record.supplierName || supplier?.name || "未命名供应商",
-      companyId: "",
-      companyNameSnapshot: "",
-      companyAddressSnapshot: "",
-      companyPhoneSnapshot: "",
-      contactNameSnapshot: supplier?.contactPerson || "",
-      contactPhoneSnapshot: supplier?.contactPhone || "",
-      partyAddressSnapshot: supplier?.address || "",
-      statementDate: createdAt,
-      periodStart: period.periodStart,
-      periodEnd: period.periodEnd,
-      documentCount: 1,
-      currentAmount: amount,
-      taxRate: 1,
-      amountWithTax: amount,
-      arrearsAmount: 0,
-      totalAmount: amount,
-      totalAmountUppercase: convertAmountToChineseUpperForBills(amount),
-      status: normalizeBillStatus(record.status),
-      notes: "",
-      details: [],
-      arrears: [],
-      payments: [],
-      sourceDocumentIds: [],
-      createdAt,
-      updatedAt: createdAt,
-    };
-  }
-
-  function migrateBillsData(records) {
-    const purchaseDeliveryIds = new Set(
-      global
-        .normalizeList(global.mockData?.deliveryNotes)
-        .filter(isPurchaseDeliveryNote)
-        .map((note) => String(note.id || "").trim())
-        .filter(Boolean),
-    );
-
-    let changed = false;
-    const nextRecords = [];
-    const existingStructuredStatements = global
-      .normalizeList(records)
-      .filter((record) => record?.recordType === "statement-v1");
-
-    global.normalizeList(records).forEach((record) => {
-      if (record?.recordType !== "statement-v1") {
-        if (record && (record.supplierName || record.supplierId)) {
-          const migratedLegacyRecord = mapLegacySupplierBillToStructured(
-            record,
-            existingStructuredStatements,
-          );
-          nextRecords.push(migratedLegacyRecord);
-          existingStructuredStatements.push(migratedLegacyRecord);
-          changed = true;
-          return;
-        }
-
-        nextRecords.push(record);
-        return;
-      }
-
-      if (record.statementType === "customer") {
-        const sourceIds = global
-          .normalizeList(record.sourceDocumentIds)
-          .map((id) => String(id || "").trim())
-          .filter(Boolean);
-
-        if (
-          sourceIds.length > 0 &&
-          sourceIds.every((id) => purchaseDeliveryIds.has(id))
-        ) {
-          changed = true;
-          return;
-        }
-      }
-
-      let nextRecord = record;
-      if (record.statementType === "supplier") {
-        const supplier = findSupplierRecord(
-          record.partyId || record.partyNameSnapshot,
-        );
-        if (supplier) {
-          nextRecord = {
-            ...record,
-            partyId: record.partyId || supplier.id,
-            partyNameSnapshot: record.partyNameSnapshot || supplier.name,
-            contactNameSnapshot:
-              record.contactNameSnapshot || supplier.contactPerson || "",
-            contactPhoneSnapshot:
-              record.contactPhoneSnapshot || supplier.contactPhone || "",
-            partyAddressSnapshot:
-              record.partyAddressSnapshot || supplier.address || "",
-          };
-
-          if (
-            nextRecord.partyId !== record.partyId ||
-            nextRecord.partyNameSnapshot !== record.partyNameSnapshot ||
-            nextRecord.contactNameSnapshot !== record.contactNameSnapshot ||
-            nextRecord.contactPhoneSnapshot !== record.contactPhoneSnapshot ||
-            nextRecord.partyAddressSnapshot !== record.partyAddressSnapshot
-          ) {
-            changed = true;
-          }
-        }
-      }
-
-      nextRecords.push(nextRecord);
-      existingStructuredStatements.push(nextRecord);
-    });
-
-    return { changed, records: nextRecords.filter(Boolean) };
-  }
-
-  function createBillsDemoSourceData() {
-    return [
-      {
-        id: "BILLTEST-SALES-001",
-        type: "sales",
-        orderNo: "XS202604180101",
-        issueDate: "20260418",
-        deliveryDate: "20260418",
-        status: "created",
-        totalAmount: 21995,
-        notes: "iPhone 13 Pro x 2, AirPods Pro x 3",
-        companyId: "CO001",
-        companyName: "化工",
-        companyAddress: "上海市浦东新区张江高科技园区",
-        companyPhone: "13800138001",
-        companyContact: "张经理",
-        customerId: "C002",
-        customerName: "天猫商城",
-        customerAddress: "杭州市余杭区阿里巴巴西溪园区",
-        customerContact: "钱经理",
-        customerPhone: "13500135000",
-        paymentTerms: "Net 45",
-        customerNo: "TM26-101",
-        createdAt: "2026-04-18T09:30:00",
-        updatedAt: "2026-04-18T09:30:00",
-        details: [
-          {
-            id: "BILLTEST-SALES-001-1",
-            deliveryId: "BILLTEST-SALES-001",
-            productId: "P001",
-            productName: "iPhone 13 Pro",
-            quantity: 2,
-            unit: "个",
-            spec: "电子产品",
-            unitPrice: 7999,
-            totalAmount: 15998,
-            notes: "",
-            status: "created",
-          },
-          {
-            id: "BILLTEST-SALES-001-2",
-            deliveryId: "BILLTEST-SALES-001",
-            productId: "P004",
-            productName: "AirPods Pro",
-            quantity: 3,
-            unit: "个",
-            spec: "电子产品",
-            unitPrice: 1999,
-            totalAmount: 5997,
-            notes: "",
-            status: "created",
-          },
-        ],
-      },
-      {
-        id: "BILLTEST-SALES-002",
-        type: "sales",
-        orderNo: "XS202604190101",
-        issueDate: "20260419",
-        deliveryDate: "20260419",
-        status: "created",
-        totalAmount: 16497,
-        notes: "MacBook Air M2 x 1, Apple Watch x 2",
-        companyId: "CO001",
-        companyName: "化工",
-        companyAddress: "上海市浦东新区张江高科技园区",
-        companyPhone: "13800138001",
-        companyContact: "张经理",
-        customerId: "C002",
-        customerName: "天猫商城",
-        customerAddress: "杭州市余杭区阿里巴巴西溪园区",
-        customerContact: "钱经理",
-        customerPhone: "13500135000",
-        paymentTerms: "Net 45",
-        customerNo: "TM26-102",
-        createdAt: "2026-04-19T14:20:00",
-        updatedAt: "2026-04-19T14:20:00",
-        details: [
-          {
-            id: "BILLTEST-SALES-002-1",
-            deliveryId: "BILLTEST-SALES-002",
-            productId: "P002",
-            productName: "MacBook Air M2",
-            quantity: 1,
-            unit: "个",
-            spec: "电子产品",
-            unitPrice: 9499,
-            totalAmount: 9499,
-            notes: "",
-            status: "created",
-          },
-          {
-            id: "BILLTEST-SALES-002-2",
-            deliveryId: "BILLTEST-SALES-002",
-            productId: "P005",
-            productName: "Apple Watch",
-            quantity: 2,
-            unit: "个",
-            spec: "电子产品",
-            unitPrice: 3499,
-            totalAmount: 6998,
-            notes: "",
-            status: "created",
-          },
-        ],
-      },
-      {
-        id: "BILLTEST-SALES-003",
-        type: "sales",
-        orderNo: "XS202604200101",
-        issueDate: "20260420",
-        deliveryDate: "20260420",
-        status: "created",
-        totalAmount: 18095,
-        notes: "Apple Watch x 3, AirPods Pro x 2, airpods x 3",
-        companyId: "CO001",
-        companyName: "化工",
-        companyAddress: "上海市浦东新区张江高科技园区",
-        companyPhone: "13800138001",
-        companyContact: "张经理",
-        customerId: "C003",
-        customerName: "苏宁易购",
-        customerAddress: "南京市玄武区苏宁总部",
-        customerContact: "孙经理",
-        customerPhone: "13400134000",
-        paymentTerms: "Net 60",
-        customerNo: "SN26-101",
-        createdAt: "2026-04-20T10:15:00",
-        updatedAt: "2026-04-20T10:15:00",
-        details: [
-          {
-            id: "BILLTEST-SALES-003-1",
-            deliveryId: "BILLTEST-SALES-003",
-            productId: "P005",
-            productName: "Apple Watch",
-            quantity: 3,
-            unit: "个",
-            spec: "电子产品",
-            unitPrice: 3499,
-            totalAmount: 10497,
-            notes: "",
-            status: "created",
-          },
-          {
-            id: "BILLTEST-SALES-003-2",
-            deliveryId: "BILLTEST-SALES-003",
-            productId: "P004",
-            productName: "AirPods Pro",
-            quantity: 2,
-            unit: "个",
-            spec: "电子产品",
-            unitPrice: 1999,
-            totalAmount: 3998,
-            notes: "",
-            status: "created",
-          },
-          {
-            id: "BILLTEST-SALES-003-3",
-            deliveryId: "BILLTEST-SALES-003",
-            productId: "P006",
-            productName: "airpods",
-            quantity: 3,
-            unit: "个",
-            spec: "未分类",
-            unitPrice: 1200,
-            totalAmount: 3600,
-            notes: "测试价差样例",
-            status: "created",
-          },
-        ],
-      },
-      {
-        id: "BILLTEST-SALES-004",
-        type: "sales",
-        orderNo: "XS202602180101",
-        issueDate: "20260218",
-        deliveryDate: "20260218",
-        status: "created",
-        totalAmount: 20997,
-        notes:
-          "苏宁易购对账测试单 - iPhone 13 Pro x 1, MacBook Air M2 x 1, Apple Watch x 1",
-        companyId: "CO001",
-        companyName: "化工",
-        companyAddress: "上海市浦东新区张江高科技园区",
-        companyPhone: "13800138001",
-        companyContact: "张经理",
-        customerId: "C003",
-        customerName: "苏宁易购",
-        customerAddress: "南京市玄武区苏宁总部",
-        customerContact: "孙经理",
-        customerPhone: "13400134000",
-        paymentTerms: "Net 60",
-        customerNo: "SN26-102",
-        createdAt: "2026-02-18T10:30:00",
-        updatedAt: "2026-02-18T10:30:00",
-        details: [
-          {
-            id: "BILLTEST-SALES-004-1",
-            deliveryId: "BILLTEST-SALES-004",
-            productId: "P001",
-            productName: "iPhone 13 Pro",
-            quantity: 1,
-            unit: "个",
-            spec: "电子产品",
-            unitPrice: 7999,
-            totalAmount: 7999,
-            notes: "",
-            status: "created",
-          },
-          {
-            id: "BILLTEST-SALES-004-2",
-            deliveryId: "BILLTEST-SALES-004",
-            productId: "P002",
-            productName: "MacBook Air M2",
-            quantity: 1,
-            unit: "个",
-            spec: "电子产品",
-            unitPrice: 9499,
-            totalAmount: 9499,
-            notes: "",
-            status: "created",
-          },
-          {
-            id: "BILLTEST-SALES-004-3",
-            deliveryId: "BILLTEST-SALES-004",
-            productId: "P005",
-            productName: "Apple Watch",
-            quantity: 1,
-            unit: "个",
-            spec: "电子产品",
-            unitPrice: 3499,
-            totalAmount: 3499,
-            notes: "",
-            status: "created",
-          },
-        ],
-      },
-      {
-        id: "BILLTEST-PUR-001",
-        supplierId: "S001",
-        orderId: "PO20260418001",
-        deliveryDate: "2026-04-18",
-        expectedDate: "2026-04-18",
-        status: "received",
-        totalAmount: 42993,
-        notes: "测试采购单 - 苹果公司",
-        createdAt: "2026-04-18T11:00:00",
-        updatedAt: "2026-04-18T11:00:00",
-        details: [
-          {
-            id: "BILLTEST-PUR-001-1",
-            deliveryId: "BILLTEST-PUR-001",
-            productId: "P001",
-            quantity: 3,
-            unitPrice: 6999,
-            totalAmount: 20997,
-            receivedQuantity: 3,
-            notes: "",
-            status: "received",
-          },
-          {
-            id: "BILLTEST-PUR-001-2",
-            deliveryId: "BILLTEST-PUR-001",
-            productId: "P004",
-            quantity: 6,
-            unitPrice: 1799,
-            totalAmount: 10794,
-            receivedQuantity: 6,
-            notes: "",
-            status: "received",
-          },
-          {
-            id: "BILLTEST-PUR-001-3",
-            deliveryId: "BILLTEST-PUR-001",
-            productId: "P005",
-            quantity: 4,
-            unitPrice: 2799,
-            totalAmount: 11202,
-            receivedQuantity: 4,
-            notes: "",
-            status: "received",
-          },
-        ],
-      },
-      {
-        id: "BILLTEST-PUR-002",
-        supplierId: "S004",
-        orderId: "PO20260419001",
-        deliveryDate: "2026-04-19",
-        expectedDate: "2026-04-19",
-        status: "received",
-        totalAmount: 11110,
-        notes: "测试采购单 - 拼多多",
-        createdAt: "2026-04-19T15:40:00",
-        updatedAt: "2026-04-19T15:40:00",
-        details: [
-          {
-            id: "BILLTEST-PUR-002-1",
-            deliveryId: "BILLTEST-PUR-002",
-            productId: "P006",
-            quantity: 5,
-            unitPrice: 1000,
-            totalAmount: 5000,
-            receivedQuantity: 5,
-            notes: "",
-            status: "received",
-          },
-          {
-            id: "BILLTEST-PUR-002-2",
-            deliveryId: "BILLTEST-PUR-002",
-            productId: "P007",
-            quantity: 2,
-            unitPrice: 3055,
-            totalAmount: 6110,
-            receivedQuantity: 2,
-            notes: "",
-            status: "received",
-          },
-        ],
-      },
-    ];
-  }
-
-  async function ensureBillsDemoSourceData() {
-    if (!global.mockData) return false;
-
-    const existingIds = new Set(
-      global
-        .normalizeList(global.mockData.deliveryNotes)
-        .map((note) => String(note.id || "").trim()),
-    );
-    const demoRecords = createBillsDemoSourceData().filter(
-      (record) => !existingIds.has(record.id),
-    );
-    if (!demoRecords.length) return false;
-
-    global.mockData.deliveryNotes = demoRecords.concat(
-      global.normalizeList(global.mockData.deliveryNotes),
-    );
-    if (typeof global.saveMockData === "function") {
-      await global.saveMockData();
-    }
-    return true;
-  }
-
-  function mapDeliveryNoteToStructured(note, index) {
-    const details = (
-      global.normalizeList ? global.normalizeList(note.details) : []
-    ).map((detail, detailIndex) => ({
-      id: `${note.id || note.orderNo || "SD"}-item-${detailIndex + 1}`,
-      sourceType: "delivery_note",
-      sourceId: note.id,
-      sourceNo: note.orderNo || note.id,
-      bizDate: note.deliveryDate || note.issueDate || note.createdAt,
-      productId: detail.productId || "",
-      productNameSnapshot: detail.productName || "未命名商品",
-      specSnapshot: detail.spec || "",
-      unitSnapshot: detail.unit || "",
-      quantity: Number(detail.quantity) || 0,
-      unitPrice: Number(detail.unitPrice) || 0,
-      lineAmount: Number(detail.totalAmount) || 0,
-      remark: detail.notes || "",
-      sortOrder: detailIndex + 1,
-    }));
-
-    const amount = details.reduce(
-      (sum, item) => sum + (Number(item.lineAmount) || 0),
-      0,
-    );
-    const createdAt = note.createdAt || global.getLocalISOString();
-    return {
-      id: `CST${String(index + 1).padStart(4, "0")}`,
-      recordType: "statement-v1",
-      statementType: "customer",
-      partyId: note.customerId || "",
-      partyNameSnapshot: note.customerName || "未命名客户",
-      companyId: note.companyId || "",
-      companyNameSnapshot: note.companyName || "",
-      companyAddressSnapshot: note.companyAddress || "",
-      companyPhoneSnapshot: note.companyPhone || "",
-      contactNameSnapshot: note.customerContact || "",
-      contactPhoneSnapshot: note.customerPhone || "",
-      partyAddressSnapshot: note.customerAddress || "",
-      statementDate: note.issueDate || note.deliveryDate || createdAt,
-      periodStart: note.deliveryDate || note.issueDate || createdAt,
-      periodEnd: note.deliveryDate || note.issueDate || createdAt,
-      documentCount: 1,
-      currentAmount: amount,
-      taxRate: 1,
-      amountWithTax: amount,
-      arrearsAmount: 0,
-      totalAmount: amount,
-      totalAmountUppercase: convertAmountToChineseUpperForBills(amount),
-      status: "pending_check",
-      notes: note.notes || "",
-      details,
-      arrears: [],
-      payments: [],
-      sourceDocumentIds: [note.id],
-      createdAt,
-      updatedAt: note.updatedAt || createdAt,
-    };
-  }
-
-  async function ensureBillsSeedData() {
-    if (typeof global.loadMockData === "function") {
-      await global.loadMockData();
-    }
-    if (typeof global.loadStockMovementData === "function") {
-      global.loadStockMovementData();
-    }
-
-    if (!global.mockData) return;
-
-    const currentBills = global.normalizeList
-      ? global.normalizeList(global.mockData.bills)
-      : [];
-    const migrated = migrateBillsData(currentBills);
-    const nextBills = migrated.records.slice();
-    const structured = nextBills.filter(
-      (record) => record?.recordType === "statement-v1",
-    );
-    let changed = migrated.changed || nextBills.length !== currentBills.length;
-
-    if (changed) {
-      global.mockData.bills = nextBills;
-      if (typeof global.saveMockData === "function") {
-        await global.saveMockData();
-      }
-    }
-  }
-
-  function normalizeBillsSectionCopy() {
-    const section = document.getElementById("bills");
-    if (!section) return;
-
-    const header = section.firstElementChild;
-    const title = section.querySelector("h2");
-    const desc = section.querySelector("p");
-    const addButton = document.getElementById("add-bill-btn");
-
-    if (title) title.textContent = "对账单系统";
-    if (desc) desc.textContent = "管理所有客户和供应商对账单";
-    if (addButton) {
-      addButton.innerHTML = '<i class="fa fa-plus mr-2"></i> 新增对账单';
-    }
-
-    section.querySelectorAll("#bills-tabs button").forEach((button) => {
-      const meta = getBillsMeta(button.dataset.tab);
-      if (meta) button.textContent = meta.label;
-    });
-
-    const partyLabel = document.getElementById("bills-filter-party-label");
-    if (partyLabel) {
-      partyLabel.textContent = getBillsMeta(state.activeTab).partyLabel;
-    }
-
-    const labels = section.querySelectorAll(
-      ".bg-white.rounded-lg.shadow-card.p-4.mb-6 label",
-    );
-    if (labels[1]) labels[1].textContent = "对账状态";
-    if (labels[2]) labels[2].textContent = "日期范围";
-    if (labels[3]) labels[3].textContent = "搜索";
-
-    const headerTitles = section.querySelectorAll("thead th");
-    const titles = [
-      "对账单编号",
-      getBillsMeta(state.activeTab).partyLabel,
-      "对账期间",
-      "账单金额",
-      "状态",
-      "创建与更新",
-      "操作",
-    ];
-    headerTitles.forEach((cell, index) => {
-      if (titles[index]) cell.textContent = titles[index];
-    });
-
-    if (headerTitles[6]) {
-      headerTitles[6].classList.add("bills-action-header");
-      headerTitles[6].style.textAlign = "left";
-    }
-
-    const tableWrapper = section.querySelector(".overflow-x-auto");
-    if (tableWrapper) {
-      tableWrapper.classList.add("bills-table-scroll");
-    }
-  }
-
-  function getBillsModalElements() {
-    return {
-      overlay: document.getElementById("modal"),
-      panel: document.getElementById("modal-panel"),
-      title: document.getElementById("modal-title"),
-      content: document.getElementById("modal-content"),
-      cancel: document.getElementById("modal-cancel"),
-      confirm: document.getElementById("modal-confirm"),
-      close: document.getElementById("close-modal"),
-      footer: document.querySelector("#modal-panel > div:last-child"),
-    };
-  }
-
-  function applyBillsListVisualParity() {
-    const section = document.getElementById("bills");
-    const addButton = document.getElementById("add-bill-btn");
-    if (!section) return;
-
-    section.firstElementChild?.classList.add("bills-list-header");
-
-    if (addButton) {
-      addButton.className =
-        "bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg flex items-center transition-all-300";
-      addButton.parentElement?.classList.add("bills-list-toolbar");
-    }
-  }
-
-  function closeBillsModal() {
-    const { overlay, panel, content, cancel, confirm, footer } =
-      getBillsModalElements();
-    if (overlay) overlay.classList.add("hidden");
-    if (panel) {
-      panel.className = "bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4";
-      panel.style.maxWidth = "";
-      panel.style.width = "";
-    }
-    if (content) {
-      content.className = "p-4";
-      content.innerHTML = "";
-    }
-    if (cancel) {
-      cancel.className =
-        "bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2 transition-all-300";
-      cancel.textContent = "取消";
-      cancel.onclick = null;
-    }
-    if (confirm) {
-      confirm.className =
-        "bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg transition-all-300";
-      confirm.textContent = "确认";
-      confirm.onclick = null;
-    }
-    if (footer) {
-      footer.className = "flex justify-end p-4 border-t border-gray-200";
-    }
-
-    const pendingClose = state.modalCloseHandler;
-    state.modalCloseHandler = null;
-    if (typeof pendingClose === "function") {
-      pendingClose();
-    }
-  }
-
-  function bindBillsModalLifecycle() {
-    if (state.modalLifecycleBound) return;
-    const { overlay, close, cancel } = getBillsModalElements();
-    if (overlay) {
-      overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) {
-          closeBillsModal();
-        }
-      });
-    }
-    if (close) {
-      close.addEventListener("click", closeBillsModal);
-    }
-    if (cancel) {
-      cancel.addEventListener("click", () => {
-        if (!cancel.classList.contains("hidden")) {
-          closeBillsModal();
-        }
-      });
-    }
-    state.modalLifecycleBound = true;
-  }
-
-  function createBillsModalButton(config) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = config.label;
-    button.className = config.className || "bills-outline-button";
-    if (config.style) {
-      button.style.cssText = config.style;
-    }
-    button.addEventListener("click", config.onClick);
-    return button;
-  }
-
-  function openBillsModal(config) {
-    const elements = getBillsModalElements();
-    if (
-      !elements.overlay ||
-      !elements.panel ||
-      !elements.content ||
-      !elements.title ||
-      !elements.footer
-    ) {
-      return;
-    }
-
-    state.modalCloseHandler =
-      typeof config.onClose === "function" ? config.onClose : null;
-
-    elements.title.textContent = config.title || "查看对账单";
-    elements.panel.className =
-      config.panelClassName ||
-      "bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4";
-    elements.panel.style.maxWidth = config.maxWidth || "";
-    elements.panel.style.width = config.width || "";
-    elements.content.className = config.contentClassName || "p-4";
-    elements.content.innerHTML = config.content || "";
-    hydrateBillsEmptyStates(elements.content);
-
-    const footer = elements.footer;
-    if (footer) {
-      footer.className =
-        config.footerClassName ||
-        "flex items-center justify-between p-4 border-t border-gray-200";
-      footer.setAttribute("data-modal-footer", "true");
-
-      let cancelButton = elements.cancel;
-      if (!cancelButton) {
-        cancelButton = document.createElement("button");
-        cancelButton.id = "modal-cancel";
-        cancelButton.type = "button";
-      }
-
-      let confirmButton = elements.confirm;
-      if (!confirmButton) {
-        confirmButton = document.createElement("button");
-        confirmButton.id = "modal-confirm";
-        confirmButton.type = "button";
-      }
-
-      cancelButton.className = "hidden";
-      cancelButton.textContent = "取消";
-      cancelButton.onclick = null;
-
-      confirmButton.className = "hidden";
-      confirmButton.textContent = "确认";
-      confirmButton.onclick = null;
-
-      footer.replaceChildren();
-
-      const leftWrap = document.createElement("div");
-      leftWrap.className = "flex items-center gap-2";
-      (config.leftButtons || []).forEach((buttonConfig) => {
-        leftWrap.appendChild(createBillsModalButton(buttonConfig));
-      });
-
-      const rightWrap = document.createElement("div");
-      rightWrap.className = "flex items-center gap-2";
-      (config.rightButtons || []).forEach((buttonConfig) => {
-        rightWrap.appendChild(createBillsModalButton(buttonConfig));
-      });
-
-      rightWrap.appendChild(cancelButton);
-      rightWrap.appendChild(confirmButton);
-
-      footer.appendChild(leftWrap);
-      footer.appendChild(rightWrap);
-    }
-
-    elements.overlay.classList.remove("hidden");
-  }
-
-  function getStatementsForTab(tabKey) {
-    if (tabKey === "payment") {
-      return getStatementRecords().filter((record) =>
-        ["pending_payment", "partial_paid"].includes(
-          normalizeBillStatus(record.status),
-        ),
-      );
-    }
-    return getStatementRecords().filter(
-      (record) => record.statementType === tabKey,
-    );
-  }
-
-  function getPartyOptions() {
-    if (state.activeTab === "supplier") {
-      return global
-        .normalizeList(global.mockData?.suppliers)
-        .map((supplier) => ({
-          value: supplier.id,
-          label: supplier.name,
-        }));
-    }
-
-    if (state.activeTab === "customer") {
-      return global
-        .normalizeList(global.mockData?.customers)
-        .map((customer) => ({
-          value: customer.id,
-          label: customer.name,
-        }));
-    }
-
-    if (state.activeTab === "payment") {
-      const optionMap = new Map();
-      getStatementsForTab("payment").forEach((record) => {
-        const value = getStatementPartyFilterValue(record);
-        if (!value || optionMap.has(value)) return;
-        optionMap.set(value, {
-          value,
-          label: record.partyNameSnapshot || value,
-        });
-      });
-      return Array.from(optionMap.values());
-    }
-
-    return [];
-  }
-
-  function renderBillPartyFilter() {
-    const container = document.getElementById(
-      "bills-filter-supplier-container",
-    );
-    const input = document.getElementById("bills-filter-supplier");
-    if (!container || !input || typeof global.renderAntdSelect !== "function")
-      return;
-
-    global.renderAntdSelect(
-      "bills-filter-supplier-container",
-      "bills-filter-supplier",
-      getPartyOptions(),
-      {
-        placeholder:
-          state.activeTab === "supplier"
-            ? "全部供应商"
-            : state.activeTab === "customer"
-              ? "全部客户"
-              : "全部对象",
-        value: input.value || undefined,
-      },
-      () => {
-        ensureBillsPaginationState().page = 1;
-        updateBillsTableOverride();
-      },
-    );
-  }
-
-  function renderBillStatusFilter() {
-    const container = document.getElementById("bills-filter-status-container");
-    const input = document.getElementById("bills-filter-status");
-    if (!container || !input || typeof global.renderAntdSelect !== "function")
-      return;
-
-    const statuses =
-      state.activeTab === "payment"
-        ? ["pending_payment", "partial_paid"]
-        : [
-            "pending_check",
-            "pending_payment",
-            "partial_paid",
-            "paid",
-            "cancelled",
-          ];
-
-    global.renderAntdSelect(
-      "bills-filter-status-container",
-      "bills-filter-status",
-      [{ value: "", label: "全部状态" }].concat(
-        statuses.map((status) => ({
-          value: status,
-          label: BILL_STATUS_META[status].label,
-        })),
-      ),
-      {
-        placeholder: "全部状态",
-        value: input.value || "",
-      },
-      () => {
-        ensureBillsPaginationState().page = 1;
-        updateBillsTableOverride();
-      },
-    );
-  }
-
-  function renderBillSearchInput() {
-    const container = document.getElementById("bills-filter-search-container");
-    const input = document.getElementById("bills-filter-search");
-    if (!container || !input || typeof global.renderAntdInput !== "function")
-      return;
-
-    global.renderAntdInput(
-      "bills-filter-search-container",
-      "bills-filter-search",
-      {
-        placeholder: "搜索对账单...",
-        defaultValue: input.value || "",
-        prefixIcon: "fa fa-search",
-      },
-      () => {
-        ensureBillsPaginationState().page = 1;
-        updateBillsTableOverride();
-      },
-    );
-  }
-
-  function initBillFiltersOverride() {
-    normalizeBillsSectionCopy();
-    applyBillsListVisualParity();
-    renderBillPartyFilter();
-    renderBillStatusFilter();
-    renderBillSearchInput();
-  }
-
-  function getStatementDisplayName(statement) {
-    return (
-      statement.partyNameSnapshot ||
-      (state.activeTab === "supplier" ? "未命名供应商" : "未命名客户")
-    );
-  }
-
-  function getBillUserInitial(statement) {
-    if (statement.updatedByName) {
-      return global.escapeHTML(
-        String(statement.updatedByName).charAt(0) || "张",
-      );
-    }
-    return getCurrentUserInitialForBills();
-  }
-
-  function getBillRowActions(record) {
-    const paymentDisabled = ["paid", "cancelled"].includes(
-      normalizeBillStatus(record.status),
-    );
-    return `
-            <div class="bills-action-links">
-                <a href="#/bills/view/${encodeURIComponent(record.id)}" class="text-primary hover:text-primary-dark">查看</a>
-                <button type="button" class="text-orange-500 hover:text-orange-600" data-action="export" data-id="${global.escapeHTML(record.id)}">导出</button>
-                <button type="button" class="${paymentDisabled ? "text-gray-300 cursor-not-allowed" : "text-green-600 hover:text-green-700"}" data-action="payment" data-id="${global.escapeHTML(record.id)}" ${paymentDisabled ? "disabled" : ""}>登记付款</button>
-            </div>
-        `;
-  }
-
-  function getBillTimeCellHtml(statement) {
-    const initial = getBillUserInitial(statement);
-    return `
-            <div class="space-y-1 whitespace-nowrap">
-                <div class="flex items-center">
-                    <span class="text-xs text-gray-500 mr-2">创建时间:</span>
-                    <span class="flex items-center">
-                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${initial}</span>
-                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formatBillDateTime(statement.createdAt)}</span>
-                    </span>
-                </div>
-                <div class="flex items-center">
-                    <span class="text-xs text-gray-500 mr-2">更新时间:</span>
-                    <span class="flex items-center">
-                        <span class="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center mr-2">${initial}</span>
-                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">${formatBillDateTime(statement.updatedAt)}</span>
-                    </span>
-                </div>
-            </div>
-        `;
-  }
-
-  function renderBillRows(records) {
-    return records
-      .map(
-        (record) => `
-            <tr>
-                <td class="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">${global.escapeHTML(record.id)}</td>
-                <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">${global.escapeHTML(getStatementDisplayName(record))}</td>
-                <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">${global.escapeHTML(formatStatementPeriod(record.periodStart, record.periodEnd))}</td>
-                <td class="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">${global.escapeHTML(formatBillCurrency(record.totalAmount))}</td>
-                <td class="px-6 py-4 whitespace-nowrap">${getStatusBadgeHtml(record.status)}</td>
-                <td class="px-6 py-4 text-sm text-gray-500 align-top">${getBillTimeCellHtml(record)}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium bills-action-cell align-top">${getBillRowActions(record)}</td>
-            </tr>
-        `,
-      )
-      .join("");
-  }
-
-  function getFilteredStatements() {
-    const statements = getStatementsForTab(state.activeTab);
-    const partyValue =
-      document.getElementById("bills-filter-supplier")?.value || "";
-    const statusValue =
-      document.getElementById("bills-filter-status")?.value || "";
-    const startValue =
-      document.getElementById("bills-filter-date-start")?.value || "";
-    const endValue =
-      document.getElementById("bills-filter-date-end")?.value || "";
-    const searchValue = String(
-      document.getElementById("bills-filter-search")?.value || "",
-    )
-      .trim()
-      .toLowerCase();
-
-    return statements
-      .filter(
-        (record) =>
-          !partyValue || getStatementPartyFilterValue(record) === partyValue,
-      )
-      .filter(
-        (record) =>
-          !statusValue || normalizeBillStatus(record.status) === statusValue,
-      )
-      .filter((record) => {
-        if (!startValue && !endValue) return true;
-        const createdAt = normalizeBillDate(
-          record.statementDate || record.createdAt,
-        );
-        if (!createdAt) return true;
-        const dateOnly = formatBillDateOnly(createdAt);
-        return (
-          (!startValue || dateOnly >= startValue) &&
-          (!endValue || dateOnly <= endValue)
-        );
-      })
-      .filter((record) => {
-        if (!searchValue) return true;
-        const bag = [
-          record.id,
-          record.partyNameSnapshot,
-          formatStatementPeriod(record.periodStart, record.periodEnd),
-          record.notes,
-        ]
-          .join(" ")
-          .toLowerCase();
-        return bag.includes(searchValue);
-      })
-      .sort((a, b) => {
-        const timeA =
-          normalizeBillDate(a.updatedAt || a.createdAt)?.getTime() || 0;
-        const timeB =
-          normalizeBillDate(b.updatedAt || b.createdAt)?.getTime() || 0;
-        return timeB - timeA;
-      });
-  }
-
-  function updateBillsTableOverride() {
-    normalizeBillsSectionCopy();
-    applyBillsListVisualParity();
-
-    const tbody = document.getElementById("bills-table-body");
-    if (!tbody) return;
-
-    const filtered = getFilteredStatements();
-    const billsPagination = ensureBillsPaginationState();
-    billsPagination.total = filtered.length;
-    const pageSize = billsPagination.pageSize;
-    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    if (billsPagination.page > totalPages) {
-      billsPagination.page = totalPages;
-    }
-
-    const startIndex = (billsPagination.page - 1) * pageSize;
-    const currentPageRows = filtered.slice(startIndex, startIndex + pageSize);
-
-    if (!currentPageRows.length) {
-      global.renderAntdEmptyTableRow(
-        tbody,
-        7,
-        getBillsMeta(state.activeTab).emptyText,
-        {
-          cellClassName: "bills-empty-state",
-          wrapperClassName: "py-2",
-        },
-      );
-    } else {
-      tbody.innerHTML = renderBillRows(currentPageRows);
-    }
-
-    if (typeof global.renderPaginationControl === "function") {
-      global.renderPaginationControl(
-        "bills-pagination-container",
-        "bills",
-        () => {
-          updateBillsTableOverride();
-        },
-      );
-    }
-  }
-
-  function updateActiveBillTabUI() {
-    document.querySelectorAll("#bills-tabs button").forEach((button) => {
-      const isActive = button.dataset.tab === state.activeTab;
-      button.classList.toggle("active", isActive);
-      button.classList.toggle("text-primary", isActive);
-      button.classList.toggle("border-primary", isActive);
-      button.classList.toggle("border-transparent", !isActive);
-    });
-  }
-
-  function bindBillTabEventsOverride() {
-    if (state.filtersBound) return;
-    document.querySelectorAll("#bills-tabs button").forEach((button) => {
-      button.addEventListener("click", () => {
-        state.activeTab = button.dataset.tab || "customer";
-        document.getElementById("bills-filter-supplier").value = "";
-        document.getElementById("bills-filter-status").value = "";
-        document.getElementById("bills-filter-search").value = "";
-        ensureBillsPaginationState().page = 1;
-        updateActiveBillTabUI();
-        initBillFiltersOverride();
-        updateBillsTableOverride();
-      });
-    });
-    state.filtersBound = true;
-  }
+  const {
+    buildCustomerStatementFromForm,
+    buildSupplierStatementFromForm,
+    findDuplicateStatement,
+    buildCreateBillDraft,
+    getDraftSourceOccupancyEntries,
+    normalizeOccupiedContextEntries,
+  } = global.AppBillsStatements;
 
   function ensureBillsRouteSections() {
     const billsSection = document.getElementById("bills");
@@ -1862,6 +248,10 @@
     }
   }
 
+  function clearBillsViewFloatingActions() {
+    document.getElementById("bills-view-floating-actions")?.remove();
+  }
+
   function handleBillsRouteHash() {
     const route = parseBillsRouteHash();
     if (!route) return false;
@@ -1933,7 +323,7 @@
           if (errorPayload?.error) {
             message = errorPayload.error;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           const rawText = await response.text().catch(() => "");
           if (rawText) {
             message = rawText;
@@ -1955,15 +345,25 @@
     }
   }
 
-  function saveStatementRecord(statement, reopenView) {
+  async function saveStatementRecord(statement, reopenView, audit) {
     const bills = global.normalizeList(global.mockData?.bills);
     const nextBills = bills.map((item) =>
       item.id === statement.id ? statement : item,
     );
     global.mockData.bills = nextBills;
+    const auditLogs = audit ? global.stageAuditLogs(audit) : [];
+    let saved = true;
     if (typeof global.saveMockData === "function") {
-      global.saveMockData();
+      saved = await global.saveMockData();
     }
+    if (saved === false) {
+      global.rollbackStagedAuditLogs(auditLogs);
+      global.mockData.bills = bills;
+      updateBillsTableOverride();
+      alert("对账单保存失败，本次变更已回滚。");
+      return false;
+    }
+    global.finalizeStagedAuditLogs(auditLogs);
     updateBillsTableOverride();
     const isViewingCurrentStatement =
       state.activeViewStatementId === statement.id &&
@@ -1973,6 +373,7 @@
         returnTab: state.activeViewReturnTab || statement.statementType,
       });
     }
+    return true;
   }
 
   function openPaymentModal(statement) {
@@ -2011,7 +412,7 @@
           label: "确认",
           className:
             "bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg transition-all-300",
-          onClick: function () {
+          onClick: async function () {
             const amount = Number(
               document.getElementById("bill-payment-amount").value || 0,
             );
@@ -2055,8 +456,8 @@
             };
             nextStatement.status =
               getOutstandingAmount(nextStatement) > 0 ? "partial_paid" : "paid";
-            closeBillsModal();
-            saveStatementRecord(nextStatement, true);
+            const saved = await saveStatementRecord(nextStatement, true);
+            if (saved) closeBillsModal();
           },
         },
       ],
@@ -2075,28 +476,6 @@
         { placeholder: "选择付款方式", value: "bank_transfer" },
       );
     }
-  }
-
-  function renderBillStatusSelect(statement) {
-    if (typeof global.renderAntdSelect !== "function") return;
-
-    global.renderAntdSelect(
-      "bill-view-status-container",
-      "bill-view-status",
-      Object.keys(BILL_STATUS_META).map((key) => ({
-        value: key,
-        label: BILL_STATUS_META[key].label,
-      })),
-      { placeholder: "修改状态", value: normalizeBillStatus(statement.status) },
-      (value) => {
-        const nextStatement = {
-          ...statement,
-          status: value,
-          updatedAt: global.getLocalISOString(),
-        };
-        saveStatementRecord(nextStatement, true);
-      },
-    );
   }
 
   function openStatementViewModal(statement, options) {
@@ -2134,338 +513,24 @@
     );
   }
 
-  function buildStatementFromDetails(
-    formData,
-    company,
-    party,
-    details,
-    sourceNumbers,
-    sourceIds,
-  ) {
-    const currentAmount = roundCurrency(
-      details.reduce((sum, item) => sum + (Number(item.lineAmount) || 0), 0),
-    );
-    const taxRate = Number(formData.taxRate || 1);
-    const amountWithTax = roundCurrency(currentAmount * taxRate);
-
-    let arrears = [];
-    let arrearsAmount = 0;
-    if (formData.includeArrears) {
-      arrears = getStatementRecords()
-        .filter((record) => record.statementType === formData.statementType)
-        .filter(
-          (record) =>
-            record.companyId === formData.companyId &&
-            record.partyId === formData.partyId,
-        )
-        .filter((record) =>
-          ["pending_payment", "partial_paid"].includes(
-            normalizeBillStatus(record.status),
-          ),
-        )
-        .filter(
-          (record) =>
-            formatBillDateOnly(record.periodEnd) < formData.periodStart,
-        )
-        .map((record) => ({
-          sourceStatementId: record.id,
-          monthLabel: `${formatBillDateOnly(record.periodEnd).slice(0, 7)} 货款`,
-          amount: getOutstandingAmount(record),
-        }))
-        .filter((item) => item.amount > 0);
-      arrearsAmount = roundCurrency(
-        arrears.reduce((sum, item) => sum + item.amount, 0),
-      );
-    }
-
-    const totalAmount = roundCurrency(amountWithTax + arrearsAmount);
-    const prefix = formData.statementType === "supplier" ? "SST" : "CST";
-    const allStatements = getStatementRecords().filter(
-      (record) => record.statementType === formData.statementType,
-    );
-
-    return {
-      id: global.createSequentialId(allStatements, prefix, 4),
-      recordType: "statement-v1",
-      statementType: formData.statementType,
-      partyId: party.id,
-      partyNameSnapshot: party.name,
-      companyId: company.id,
-      companyNameSnapshot: company.name,
-      companyAddressSnapshot: company.address || "",
-      companyPhoneSnapshot: company.contactPhone || "",
-      contactNameSnapshot: party.contactPerson || "",
-      contactPhoneSnapshot: party.contactPhone || "",
-      partyAddressSnapshot: party.address || "",
-      statementDate: formData.statementDate,
-      periodStart: formData.periodStart,
-      periodEnd: formData.periodEnd,
-      documentCount: sourceNumbers.length,
-      currentAmount,
-      taxRate,
-      amountWithTax,
-      arrearsAmount,
-      totalAmount,
-      totalAmountUppercase: convertAmountToChineseUpperForBills(totalAmount),
-      status: "pending_check",
-      notes: "",
-      details,
-      arrears,
-      payments: [],
-      sourceDocumentIds: sourceIds,
-      createdAt: global.getLocalISOString(),
-      updatedAt: global.getLocalISOString(),
-    };
-  }
-
-  function buildCustomerStatementFromForm(formData) {
-    const company = global
-      .normalizeList(global.mockData?.companies)
-      .find((item) => item.id === formData.companyId);
-    const party = global
-      .normalizeList(global.mockData?.customers)
-      .find((item) => item.id === formData.partyId);
-    if (!company || !party) return null;
-
-    const occupiedSourceIds = getActiveSourceDocumentIdSet("customer");
-    const notes = global
-      .normalizeList(global.mockData?.deliveryNotes)
-      .filter(isSalesDeliveryNote)
-      .filter((note) => note.companyId === formData.companyId)
-      .filter((note) => note.customerId === formData.partyId)
-      .filter((note) => {
-        const date = formatBillDateOnly(
-          note.deliveryDate || note.issueDate || note.createdAt,
-        );
-        return date >= formData.periodStart && date <= formData.periodEnd;
-      })
-      .filter((note) => !occupiedSourceIds.has(String(note.id || "").trim()));
-
-    const details = [];
-    notes.forEach((note) => {
-      global.normalizeList(note.details).forEach((detail, index) => {
-        details.push({
-          id: `${note.id}-detail-${index + 1}`,
-          sourceType: "delivery_note",
-          sourceId: note.id,
-          sourceNo: note.orderNo || note.id,
-          bizDate: note.deliveryDate || note.issueDate || note.createdAt,
-          productId: detail.productId || "",
-          productNameSnapshot: detail.productName || "",
-          specSnapshot: detail.spec || "",
-          unitSnapshot: detail.unit || "",
-          quantity: Number(detail.quantity) || 0,
-          unitPrice: Number(detail.unitPrice) || 0,
-          lineAmount: Number(detail.totalAmount) || 0,
-          remark: detail.notes || "",
-          sortOrder: details.length + 1,
-        });
-      });
-    });
-
-    return buildStatementFromDetails(
-      formData,
-      company,
-      party,
-      details,
-      notes.map((note) => note.orderNo || note.id),
-      notes.map((note) => note.id),
-    );
-  }
-
-  function buildSupplierStatementFromForm(formData) {
-    const company = global
-      .normalizeList(global.mockData?.companies)
-      .find((item) => item.id === formData.companyId);
-    const party = global
-      .normalizeList(global.mockData?.suppliers)
-      .find((item) => item.id === formData.partyId);
-    if (!company || !party) return null;
-
-    const productMap = new Map(
-      global
-        .normalizeList(global.mockData?.products)
-        .map((item) => [item.id, item]),
-    );
-    const occupiedSourceIds = getActiveSourceDocumentIdSet("supplier");
-    const sourceNumbers = [];
-    const sourceIds = [];
-    const details = [];
-
-    global
-      .normalizeList(global.mockData?.deliveryNotes)
-      .filter(isPurchaseDeliveryNote)
-      .filter((note) => note.supplierId === formData.partyId)
-      .filter((note) => {
-        const date = formatBillDateOnly(
-          note.deliveryDate || note.expectedDate || note.createdAt,
-        );
-        return date >= formData.periodStart && date <= formData.periodEnd;
-      })
-      .filter((note) => !occupiedSourceIds.has(String(note.id || "").trim()))
-      .forEach((note) => {
-        sourceNumbers.push(note.orderId || note.id);
-        sourceIds.push(note.id);
-        global.normalizeList(note.details).forEach((detail) => {
-          const product = productMap.get(detail.productId);
-          details.push({
-            id: `${note.id}-detail-${details.length + 1}`,
-            sourceType: "purchase_delivery_note",
-            sourceId: note.id,
-            sourceNo: note.orderId || note.id,
-            bizDate: note.deliveryDate || note.expectedDate || note.createdAt,
-            productId: detail.productId || "",
-            productNameSnapshot: detail.productName || product?.name || "",
-            specSnapshot: detail.spec || product?.category || "",
-            unitSnapshot: detail.unit || product?.unit || "",
-            quantity: Number(detail.quantity) || 0,
-            unitPrice: Number(detail.unitPrice) || 0,
-            lineAmount:
-              Number(detail.totalAmount) ||
-              roundCurrency(
-                (Number(detail.quantity) || 0) *
-                  (Number(detail.unitPrice) || 0),
-              ),
-            remark: detail.notes || note.notes || "",
-            sortOrder: details.length + 1,
-          });
-        });
-      });
-
-    global
-      .normalizeList(global.stockMovementData)
-      .filter((record) => record.type === "inbound")
-      .filter(
-        (record) =>
-          record.supplierId === formData.partyId ||
-          record.supplierName === party.name,
-      )
-      .filter((record) => {
-        const date = formatBillDateOnly(record.createdAt || record.updatedAt);
-        return date >= formData.periodStart && date <= formData.periodEnd;
-      })
-      .filter(
-        (record) => !occupiedSourceIds.has(String(record.id || "").trim()),
-      )
-      .forEach((record) => {
-        sourceNumbers.push(record.id);
-        sourceIds.push(record.id);
-        details.push({
-          id: `${record.id}-detail-${details.length + 1}`,
-          sourceType: "stock_inbound",
-          sourceId: record.id,
-          sourceNo: record.id,
-          bizDate: record.createdAt || record.updatedAt,
-          productId: record.productId || "",
-          productNameSnapshot: record.productName || "",
-          specSnapshot: "",
-          unitSnapshot: record.unit || "",
-          quantity: Number(record.quantity) || 0,
-          unitPrice: Number(record.price) || 0,
-          lineAmount: roundCurrency(
-            (Number(record.quantity) || 0) * (Number(record.price) || 0),
-          ),
-          remark: record.remark || "",
-          sortOrder: details.length + 1,
-        });
-      });
-
-    return buildStatementFromDetails(
-      formData,
-      company,
-      party,
-      details,
-      sourceNumbers,
-      sourceIds,
-    );
-  }
-
-  function findDuplicateStatement(formData) {
-    return getStatementRecords().find(
-      (record) =>
-        record.statementType === formData.statementType &&
-        record.companyId === formData.companyId &&
-        record.partyId === formData.partyId &&
-        formatBillDateOnly(record.periodStart) === formData.periodStart &&
-        formatBillDateOnly(record.periodEnd) === formData.periodEnd &&
-        normalizeBillStatus(record.status) !== "cancelled",
-    );
-  }
-
-  function persistStatement(statement) {
-    global.mockData.bills = global
-      .normalizeList(global.mockData.bills)
-      .concat([statement]);
+  async function persistStatement(statement) {
+    const previousBills = global.normalizeList(global.mockData.bills);
+    global.mockData.bills = previousBills.concat([statement]);
+    let saved = true;
     if (typeof global.saveMockData === "function") {
-      global.saveMockData();
+      saved = await global.saveMockData();
+    }
+    if (saved === false) {
+      global.mockData.bills = previousBills;
+      updateBillsTableOverride();
+      alert("对账单创建失败，未保存的数据已回滚。");
+      return false;
     }
     state.activeTab = statement.statementType;
     updateActiveBillTabUI();
     initBillFiltersOverride();
     updateBillsTableOverride();
-  }
-
-  function getCreateDraftSourceCandidates(statementType, companyId, partyId) {
-    if (statementType === "supplier") {
-      const occupiedSourceIds = getActiveSourceDocumentIdSet("supplier");
-      const purchaseCandidates = global
-        .normalizeList(global.mockData?.deliveryNotes)
-        .filter(isPurchaseDeliveryNote)
-        .filter((note) => !partyId || note.supplierId === partyId)
-        .filter((note) => !occupiedSourceIds.has(String(note.id || "").trim()))
-        .map((note) => ({
-          partyId: note.supplierId || "",
-          date: formatBillDateOnly(
-            note.deliveryDate || note.expectedDate || note.createdAt,
-          ),
-        }));
-
-      const inboundCandidates = global
-        .normalizeList(global.stockMovementData)
-        .filter((record) => record.type === "inbound")
-        .filter((record) => !partyId || record.supplierId === partyId)
-        .filter(
-          (record) => !occupiedSourceIds.has(String(record.id || "").trim()),
-        )
-        .map((record) => ({
-          partyId: record.supplierId || "",
-          date: formatBillDateOnly(record.createdAt || record.updatedAt),
-        }));
-
-      return purchaseCandidates
-        .concat(inboundCandidates)
-        .filter((item) => item.partyId && item.date !== "-");
-    }
-
-    const occupiedSourceIds = getActiveSourceDocumentIdSet("customer");
-    return global
-      .normalizeList(global.mockData?.deliveryNotes)
-      .filter(isSalesDeliveryNote)
-      .filter((note) => !companyId || note.companyId === companyId)
-      .filter((note) => !partyId || note.customerId === partyId)
-      .filter((note) => !occupiedSourceIds.has(String(note.id || "").trim()))
-      .map((note) => ({
-        partyId: note.customerId || "",
-        date: formatBillDateOnly(
-          note.deliveryDate || note.issueDate || note.createdAt,
-        ),
-      }))
-      .filter((item) => item.partyId && item.date !== "-");
-  }
-
-  function buildCreateBillDraft(draft) {
-    const baseDraft = {
-      statementType: "",
-      companyId: "",
-      partyId: "",
-      statementDate: "",
-      periodStart: "",
-      periodEnd: "",
-      taxRate: "",
-      includeArrears: false,
-      ...(draft || {}),
-    };
-    return baseDraft;
+    return true;
   }
 
   function renderCreateBillDatePicker(containerId, inputId, value) {
@@ -2628,6 +693,7 @@
       "bill-create-company",
       global
         .normalizeList(global.mockData?.companies)
+        .filter((item) => item.status !== "inactive")
         .map((item) => ({ value: item.id, label: item.name })),
       { placeholder: "选择我方公司", value: draft.companyId || undefined },
       function (value) {
@@ -2646,10 +712,12 @@
       draft.statementType === "supplier"
         ? global
             .normalizeList(global.mockData?.suppliers)
+            .filter((item) => item.status !== "inactive")
             .map((item) => ({ value: item.id, label: item.name }))
         : draft.statementType === "customer"
           ? global
               .normalizeList(global.mockData?.customers)
+              .filter((item) => item.status !== "inactive")
               .map((item) => ({ value: item.id, label: item.name }))
           : [];
 
@@ -2699,121 +767,7 @@
         `;
   }
 
-  function getDraftSourceOccupancyEntries(formData) {
-    if (
-      !formData?.statementType ||
-      !formData.partyId ||
-      !formData.periodStart ||
-      !formData.periodEnd
-    ) {
-      return [];
-    }
-
-    let sourcePool = [];
-
-    if (formData.statementType === "supplier") {
-      const supplier = global
-        .normalizeList(global.mockData?.suppliers)
-        .find((item) => item.id === formData.partyId);
-      const purchaseSources = global
-        .normalizeList(global.mockData?.deliveryNotes)
-        .filter(isPurchaseDeliveryNote)
-        .filter((note) => note.supplierId === formData.partyId)
-        .filter((note) => {
-          const date = formatBillDateOnly(
-            note.deliveryDate || note.expectedDate || note.createdAt,
-          );
-          return date >= formData.periodStart && date <= formData.periodEnd;
-        })
-        .map((note) => ({
-          id: String(note.id || "").trim(),
-          sourceNo: note.orderId || note.id,
-          bizDate: formatBillDateOnly(
-            note.deliveryDate || note.expectedDate || note.createdAt,
-          ),
-          sourceType: "purchase_delivery_note",
-        }));
-
-      const inboundSources = global
-        .normalizeList(global.stockMovementData)
-        .filter((record) => record.type === "inbound")
-        .filter(
-          (record) =>
-            record.supplierId === formData.partyId ||
-            (supplier?.name && record.supplierName === supplier.name),
-        )
-        .filter((record) => {
-          const date = formatBillDateOnly(record.createdAt || record.updatedAt);
-          return date >= formData.periodStart && date <= formData.periodEnd;
-        })
-        .map((record) => ({
-          id: String(record.id || "").trim(),
-          sourceNo: record.id,
-          bizDate: formatBillDateOnly(record.createdAt || record.updatedAt),
-          sourceType: "stock_inbound",
-        }));
-
-      sourcePool = purchaseSources.concat(inboundSources);
-    } else if (formData.statementType === "customer") {
-      sourcePool = global
-        .normalizeList(global.mockData?.deliveryNotes)
-        .filter(isSalesDeliveryNote)
-        .filter((note) => note.companyId === formData.companyId)
-        .filter((note) => note.customerId === formData.partyId)
-        .filter((note) => {
-          const date = formatBillDateOnly(
-            note.deliveryDate || note.issueDate || note.createdAt,
-          );
-          return date >= formData.periodStart && date <= formData.periodEnd;
-        })
-        .map((note) => ({
-          id: String(note.id || "").trim(),
-          sourceNo: note.orderNo || note.id,
-          bizDate: formatBillDateOnly(
-            note.deliveryDate || note.issueDate || note.createdAt,
-          ),
-          sourceType: "delivery_note",
-        }));
-    }
-
-    const sourceMap = new Map(
-      sourcePool.filter((item) => item.id).map((item) => [item.id, item]),
-    );
-
-    return getStatementRecords()
-      .filter((record) => record.statementType === formData.statementType)
-      .filter((record) => normalizeBillStatus(record.status) !== "cancelled")
-      .map((record) => {
-        const matchedSources = global
-          .normalizeList(record.sourceDocumentIds)
-          .map((id) => String(id || "").trim())
-          .filter((id) => sourceMap.has(id))
-          .map((id) => sourceMap.get(id));
-
-        if (!matchedSources.length) {
-          return null;
-        }
-
-        return {
-          statement: record,
-          matchedSources,
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => {
-        const timeA =
-          normalizeBillDate(
-            a.statement.updatedAt || a.statement.createdAt,
-          )?.getTime() || 0;
-        const timeB =
-          normalizeBillDate(
-            b.statement.updatedAt || b.statement.createdAt,
-          )?.getTime() || 0;
-        return timeB - timeA;
-      });
-  }
-
-  function createStatementFromDraft(formData) {
+  async function createStatementFromDraft(formData) {
     const statement =
       formData.statementType === "supplier"
         ? buildSupplierStatementFromForm(formData)
@@ -2831,52 +785,11 @@
       alert("当前条件下没有可生成的对账明细，可能是没有匹配单据");
       return;
     }
-    persistStatement(statement);
+    const saved = await persistStatement(statement);
+    if (!saved) return false;
     state.pendingDraft = null;
     openStatementViewModal(statement);
-  }
-
-  function normalizeOccupiedContextEntries(occupiedEntries) {
-    return global
-      .normalizeList(occupiedEntries)
-      .map((entry) => {
-        const liveStatement =
-          entry.statement ||
-          getStatementRecords().find((item) => item.id === entry.statementId) ||
-          null;
-        const statementId = String(
-          liveStatement?.id || entry.statementId || "",
-        ).trim();
-        const sourceNos = Array.from(
-          new Set(
-            global
-              .normalizeList(entry.matchedSources || entry.sourceNos)
-              .map((item) => {
-                if (typeof item === "string") {
-                  return item;
-                }
-                return item?.sourceNo || item?.id || "";
-              })
-              .map((item) => String(item || "").trim())
-              .filter(Boolean),
-          ),
-        );
-
-        if (!statementId) {
-          return null;
-        }
-
-        return {
-          statementId,
-          partyNameSnapshot:
-            liveStatement?.partyNameSnapshot || entry.partyNameSnapshot || "-",
-          periodStart: liveStatement?.periodStart || entry.periodStart || "",
-          periodEnd: liveStatement?.periodEnd || entry.periodEnd || "",
-          status: normalizeBillStatus(liveStatement?.status || entry.status),
-          sourceNos,
-        };
-      })
-      .filter(Boolean);
+    return true;
   }
 
   function getOccupiedViewNavigation(statementId) {
@@ -3019,13 +932,20 @@
     return state.statementViewOptions[statementId];
   }
 
-  function persistStatementRecordWithViewContext(statement, options) {
+  async function persistStatementRecordWithViewContext(statement, options) {
     const bills = global.normalizeList(global.mockData?.bills);
     global.mockData.bills = bills.map((item) =>
       item.id === statement.id ? statement : item,
     );
+    let saved = true;
     if (typeof global.saveMockData === "function") {
-      global.saveMockData();
+      saved = await global.saveMockData();
+    }
+    if (saved === false) {
+      global.mockData.bills = bills;
+      updateBillsTableOverride();
+      alert("对账单保存失败，本次变更已回滚。");
+      return false;
     }
     updateBillsTableOverride();
 
@@ -3042,6 +962,7 @@
         occupiedActiveStatementId: statement.id,
       });
     }
+    return true;
   }
 
   function openStatementConfirmExportModal(statement, options) {
@@ -3077,7 +998,7 @@
           label: "确认并导出",
           className:
             "bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg transition-all-300",
-          onClick: function () {
+          onClick: async function () {
             const shouldExportExcel = !!document.getElementById(
               "bill-confirm-export-excel",
             )?.checked;
@@ -3098,13 +1019,17 @@
               : statement;
 
             if (nextStatement !== statement) {
-              persistStatementRecordWithViewContext(nextStatement, {
-                returnTab:
-                  options?.returnTab ||
-                  state.activeViewReturnTab ||
-                  statement.statementType,
-                preserveOccupiedContext: !!options?.preserveOccupiedContext,
-              });
+              const saved = await persistStatementRecordWithViewContext(
+                nextStatement,
+                {
+                  returnTab:
+                    options?.returnTab ||
+                    state.activeViewReturnTab ||
+                    statement.statementType,
+                  preserveOccupiedContext: !!options?.preserveOccupiedContext,
+                },
+              );
+              if (!saved) return;
             }
 
             closeBillsModal();
@@ -3394,29 +1319,27 @@
           label: "确认作废",
           className: "px-4 py-2 rounded-lg text-white transition-all-300",
           style: "background:#dc2626;",
-          onClick: function () {
-            closeBillsModal();
+          onClick: async function () {
             const nextStatement = {
               ...statement,
               status: "cancelled",
               updatedAt: global.getLocalISOString(),
             };
-            saveStatementRecord(nextStatement, true);
-            if (typeof global.addLog === "function") {
-              const statementTypeLabel = getBillsMeta(
-                nextStatement.statementType,
-              ).label;
-              const periodText = formatStatementPeriod(
-                nextStatement.periodStart,
-                nextStatement.periodEnd,
-              );
-              global.addLog(
-                "cancel",
-                "bill",
-                nextStatement.id,
-                `作废${statementTypeLabel}：${nextStatement.partyNameSnapshot || "-"} / ${nextStatement.id} / ${periodText}`,
-              );
-            }
+            const statementTypeLabel = getBillsMeta(
+              nextStatement.statementType,
+            ).label;
+            const periodText = formatStatementPeriod(
+              nextStatement.periodStart,
+              nextStatement.periodEnd,
+            );
+            const saved = await saveStatementRecord(nextStatement, true, {
+              actionType: "cancel",
+              objectType: "bill",
+              objectName: nextStatement.id,
+              details: `作废${statementTypeLabel}：${nextStatement.partyNameSnapshot || "-"} / ${nextStatement.id} / ${periodText}`,
+            });
+            if (!saved) return;
+            closeBillsModal();
           },
         },
       ],
@@ -3560,7 +1483,7 @@
 
     document
       .getElementById("bill-view-up-btn")
-      ?.addEventListener("click", () => {
+      ?.addEventListener("click", async () => {
         returnToPreviousBillsLevel(statement.id, returnTab);
       });
     document
@@ -3745,7 +1668,7 @@
       );
     document
       .getElementById("bill-create-submit-btn")
-      ?.addEventListener("click", () => {
+      ?.addEventListener("click", async () => {
         const formData = getCreateDraftFromModal();
         state.pendingDraft = formData;
 
@@ -3780,27 +1703,8 @@
           return;
         }
 
-        createStatementFromDraft(formData);
+        await createStatementFromDraft(formData);
       });
-  }
-
-  function clearBillsViewFloatingActions() {
-    document.getElementById("bills-view-floating-actions")?.remove();
-  }
-
-  function mountBillsViewFloatingActions() {
-    clearBillsViewFloatingActions();
-
-    const root = document.createElement("div");
-    root.id = "bills-view-floating-actions";
-    root.className = "bills-route-actions";
-    root.style.cssText =
-      "position:fixed;right:max(16px, env(safe-area-inset-right));bottom:max(16px, env(safe-area-inset-bottom));z-index:90;display:flex;align-items:center;gap:12px;";
-    root.innerHTML = `
-            <button id="bill-view-register-payment-btn" type="button" class="bills-outline-button">登记付款</button>
-            <button id="bill-view-confirm-export-btn" type="button" class="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg transition-all-300">确认并导出</button>
-        `;
-    document.body.appendChild(root);
   }
 
   function bindBillsTableEvents() {
@@ -3860,12 +1764,21 @@
     if (state.addButtonBound) return;
     const button = document.getElementById("add-bill-btn");
     if (!button) return;
-    button.addEventListener("click", () => openCreateBillModal());
+    button.addEventListener("click", () => {
+      const statementType =
+        state.activeTab === "supplier" ? "supplier" : "customer";
+      if (
+        typeof global.guardWorkflowAction === "function" &&
+        !global.guardWorkflowAction("addBill", { statementType })
+      ) {
+        return;
+      }
+      openCreateBillModal();
+    });
     state.addButtonBound = true;
   }
 
   async function initBillsModule() {
-    injectBillsModuleStyles();
     ensureBillsRouteSections();
     bindBillsModalLifecycle();
     bindBillsRouteLifecycle();
@@ -3879,12 +1792,6 @@
     updateBillsTableOverride();
     handleBillsRouteHash();
   }
-
-  global.normalizeBillsSectionCopy = normalizeBillsSectionCopy;
-  global.initBillFilters = initBillFiltersOverride;
-  global.updateBillsTable = updateBillsTableOverride;
-  global.renderBillsTable = updateBillsTableOverride;
-  global.bindBillTabEvents = bindBillTabEventsOverride;
 
   document.addEventListener("DOMContentLoaded", function () {
     initBillsModule().catch((error) => {
