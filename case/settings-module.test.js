@@ -47,6 +47,24 @@ test("bindSettingsEvents switches tabs and wires export and import actions", asy
       .getElementById("settings-backup")
       .classList.contains("hidden"),
   );
+  assert.equal(
+    harness.window.document
+      .querySelector('#settings-tabs button[data-target="settings-backup"]')
+      .classList.contains("active"),
+    true,
+  );
+  assert.equal(
+    harness.window.document
+      .querySelector('#settings-tabs button[data-target="settings-general"]')
+      .classList.contains("active"),
+    false,
+  );
+  assert.equal(
+    harness.window.document
+      .querySelector('#settings-tabs button[data-target="settings-backup"]')
+      .getAttribute("aria-selected"),
+    "true",
+  );
 
   harness.window.document.getElementById("export-data-btn").click();
   harness.window.document.getElementById("import-data-btn").click();

@@ -602,3 +602,31 @@ test("index.html renders Ant Design Empty for missing bills route views", async 
 
   harness.close();
 });
+
+test("history import tab owns test and clear actions and shows its selected state", async () => {
+  const harness = await bootRealIndexPage();
+  const { document } = harness.window;
+  const historyTab = document.querySelector(
+    '#settings-tabs button[data-target="settings-history-import"]',
+  );
+
+  historyTab.click();
+
+  assert.equal(historyTab.classList.contains("active"), true);
+  assert.equal(historyTab.getAttribute("aria-selected"), "true");
+  assert.equal(
+    document
+      .querySelector('#settings-tabs button[data-target="settings-basic"]')
+      .classList.contains("active"),
+    false,
+  );
+  assert.ok(
+    document.querySelector("#settings-history-import #seed-test-data-button"),
+  );
+  assert.ok(
+    document.querySelector("#settings-history-import #clear-all-data-button"),
+  );
+  assert.equal(document.querySelector("aside #seed-test-data-button"), null);
+
+  harness.close();
+});

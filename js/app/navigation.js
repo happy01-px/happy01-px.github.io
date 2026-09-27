@@ -772,22 +772,39 @@
   }
 
   async function requestClearAllDataConfirmation() {
-    const firstConfirmed =
+    const shouldDownloadBackup =
       typeof global.showAntdConfirm === "function"
         ? await global.showAntdConfirm({
-            title: "确认清除所有数据？",
+            title: "清空前是否下载当前数据？",
             content: [
-              "此操作会清空商品、供应商、客户、公司、进出货记录、送货单、对账单和日志。",
-              "建议先在系统设置里导出备份；清空后无法从页面恢复。",
+              "建议先保存一份当前完整数据，之后可通过“数据备份”恢复。",
+              "选择不备份不会立即清空，下一步仍会要求最终确认。",
             ],
-            okText: "继续",
-            cancelText: "取消",
+            okText: "下载备份",
+            cancelText: "不备份，继续",
             okType: "primary",
             width: 520,
           })
-        : global.confirm("确认清除所有数据？");
+        : global.confirm("清空前是否下载当前数据备份？");
 
-    if (!firstConfirmed) return false;
+    if (shouldDownloadBackup) {
+      if (typeof global.exportAllData !== "function") {
+        global.showAntdMessage?.("error", "备份功能尚未加载，已停止清空操作。");
+        return false;
+      }
+
+      try {
+        global.exportAllData({ log: false });
+        global.showAntdMessage?.(
+          "success",
+          "当前数据备份已开始下载，请确认文件保存后再继续。",
+        );
+      } catch (error) {
+        console.error("Backup before clearing failed:", error);
+        global.showAntdMessage?.("error", "备份下载失败，已停止清空操作。");
+        return false;
+      }
+    }
 
     return typeof global.showAntdConfirm === "function"
       ? global.showAntdConfirm({

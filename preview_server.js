@@ -408,6 +408,7 @@ function runBrowserPdfExport(
     "--no-first-run",
     "--no-default-browser-check",
     "--allow-file-access-from-files",
+    "--no-pdf-header-footer",
     "--print-to-pdf-no-header",
     `--print-to-pdf=${pdfPath}`,
     "--run-all-compositor-stages-before-draw",

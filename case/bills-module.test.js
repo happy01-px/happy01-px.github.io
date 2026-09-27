@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const path = require("node:path");
+const XLSX = require(path.join(__dirname, "..", "lib", "xlsx.full.min.js"));
 const {
   applyFixtureState,
   createWindow,
@@ -103,6 +105,117 @@ test("updateBillsTable renders the active customer statements and empty states",
       .getElementById("bills-table-body")
       .querySelector('[data-role="antd-empty"]'),
   );
+
+  harness.close();
+});
+
+test("statement Excel export builds a real readable xlsx workbook", () => {
+  const harness = createWindow({ markup: createBillsMarkup() });
+  const fixture = createFixtureData();
+  harness.window.XLSX = XLSX;
+
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/bills-core.js",
+    "js/modules/bills-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+
+  const statement = {
+    ...fixture.mockData.bills[0],
+    companyNameSnapshot: "示例公司",
+    contactNameSnapshot: "示例联系人",
+    contactPhoneSnapshot: "未提供",
+    documentCount: 1,
+    currentAmount: 1200,
+    amountWithTax: 1200,
+    arrearsAmount: 0,
+    details: [
+      {
+        bizDate: "2026-04-10",
+        sourceNo: "TEST-001",
+        productNameSnapshot: "示例商品",
+        specSnapshot: "标准",
+        unitSnapshot: "件",
+        quantity: 2,
+        unitPrice: 600,
+        lineAmount: 1200,
+        remark: "验证导出",
+      },
+    ],
+    arrears: [],
+    payments: [],
+  };
+
+  const workbook =
+    harness.window.AppBillsExport.buildStatementExcelWorkbook(statement);
+  const bytes = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
+  assert.equal(Buffer.from(bytes).subarray(0, 2).toString("utf8"), "PK");
+
+  const reopened = XLSX.read(bytes, { type: "buffer" });
+  const rows = XLSX.utils.sheet_to_json(reopened.Sheets["对账单"], {
+    header: 1,
+    raw: true,
+  });
+  assert.ok(rows.some((row) => row.includes("示例商品")));
+  assert.ok(rows.some((row) => row.includes("对账总额")));
+  assert.ok(rows.some((row) => row.includes(1200)));
+
+  const populatedWorkbook =
+    harness.window.AppBillsExport.buildStatementExcelWorkbook({
+      ...statement,
+      amountWithTax: 1296,
+      arrearsAmount: 300,
+      totalAmount: 1596,
+      totalAmountUppercase: "壹仟伍佰玖拾陆元整",
+      arrears: [{ monthLabel: "2026-03", amount: 300 }],
+      payments: [
+        {
+          payDate: "2026-04-20",
+          payMethod: "银行转账",
+          payAmount: 500,
+          remark: "测试付款",
+        },
+      ],
+    });
+  const populatedRows = XLSX.utils.sheet_to_json(
+    populatedWorkbook.Sheets["对账单"],
+    { header: 1, raw: true },
+  );
+  assert.ok(populatedRows.some((row) => row.includes("2026-03")));
+  assert.ok(populatedRows.some((row) => row.includes("银行转账")));
+  assert.ok(populatedRows.some((row) => row.includes("壹仟伍佰玖拾陆元整")));
+
+  const downloads = [];
+  harness.window.HTMLAnchorElement.prototype.click = function click() {
+    downloads.push(this.download);
+  };
+  assert.equal(
+    harness.window.AppBillsExport.exportStatementAsExcel(statement),
+    true,
+  );
+  assert.deepEqual(downloads, ["BILL-C-001.xlsx"]);
+
+  const fallbackWorkbook =
+    harness.window.AppBillsExport.buildStatementExcelWorkbook({
+      statementType: "supplier",
+      details: [{}],
+      arrears: [{}],
+      payments: [{}],
+    });
+  const fallbackRows = XLSX.utils.sheet_to_json(
+    fallbackWorkbook.Sheets["对账单"],
+    { header: 1, raw: true },
+  );
+  assert.ok(fallbackRows.some((row) => row.includes("供应商对账单")));
+
+  harness.window.XLSX = undefined;
+  assert.equal(
+    harness.window.AppBillsExport.exportStatementAsExcel(statement),
+    false,
+  );
+  assert.match(harness.alerts.at(-1), /Excel 导出组件未加载/);
 
   harness.close();
 });

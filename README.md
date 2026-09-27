@@ -37,6 +37,15 @@ npm run ci:check
 
 该命令依次执行代码检查、类型检查、测试和覆盖率检查。
 
+在 Windows 上实际生成并回读 Excel/PDF 文件，以及检查 Electron 能否识别系统打印机：
+
+```powershell
+npm run verify:exports
+npm run verify:printers
+```
+
+验证文件仅写入已忽略的 `.runtime/export-verification/`，不会提交到仓库。
+
 ## Windows 桌面应用
 
 开发调试桌面窗口：

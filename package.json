@@ -20,6 +20,8 @@
     "test:cases": "node --test",
     "coverage": "c8 --check-coverage --lines 75 --statements 75 --functions 80 --branches 60 --exclude=case/** --exclude=lib/** --reporter=text --reporter=html node --test",
     "ci:check": "npm run lint && npm run typecheck && npm test && npm run coverage",
+    "verify:exports": "node scripts/verify-export-capabilities.js",
+    "verify:printers": "electron scripts/verify-electron-printers.js",
     "build": "npm run build:desktop",
     "build:server": "pkg . --out-path dist",
     "build:desktop": "electron-builder --win nsis",

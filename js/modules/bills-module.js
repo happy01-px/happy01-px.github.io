@@ -21,11 +21,8 @@
     throw new Error("bills-data.js must be loaded before bills-module.js");
   }
 
-  const {
-    getStatementRecords,
-    getOutstandingAmount,
-    ensureBillsSeedData,
-  } = global.AppBillsData;
+  const { getStatementRecords, getOutstandingAmount, ensureBillsSeedData } =
+    global.AppBillsData;
 
   if (!state || !global.AppBillsList) {
     throw new Error(
@@ -296,11 +293,151 @@
     URL.revokeObjectURL(url);
   }
 
+  function buildStatementExcelWorkbook(statement) {
+    if (!global.XLSX?.utils || typeof global.XLSX.write !== "function") {
+      throw new Error("Excel 导出组件未加载");
+    }
+
+    const meta = getBillsMeta(statement.statementType);
+    const details = global.normalizeList(statement.details);
+    const arrears = global.normalizeList(statement.arrears);
+    const payments = global.normalizeList(statement.payments);
+    const rows = [
+      [statement.companyNameSnapshot || "对账单"],
+      [meta.label],
+      [],
+      [
+        "对账单编号",
+        statement.id,
+        "对账日期",
+        formatBillDateOnly(statement.statementDate),
+      ],
+      [
+        "对账周期",
+        formatStatementPeriod(statement.periodStart, statement.periodEnd),
+        meta.partyLabel,
+        statement.partyNameSnapshot || "-",
+      ],
+      [
+        "联系人",
+        statement.contactNameSnapshot || "-",
+        "联系电话",
+        statement.contactPhoneSnapshot || "-",
+      ],
+      [],
+      [
+        "序号",
+        "业务日期",
+        "来源单号",
+        "产品名称",
+        "规格",
+        "单位",
+        "数量",
+        "单价",
+        "金额",
+        "备注",
+      ],
+      ...details.map((detail, index) => [
+        index + 1,
+        formatBillDateOnly(detail.bizDate),
+        detail.sourceNo || "-",
+        detail.productNameSnapshot || "-",
+        detail.specSnapshot || "-",
+        detail.unitSnapshot || "-",
+        Number(detail.quantity) || 0,
+        roundCurrency(Number(detail.unitPrice) || 0),
+        roundCurrency(Number(detail.lineAmount) || 0),
+        detail.remark || "-",
+      ]),
+      [
+        "明细合计",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        roundCurrency(Number(statement.currentAmount) || 0),
+        "",
+      ],
+      [],
+      ["往期欠款月份", "金额"],
+      ...(arrears.length
+        ? arrears.map((item) => [
+            item.monthLabel || "-",
+            roundCurrency(Number(item.amount) || 0),
+          ])
+        : [["暂无往期欠款", 0]]),
+      [],
+      ["付款日期", "方式", "金额", "备注"],
+      ...(payments.length
+        ? payments.map((item) => [
+            formatBillDateOnly(item.payDate),
+            item.payMethod || "-",
+            roundCurrency(Number(item.payAmount) || 0),
+            item.remark || "-",
+          ])
+        : [["暂无付款记录", "", 0, ""]]),
+      [],
+      ["单据份数", Number(statement.documentCount) || 0],
+      ["当前货款", roundCurrency(Number(statement.currentAmount) || 0)],
+      ["含税金额", roundCurrency(Number(statement.amountWithTax) || 0)],
+      ["往期欠款", roundCurrency(Number(statement.arrearsAmount) || 0)],
+      ["对账总额", roundCurrency(Number(statement.totalAmount) || 0)],
+      [
+        "大写金额",
+        statement.totalAmountUppercase ||
+          convertAmountToChineseUpperForBills(statement.totalAmount),
+      ],
+    ];
+
+    const worksheet = global.XLSX.utils.aoa_to_sheet(rows);
+    worksheet["!cols"] = [
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 24 },
+      { wch: 14 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 24 },
+    ];
+    worksheet["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } },
+    ];
+
+    const workbook = global.XLSX.utils.book_new();
+    global.XLSX.utils.book_append_sheet(workbook, worksheet, "对账单");
+    workbook.Props = {
+      Title: `${statement.id || ""} ${meta.label}`.trim(),
+      Subject: "库存管理系统对账单",
+      CreatedDate: new Date(),
+    };
+    return workbook;
+  }
+
   function exportStatementAsExcel(statement) {
-    const blob = new Blob([buildStatementExportHtml(statement)], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    downloadBlob(blob, `${statement.id}.xls`);
+    try {
+      const workbook = buildStatementExcelWorkbook(statement);
+      const workbookData = global.XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+        compression: true,
+      });
+      const blob = new Blob([workbookData], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      downloadBlob(blob, `${statement.id}.xlsx`);
+      return true;
+    } catch (error) {
+      console.error("exportStatementAsExcel failed:", error);
+      alert(`Excel 导出失败：${error?.message || "请刷新页面后重试"}`);
+      return false;
+    }
   }
 
   async function exportStatementAsPdf(statement) {
@@ -1792,6 +1929,13 @@
     updateBillsTableOverride();
     handleBillsRouteHash();
   }
+
+  global.AppBillsExport = Object.freeze({
+    buildStatementExcelWorkbook,
+    buildStatementExportHtml,
+    exportStatementAsExcel,
+    exportStatementAsPdf,
+  });
 
   document.addEventListener("DOMContentLoaded", function () {
     initBillsModule().catch((error) => {

@@ -551,6 +551,7 @@ test("workflow prerequisite prompt lets the user go create the missing data", as
 test("clear all data buttons require two confirmations before clearing", async () => {
   const harness = createWindow({ markup: createScriptPageMarkup() });
   const calls = {
+    backup: 0,
     clear: 0,
     inventory: 0,
     logs: 0,
@@ -567,6 +568,11 @@ test("clear all data buttons require two confirmations before clearing", async (
     calls.clear += 1;
     return true;
   };
+  harness.window.exportAllData = (options) => {
+    assert.equal(options.log, false);
+    calls.backup += 1;
+    return "inventory_backup_test.json";
+  };
   harness.window.updateInventoryTable = () => {
     calls.inventory += 1;
   };
@@ -574,13 +580,16 @@ test("clear all data buttons require two confirmations before clearing", async (
     calls.logs += 1;
   };
 
-  confirmQueue.push(true, false);
+  confirmQueue.push(false, false);
   harness.window.bindActionButtons();
   harness.window.document.getElementById("clear-all-data-button").click();
   await flushAsyncTasks(3);
 
   assert.equal(calls.clear, 0);
+  assert.equal(calls.backup, 0);
   assert.equal(confirmCalls.length, 2);
+  assert.equal(confirmCalls[0].okText, "下载备份");
+  assert.equal(confirmCalls[0].cancelText, "不备份，继续");
   assert.equal(confirmCalls[1].okText, "确认清空");
   assert.equal(confirmCalls[1].okType, "danger");
 
@@ -591,6 +600,7 @@ test("clear all data buttons require two confirmations before clearing", async (
   await flushAsyncTasks(4);
 
   assert.equal(calls.clear, 1);
+  assert.equal(calls.backup, 1);
   assert.equal(calls.inventory, 1);
   assert.equal(calls.logs, 1);
 

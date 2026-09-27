@@ -703,7 +703,7 @@
     }
   }
 
-  function exportAllData() {
+  function exportAllData(options = {}) {
     mockData = normalizeMockData(mockData);
 
     const data = {
@@ -719,15 +719,18 @@
 
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `inventory_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    const filename = `inventory_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.download = filename;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
 
-    if (typeof global.addLog === "function") {
+    if (options?.log !== false && typeof global.addLog === "function") {
       global.addLog("export", "system", "数据备份", "导出系统全部数据");
     }
+
+    return filename;
   }
 
   function importData(file) {

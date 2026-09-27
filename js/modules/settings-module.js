@@ -5,10 +5,12 @@
       const isActive = item.getAttribute("data-target") === targetId;
       item.classList.toggle("border-primary", isActive);
       item.classList.toggle("text-primary", isActive);
+      item.classList.toggle("active", isActive);
       item.classList.toggle("border-transparent", !isActive);
       item.classList.toggle("text-gray-500", !isActive);
       item.classList.toggle("hover:text-gray-700", !isActive);
       item.classList.toggle("hover:border-gray-300", !isActive);
+      item.setAttribute("aria-selected", String(isActive));
     });
 
     document.querySelectorAll(".settings-content").forEach((content) => {
