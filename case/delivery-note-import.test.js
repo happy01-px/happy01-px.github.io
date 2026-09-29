@@ -24,6 +24,7 @@ const WORKFLOW_MARKUP = `
     <div id="delivery-import-workflow-content"></div>
     <div id="delivery-import-workflow-actions" class="hidden">
       <button id="delivery-import-workflow-secondary" type="button"></button>
+      <button id="delivery-import-workflow-partial" class="hidden" type="button"></button>
       <button id="delivery-import-workflow-primary" type="button"></button>
     </div>
   </section>`;
@@ -436,6 +437,869 @@ test("history import uses a routed review and returns from preview with edits", 
   );
 });
 
+test("archive batch review requires every file to be confirmed or excluded", async () => {
+  const harness = createWindow({ markup: WORKFLOW_MARKUP });
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/app/app-shell.js",
+    "js/modules/delivery-note-import.js",
+  ]);
+  harness.window.mockData = {
+    companies: [],
+    customers: [],
+    products: [],
+    suppliers: [],
+    customerProductPrices: [],
+    deliveryNotes: [],
+  };
+  const first = createImportDocument();
+  const second = createImportDocument();
+  second.fileName = "第二份.xlsx";
+  second.metadata.orderNo = "AA26-098";
+  harness.window.DeliveryNoteImport.showBatchReviewPage([
+    {
+      archiveName: "送货单.rar",
+      relativePath: "客户甲/第一份.xlsx",
+      fileName: "第一份.xlsx",
+      status: "pending",
+      documentCount: 1,
+      itemCount: 1,
+      documents: [first],
+      errors: [],
+      warnings: [],
+    },
+    {
+      archiveName: "送货单.rar",
+      relativePath: "客户乙/第二份.xlsx",
+      fileName: "第二份.xlsx",
+      status: "pending",
+      documentCount: 1,
+      itemCount: 1,
+      documents: [second],
+      errors: [],
+      warnings: [],
+    },
+    {
+      archiveName: "送货单.rar",
+      relativePath: "其他/无法识别.xlsx",
+      fileName: "无法识别.xlsx",
+      status: "error",
+      documentCount: 0,
+      itemCount: 0,
+      documents: [],
+      errors: ["表头不完整"],
+      warnings: [],
+    },
+  ]);
+
+  const document = harness.window.document;
+  const primary = document.getElementById("delivery-import-workflow-primary");
+  assert.equal(primary.disabled, true);
+  assert.match(primary.textContent, /还剩 3 个/);
+  assert.equal(document.querySelectorAll("[data-batch-open]").length, 3);
+  assert.equal(document.querySelectorAll("[data-import-document]").length, 1);
+  assert.ok(document.querySelector("[data-batch-preview-document]"));
+  assert.equal(
+    document
+      .getElementById("delivery-import-batch-detail-form")
+      .classList.contains("hidden"),
+    true,
+  );
+  assert.ok(document.querySelector("[data-batch-edit]"));
+
+  document.querySelector("[data-batch-edit]").click();
+  assert.equal(
+    document
+      .getElementById("delivery-import-batch-detail-form")
+      .classList.contains("hidden"),
+    false,
+  );
+  assert.equal(document.querySelector("[data-batch-confirm]"), null);
+  document.querySelector('[data-field="customerContact"]').value =
+    "编辑后的联系人";
+  document.querySelector("[data-batch-edit-save]").click();
+  assert.ok(document.querySelector("[data-batch-confirm]"));
+  assert.match(
+    document.getElementById("delivery-import-batch-preview").textContent,
+    /编辑后的联系人/,
+  );
+
+  document.querySelector("[data-batch-confirm]").click();
+  assert.equal(primary.disabled, true);
+  assert.match(primary.textContent, /还剩 2 个/);
+  assert.equal(
+    document
+      .getElementById("delivery-import-workflow-partial")
+      .classList.contains("hidden"),
+    false,
+  );
+  assert.match(
+    document.getElementById("delivery-import-workflow-partial").textContent,
+    /暂时导入已确认文件（1 个）/,
+  );
+  assert.match(
+    document.querySelector(".delivery-import-batch-detail-heading h3")
+      .textContent,
+    /第二份/,
+  );
+
+  document.querySelector("[data-batch-confirm]").click();
+  assert.equal(primary.disabled, true);
+  assert.match(primary.textContent, /还剩 1 个/);
+  assert.ok(document.querySelector("[data-batch-exclude]"));
+
+  document.querySelector("[data-batch-exclude]").click();
+  await flushAsyncTasks();
+  assert.equal(harness.confirmCalls.length, 1);
+  assert.equal(harness.confirmCalls[0].title, "排除此文件？");
+  assert.equal(primary.disabled, false);
+  assert.match(primary.textContent, /已确认文件（2 个）/);
+  assert.equal(
+    document.querySelector('[data-batch-count="excluded"]').textContent,
+    "1",
+  );
+
+  harness.close();
+});
+
+test("partial archive import saves only confirmed files and filters them next time", async () => {
+  const harness = createWindow({ markup: WORKFLOW_MARKUP });
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/app/app-shell.js",
+    "js/modules/delivery-note-import.js",
+  ]);
+  harness.window.mockData = {
+    companies: [],
+    customers: [],
+    products: [],
+    suppliers: [],
+    bills: [],
+    customerProductPrices: [],
+    deliveryNotes: [],
+  };
+  const first = createImportDocument();
+  const second = createImportDocument();
+  second.metadata.orderNo = "AA26-098";
+  const records = [first, second].map((documentData, index) => ({
+    archiveName: "销售出货单.rar",
+    relativePath: `客户甲/送货单${index + 1}.xlsx`,
+    fileName: `送货单${index + 1}.xlsx`,
+    status: "pending",
+    documentCount: 1,
+    itemCount: 1,
+    documents: [documentData],
+    errors: [],
+    warnings: [],
+  }));
+
+  harness.window.DeliveryNoteImport.showBatchReviewPage(records);
+  const document = harness.window.document;
+  document.querySelector("[data-batch-confirm]").click();
+  document.getElementById("delivery-import-workflow-partial").click();
+  await flushAsyncTasks(4);
+
+  assert.match(
+    document.getElementById("delivery-import-workflow-title").textContent,
+    /暂时导入的已确认文件/,
+  );
+  assert.equal(harness.confirmCalls.at(-1).okText, "预览已确认文件");
+  document.getElementById("delivery-import-workflow-primary").click();
+  await flushAsyncTasks(4);
+
+  assert.equal(harness.window.mockData.deliveryNotes.length, 1);
+  assert.equal(
+    harness.window.mockData.deliveryNotes[0].sourceArchiveEntryKey,
+    "销售出货单.rar::客户甲/送货单1.xlsx",
+  );
+  const filtered =
+    harness.window.DeliveryNoteImport.filterPreviouslyImportedArchiveRecords(
+      records,
+      harness.window.mockData,
+    );
+  assert.equal(filtered.skipped.length, 1);
+  assert.equal(filtered.pending.length, 1);
+  assert.equal(filtered.pending[0].fileName, "送货单2.xlsx");
+
+  harness.close();
+});
+
+test("confirmed files with the same order number merge instead of blocking preview", async () => {
+  const harness = createWindow({ markup: WORKFLOW_MARKUP });
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/app/app-shell.js",
+    "js/modules/delivery-note-import.js",
+  ]);
+  harness.window.mockData = {
+    companies: [],
+    customers: [],
+    products: [],
+    suppliers: [],
+    bills: [],
+    customerProductPrices: [],
+    deliveryNotes: [],
+  };
+  const first = createImportDocument();
+  first.sourceFileName = "HS26-002.xlsx";
+  first.sourceArchiveEntryKey = "销售出货单.rar::环晟/hs26-002.xlsx";
+  const duplicate = createImportDocument();
+  duplicate.fileName = "HS26-002.xlsx-1.xlsx";
+  duplicate.sourceFileName = "HS26-002.xlsx-1.xlsx";
+  duplicate.sourceArchiveEntryKey = "销售出货单.rar::环晟/hs26-002.xlsx-1.xlsx";
+  const records = [first, duplicate].map((documentData, index) => ({
+    archiveName: "销售出货单.rar",
+    relativePath: `环晟/${documentData.fileName}`,
+    fileName: documentData.fileName,
+    status: "pending",
+    documentCount: 1,
+    itemCount: 1,
+    documents: [documentData],
+    errors: [],
+    warnings: [],
+    id: `same-order-${index + 1}`,
+  }));
+
+  harness.window.DeliveryNoteImport.showBatchReviewPage(records);
+  const document = harness.window.document;
+  document.querySelector("[data-batch-confirm]").click();
+  document.querySelector("[data-batch-confirm]").click();
+  document.getElementById("delivery-import-workflow-primary").click();
+  await flushAsyncTasks(3);
+
+  assert.equal(harness.alerts.length, 0);
+  assert.match(
+    document.getElementById("delivery-import-workflow-title").textContent,
+    /预览本次新增与补充内容/,
+  );
+  assert.match(
+    document.querySelector("[data-import-merge-summary]").textContent,
+    /相同送货单号已自动合并.*AA26-097.*去除 1 条完全重复/s,
+  );
+
+  const plan = harness.window.DeliveryNoteImport.createImportPlan(
+    harness.window.DeliveryNoteImport.mergeDocumentsByOrderNumber([
+      {
+        ...records[0].documents[0],
+        orderNo: "AA26-097",
+        issueDate: "2026-08-07",
+        companyName: "示例供货公司甲",
+        customerName: "示例客户甲",
+      },
+      {
+        ...records[1].documents[0],
+        orderNo: "AA26-097",
+        issueDate: "2026-08-07",
+        companyName: "示例供货公司甲",
+        customerName: "示例客户甲",
+      },
+    ]).documents,
+  );
+  assert.equal(plan.deliveryNotes.length, 1);
+  assert.equal(plan.deliveryNotes[0].details.length, 1);
+  assert.equal(plan.deliveryNotes[0].sourceArchiveEntryKeys.length, 2);
+  const filteredAfterMerge =
+    harness.window.DeliveryNoteImport.filterPreviouslyImportedArchiveRecords(
+      records,
+      { deliveryNotes: plan.deliveryNotes },
+    );
+  assert.equal(filteredAfterMerge.skipped.length, 2);
+  assert.equal(filteredAfterMerge.pending.length, 0);
+
+  harness.close();
+});
+
+test("archive screening lists recognized, failed and automatically filtered files before review", async () => {
+  const harness = createWindow({ markup: WORKFLOW_MARKUP });
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/app/app-shell.js",
+    "js/modules/delivery-note-import.js",
+  ]);
+  harness.window.mockData = {
+    companies: [],
+    customers: [],
+    products: [],
+    suppliers: [],
+    customerProductPrices: [],
+    deliveryNotes: [],
+  };
+  const recognizedDocument = createImportDocument();
+  const recognized = {
+    archiveName: "销售出货单.rar",
+    relativePath: "华庆/识别成功.xlsx",
+    fileName: "识别成功.xlsx",
+    status: "pending",
+    documentCount: 1,
+    itemCount: 1,
+    documents: [recognizedDocument],
+    errors: [],
+    warnings: [],
+  };
+  const failed = {
+    archiveName: "销售出货单.rar",
+    relativePath: "华庆/识别失败.xlsx",
+    fileName: "识别失败.xlsx",
+    status: "error",
+    documentCount: 0,
+    itemCount: 0,
+    documents: [],
+    errors: ["没有找到送货单表头"],
+    warnings: [],
+  };
+  const filtered = {
+    ...recognized,
+    relativePath: "华庆/上次已导入.xlsx",
+    fileName: "上次已导入.xlsx",
+  };
+
+  harness.window.DeliveryNoteImport.showArchiveScreeningPage(
+    [recognized, failed],
+    [filtered],
+  );
+
+  const document = harness.window.document;
+  assert.match(
+    document.getElementById("delivery-import-workflow-title").textContent,
+    /检查压缩包解析结果/,
+  );
+  assert.equal(
+    document.querySelector('[data-archive-screening-tab="recognized"] strong')
+      .textContent,
+    "1",
+  );
+  assert.equal(
+    document.querySelector('[data-archive-screening-tab="unrecognized"] strong')
+      .textContent,
+    "1",
+  );
+  assert.equal(
+    document.querySelector('[data-archive-screening-tab="filtered"] strong')
+      .textContent,
+    "1",
+  );
+  assert.match(
+    document.querySelector('[data-archive-screening-panel="unrecognized"]')
+      .textContent,
+    /识别失败\.xlsx.*没有找到送货单表头/s,
+  );
+
+  document.querySelector('[data-archive-screening-tab="filtered"]').click();
+  assert.equal(
+    document.querySelector('[data-archive-screening-panel="filtered"]').hidden,
+    false,
+  );
+  assert.match(
+    document.querySelector('[data-archive-screening-panel="filtered"]')
+      .textContent,
+    /上次已导入\.xlsx.*自动过滤/s,
+  );
+
+  document.getElementById("delivery-import-workflow-primary").click();
+  await flushAsyncTasks();
+  assert.match(
+    document.getElementById("delivery-import-workflow-title").textContent,
+    /批量核对压缩包/,
+  );
+  assert.equal(document.querySelectorAll("[data-batch-open]").length, 2);
+  assert.doesNotMatch(
+    document.getElementById("delivery-import-batch-review").textContent,
+    /上次已导入\.xlsx/,
+  );
+
+  harness.close();
+});
+
+test("archive batch selection keeps the queue page and detail in sync", async () => {
+  const harness = createWindow({ markup: `<main>${WORKFLOW_MARKUP}</main>` });
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/app/app-shell.js",
+    "js/modules/delivery-note-import.js",
+  ]);
+  harness.window.mockData = {
+    companies: [],
+    customers: [],
+    products: [],
+    suppliers: [],
+    customerProductPrices: [],
+    deliveryNotes: [],
+  };
+  const records = Array.from({ length: 45 }, (_, index) => {
+    const sequence = String(index + 1).padStart(2, "0");
+    const documentData = createImportDocument();
+    documentData.fileName = `送货单${sequence}.xlsx`;
+    documentData.metadata.orderNo = `AA26-${sequence}`;
+    return {
+      archiveName: "送货单.rar",
+      relativePath: `客户/送货单${sequence}.xlsx`,
+      fileName: `送货单${sequence}.xlsx`,
+      status: "pending",
+      documentCount: 1,
+      itemCount: 1,
+      documents: [documentData],
+      errors: [],
+      warnings: [],
+    };
+  });
+
+  harness.window.DeliveryNoteImport.showBatchReviewPage(records);
+  const document = harness.window.document;
+  const main = document.querySelector("main");
+  main.scrollTo = function (_left, top) {
+    this.scrollTop = top;
+  };
+  main.scrollTop = 420;
+  document.querySelector(".delivery-import-batch-queue").scrollTop = 180;
+  document.querySelector('[data-batch-open="batch-file-40"]').click();
+
+  assert.equal(
+    document.querySelector(".delivery-import-batch-row.is-active").dataset
+      .batchRecordId,
+    "batch-file-40",
+  );
+  assert.match(
+    document.querySelector(".delivery-import-batch-detail-heading h3")
+      .textContent,
+    /送货单40\.xlsx/,
+  );
+  assert.equal(main.scrollTop, 420);
+  assert.equal(
+    document.querySelector(".delivery-import-batch-queue").scrollTop,
+    180,
+  );
+
+  document.querySelector("[data-batch-confirm]").click();
+  await flushAsyncTasks();
+
+  assert.match(
+    document.querySelector(".delivery-import-batch-pagination").textContent,
+    /第 2\/2 页/,
+  );
+  assert.equal(
+    document.querySelector(".delivery-import-batch-row.is-active").dataset
+      .batchRecordId,
+    "batch-file-41",
+  );
+  assert.match(
+    document.querySelector(".delivery-import-batch-detail-heading h3")
+      .textContent,
+    /送货单41\.xlsx/,
+  );
+  assert.equal(main.scrollTop, 420);
+
+  harness.close();
+});
+
+test("archive batch review confirms only safe files in bulk", async () => {
+  const harness = createWindow({ markup: `<main>${WORKFLOW_MARKUP}</main>` });
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/app/app-shell.js",
+    "js/modules/delivery-note-import.js",
+  ]);
+  harness.window.mockData = {
+    companies: [],
+    customers: [],
+    products: [],
+    suppliers: [],
+    customerProductPrices: [],
+    deliveryNotes: [],
+  };
+  const records = ["001", "002", "003"].map((sequence, index) => ({
+    archiveName: "送货单.rar",
+    relativePath: `客户甲/送货单${sequence}.xlsx`,
+    fileName: `送货单${sequence}.xlsx`,
+    status: "pending",
+    documentCount: 1,
+    itemCount: 1,
+    documents: [createImportDocument()],
+    errors: [],
+    warnings: index === 1 ? ["客户名称需要人工复核"] : [],
+  }));
+
+  harness.window.DeliveryNoteImport.showBatchReviewPage(records);
+  const document = harness.window.document;
+  assert.ok(document.getElementById("delivery-import-batch-confirm-page"));
+  assert.ok(document.getElementById("delivery-import-batch-confirm-directory"));
+  assert.ok(document.getElementById("delivery-import-batch-confirm-selected"));
+  assert.ok(document.getElementById("delivery-import-batch-exclude-selected"));
+
+  document.getElementById("delivery-import-batch-confirm-page").click();
+  await flushAsyncTasks();
+
+  assert.equal(
+    document.querySelector('[data-batch-count="confirmed"]').textContent,
+    "2",
+  );
+  assert.equal(
+    document.querySelector('[data-batch-count="pending"]').textContent,
+    "1",
+  );
+  assert.match(
+    document.getElementById("delivery-import-batch-review").textContent,
+    /客户名称需要人工复核|1 项提醒/,
+  );
+
+  harness.close();
+});
+
+test("archive import discovers a compatible local preview service", async () => {
+  const harness = createWindow({
+    markup: `${WORKFLOW_MARKUP}<button id="historical-business-import-btn"></button>`,
+    url: "http://127.0.0.1:8080/",
+  });
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/app/app-shell.js",
+    "js/modules/delivery-note-import.js",
+  ]);
+  harness.window.mockData = {
+    companies: [],
+    customers: [],
+    products: [],
+    suppliers: [],
+    customerProductPrices: [],
+    deliveryNotes: [],
+  };
+
+  const calls = [];
+  const parsedDocument = createImportDocument();
+  harness.window.fetch = async (endpoint, options = {}) => {
+    const bodySize = Number(
+      options.body?.byteLength || options.body?.size || 0,
+    );
+    calls.push({ endpoint: String(endpoint), bodySize });
+    const isCompatibleEndpoint =
+      String(endpoint) === "http://127.0.0.1:8083/api/import/archive";
+    if (!isCompatibleEndpoint) {
+      return {
+        ok: false,
+        status: 404,
+        headers: { get: () => "text/plain" },
+        json: async () => {
+          throw new Error("not json");
+        },
+      };
+    }
+    if (bodySize === 0) {
+      return {
+        ok: false,
+        status: 400,
+        headers: {
+          get: (name) =>
+            name.toLowerCase() === "x-archive-progress"
+              ? "ndjson"
+              : "application/json; charset=utf-8",
+        },
+        json: async () => ({ success: false, error: "压缩包内容为空。" }),
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => "application/json; charset=utf-8" },
+      json: async () => ({
+        success: true,
+        records: [
+          {
+            archiveName: "销售出货单.rar",
+            relativePath: "客户甲/送货单.xlsx",
+            fileName: "送货单.xlsx",
+            status: "pending",
+            documentCount: 1,
+            itemCount: 1,
+            documents: [parsedDocument],
+            errors: [],
+            warnings: [],
+          },
+        ],
+      }),
+    };
+  };
+
+  const archiveFile = {
+    name: "销售出货单.rar",
+    size: 4,
+    arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+  };
+  const handled = await harness.window.DeliveryNoteImport.handleFiles([
+    archiveFile,
+  ]);
+
+  assert.equal(handled, true);
+  assert.deepEqual(
+    calls.filter((call) => call.bodySize > 0),
+    [
+      {
+        endpoint: "http://127.0.0.1:8083/api/import/archive",
+        bodySize: 4,
+      },
+    ],
+  );
+  assert.match(
+    harness.window.document.getElementById("delivery-import-workflow-title")
+      .textContent,
+    /检查压缩包解析结果/,
+  );
+  harness.window.document
+    .getElementById("delivery-import-workflow-primary")
+    .click();
+  await flushAsyncTasks();
+  assert.match(
+    harness.window.document.getElementById("delivery-import-workflow-title")
+      .textContent,
+    /批量核对/,
+  );
+  harness.close();
+});
+
+test("archive progress dialog shows the live count and current workbook", async () => {
+  const harness = createWindow({
+    markup: `${WORKFLOW_MARKUP}<button id="historical-business-import-btn"></button>`,
+    url: "http://127.0.0.1:8083/",
+  });
+  harness.window.TextDecoder = TextDecoder;
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/app/app-shell.js",
+    "js/modules/delivery-note-import.js",
+  ]);
+  harness.window.mockData = {
+    companies: [],
+    customers: [],
+    products: [],
+    suppliers: [],
+    customerProductPrices: [],
+    deliveryNotes: [],
+  };
+
+  const parsedDocument = createImportDocument();
+  const record = {
+    archiveName: "销售出货单.rar",
+    relativePath: "客户甲/2026年8月/送货单1170.xlsx",
+    fileName: "送货单1170.xlsx",
+    status: "pending",
+    documentCount: 1,
+    itemCount: 1,
+    documents: [parsedDocument],
+    errors: [],
+    warnings: [],
+  };
+  /** @type {(() => void) | undefined} */
+  let releaseRegressedProgress;
+  const regressedProgressGate = new Promise((resolve) => {
+    releaseRegressedProgress = () => resolve(undefined);
+  });
+  /** @type {(() => void) | undefined} */
+  let releaseCompletion;
+  const completionGate = new Promise((resolve) => {
+    releaseCompletion = () => resolve(undefined);
+  });
+  let readCount = 0;
+  const encoder = new TextEncoder();
+  harness.window.fetch = async (_endpoint, options = {}) => {
+    const bodySize = Number(options.body?.byteLength || 0);
+    if (bodySize === 0) {
+      return {
+        ok: false,
+        status: 400,
+        headers: {
+          get: (name) =>
+            name.toLowerCase() === "x-archive-progress"
+              ? "ndjson"
+              : "application/json; charset=utf-8",
+        },
+        json: async () => ({ success: false, error: "压缩包内容为空。" }),
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => "application/x-ndjson; charset=utf-8" },
+      body: {
+        getReader() {
+          return {
+            async read() {
+              readCount += 1;
+              if (readCount === 1) {
+                return {
+                  done: false,
+                  value: encoder.encode(
+                    `${JSON.stringify({
+                      type: "progress",
+                      phase: "parsing",
+                      current: 2,
+                      total: 1170,
+                      fileName: "客户甲/2026年8月/送货单0002.xlsx",
+                    })}\n`,
+                  ),
+                };
+              }
+              if (readCount === 2) {
+                await regressedProgressGate;
+                return {
+                  done: false,
+                  value: encoder.encode(
+                    `${JSON.stringify({
+                      type: "progress",
+                      phase: "parsing",
+                      current: 1,
+                      total: 1170,
+                      fileName: "客户甲/2026年8月/送货单0001.xlsx",
+                    })}\n`,
+                  ),
+                };
+              }
+              if (readCount === 3) {
+                await completionGate;
+                return {
+                  done: false,
+                  value: encoder.encode(
+                    `${JSON.stringify({
+                      type: "complete",
+                      result: { success: true, records: [record] },
+                    })}\n`,
+                  ),
+                };
+              }
+              return { done: true, value: undefined };
+            },
+          };
+        },
+      },
+    };
+  };
+
+  const pendingImport = harness.window.DeliveryNoteImport.handleFiles([
+    {
+      name: "销售出货单.rar",
+      size: 4,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+    },
+  ]);
+  await flushAsyncTasks();
+
+  const dialog = harness.window.document.getElementById(
+    "archive-import-progress-dialog",
+  );
+  assert.ok(dialog);
+  assert.equal(
+    dialog.querySelector("[data-archive-progress-status]").textContent,
+    "正在解析 2/1170",
+  );
+  assert.equal(
+    dialog.querySelector("[data-archive-progress-file]").textContent,
+    "客户甲/2026年8月/送货单0002.xlsx",
+  );
+  assert.equal(
+    dialog
+      .querySelector(".archive-import-progress-track")
+      .classList.contains("is-indeterminate"),
+    false,
+  );
+  const progressWidthBeforeRegression = Number.parseFloat(
+    dialog.querySelector("[data-archive-progress-bar]").style.width,
+  );
+  releaseRegressedProgress?.();
+  await flushAsyncTasks();
+  const progressWidthAfterRegression = Number.parseFloat(
+    dialog.querySelector("[data-archive-progress-bar]").style.width,
+  );
+  assert.equal(progressWidthAfterRegression, progressWidthBeforeRegression);
+
+  releaseCompletion?.();
+  assert.equal(await pendingImport, true);
+  assert.equal(
+    harness.window.document.getElementById("archive-import-progress-dialog"),
+    null,
+  );
+  harness.close();
+});
+
+test("archive import exits only after a second confirmation and aborts the request", async () => {
+  const harness = createWindow({
+    markup: `${WORKFLOW_MARKUP}<button id="historical-business-import-btn"></button>`,
+    url: "http://127.0.0.1:8085/",
+  });
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/app/app-shell.js",
+    "js/modules/delivery-note-import.js",
+  ]);
+  harness.window.mockData = {
+    companies: [],
+    customers: [],
+    products: [],
+    suppliers: [],
+    customerProductPrices: [],
+    deliveryNotes: [],
+  };
+  /** @type {any} */
+  let uploadSignal;
+  harness.window.fetch = async (_endpoint, options = {}) => {
+    const bodySize = Number(options.body?.byteLength || 0);
+    if (bodySize === 0) {
+      return {
+        ok: false,
+        status: 400,
+        headers: {
+          get: (name) =>
+            name.toLowerCase() === "x-archive-progress"
+              ? "ndjson"
+              : "application/json; charset=utf-8",
+        },
+        json: async () => ({ success: false, error: "压缩包内容为空。" }),
+      };
+    }
+    uploadSignal = options.signal;
+    return new Promise((_resolve, reject) => {
+      options.signal?.addEventListener(
+        "abort",
+        () => {
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+        },
+        { once: true },
+      );
+    });
+  };
+
+  const pendingImport = harness.window.DeliveryNoteImport.handleFiles([
+    {
+      name: "销售出货单.rar",
+      size: 4,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+    },
+  ]);
+  await flushAsyncTasks();
+
+  const exitButton = harness.window.document.querySelector(
+    "[data-archive-progress-exit]",
+  );
+  assert.ok(exitButton);
+  harness.window.queueConfirmResult(false);
+  exitButton.click();
+  await flushAsyncTasks();
+  assert.equal(harness.confirmCalls.length, 1);
+  assert.match(harness.confirmCalls[0].title, /退出压缩包解析/);
+  assert.equal(exitButton.disabled, false);
+  assert.equal(uploadSignal.aborted, false);
+
+  harness.window.queueConfirmResult(true);
+  exitButton.click();
+  assert.equal(await pendingImport, false);
+  assert.equal(harness.confirmCalls.length, 2);
+  assert.equal(uploadSignal.aborted, true);
+  assert.equal(harness.alerts.length, 0);
+  assert.equal(
+    harness.window.document.getElementById("archive-import-progress-dialog"),
+    null,
+  );
+  harness.close();
+});
+
 test("history import restores the preview step and edited fields after a refresh", async () => {
   const firstHarness = createWindow({ markup: WORKFLOW_MARKUP });
   loadScripts(firstHarness.window, [
@@ -518,7 +1382,7 @@ test("history import restores the preview step and edited fields after a refresh
   firstHarness.close();
 });
 
-test("history import refresh without a draft shows recovery actions", () => {
+test("history import refresh without a draft returns to import settings", () => {
   const harness = createWindow({ markup: WORKFLOW_MARKUP });
   loadScripts(harness.window, [
     "js/modules/app-utils.js",
@@ -528,22 +1392,19 @@ test("history import refresh without a draft shows recovery actions", () => {
   harness.window.mockData = { deliveryNotes: [] };
 
   assert.equal(harness.window.DeliveryNoteImport.restoreWorkflowDraft(), false);
-  assert.match(
-    harness.window.document.getElementById("delivery-import-workflow-content")
-      .textContent,
-    /没有待处理的导入任务/,
-  );
-  assert.equal(
-    harness.window.document.getElementById("delivery-import-workflow-primary")
-      .textContent,
-    "选择送货单 / 对账单文件",
-  );
   assert.equal(
     harness.window.document
-      .getElementById("delivery-import-workflow-actions")
+      .getElementById("settings")
       .classList.contains("hidden"),
     false,
   );
+  assert.equal(
+    harness.window.document
+      .getElementById("history-import-workflow")
+      .classList.contains("hidden"),
+    true,
+  );
+  assert.equal(harness.showSectionCalls.at(-1), "settings");
 
   harness.close();
 });

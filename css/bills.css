@@ -8,7 +8,14 @@
 }
 #bills .bills-action-header,
 #bills .bills-action-cell {
+  box-sizing: border-box;
+  width: 176px !important;
+  min-width: 176px !important;
+  max-width: 176px !important;
+  padding-right: 12px !important;
+  padding-left: 12px !important;
   text-align: left !important;
+  white-space: nowrap !important;
 }
 #bills .bills-list-header {
   display: flex;
@@ -25,12 +32,13 @@
 #bills .bills-list-toolbar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 1rem;
-  margin-left: auto;
+  margin-right: auto;
+  margin-left: 0;
 }
 #bills #add-bill-btn {
-  padding: 0.5rem 1.5rem;
+  padding: 0.5rem 1rem;
   font-size: 1rem;
   font-weight: 600;
 }
@@ -38,6 +46,8 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  width: auto;
+  margin-left: 0;
   gap: 0.75rem;
   white-space: nowrap;
   font-size: 0.875rem;

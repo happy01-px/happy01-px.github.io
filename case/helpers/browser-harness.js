@@ -610,7 +610,14 @@ function installAntdComponentStubs(window) {
     return React.createElement(
       "div",
       {
-        className: props.className || "antd-menu-stub",
+        className: [
+          props.className || "antd-menu-stub",
+          "ant-menu",
+          props.mode === "inline" ? "ant-menu-inline" : "",
+          props.inlineCollapsed ? "ant-menu-inline-collapsed" : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
         style: props.style,
       },
       ...items.map(renderItem),

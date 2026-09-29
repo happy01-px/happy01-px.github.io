@@ -1,7 +1,15 @@
 (function initStockModule(global) {
-  function showBusinessEditor(title, content, onConfirm) {
+  function showBusinessEditor(title, content, onConfirm, options = {}) {
     const open = global.showBusinessFormPage || global.showModal;
-    return open?.(title, content, onConfirm);
+    return open?.(title, content, onConfirm, options);
+  }
+
+  function formError(form, selector, message) {
+    if (typeof global.reportFormError === "function") {
+      return global.reportFormError(message, selector, form);
+    }
+    global.alert(message);
+    return false;
   }
 
   function formatDateTime(value) {
@@ -349,6 +357,21 @@
       return false;
     });
     configureDeliveryNoteReadonlyModal();
+    document.getElementById("delivery-note-create-bill")?.remove();
+    const cancelButton = document.getElementById("modal-cancel");
+    if (cancelButton?.parentElement) {
+      const billButton = document.createElement("button");
+      billButton.id = "delivery-note-create-bill";
+      billButton.type = "button";
+      billButton.className =
+        "rounded-lg border border-primary bg-white px-4 py-2 text-primary transition hover:bg-purple-50";
+      billButton.textContent = "生成对账单";
+      billButton.onclick = () => {
+        document.getElementById("modal")?.classList.add("hidden");
+        global.openCreateBillFromSource?.(note);
+      };
+      cancelButton.parentElement.insertBefore(billButton, cancelButton);
+    }
   }
 
   function renderStockMovementTable(filter) {
@@ -502,6 +525,7 @@
       );
 
       const row = document.createElement("tr");
+      row.dataset.recordId = record.id;
       if (filter === "delivery-note") {
         const safeCompanyName = escapeHTML(record.companyName || "-");
         const safeDeliveryAmount = escapeHTML(
@@ -525,9 +549,17 @@
                             <button class="text-primary hover:text-primary-dark" onclick="showViewDeliveryNoteModal('${record.id}')">
                                 查看
                             </button>
+                            <button class="text-orange-600 hover:text-orange-800" data-delivery-bill="${escapeHTML(record.id)}">
+                                对账
+                            </button>
                         </div>
                     </td>
                 `;
+        row
+          .querySelector("[data-delivery-bill]")
+          ?.addEventListener("click", () =>
+            global.openCreateBillFromSource?.(record),
+          );
       } else if (filter === "inbound") {
         let priceHtml = '<span class="text-gray-400">-</span>';
         if (record.price !== null && record.price !== undefined) {
@@ -696,95 +728,109 @@
             </form>
         `;
 
-    showModal("新增出货", content, async function onConfirm() {
-      const form = document.getElementById("add-outbound-form");
-      const formData = new FormData(form);
-      const productId = document.getElementById("outbound-product-id").value;
-      const quantityStr = formData.get("quantity");
-      const warehouseId = getSingleWarehouseId();
+    showModal(
+      "新增出货",
+      content,
+      async function onConfirm() {
+        const form = document.getElementById("add-outbound-form");
+        const formData = new FormData(form);
+        const productId = document.getElementById("outbound-product-id").value;
+        const quantityStr = formData.get("quantity");
+        const warehouseId = getSingleWarehouseId();
 
-      if (!productId) {
-        alert("请选择商品（必填）");
-        return false;
-      }
-      if (!quantityStr) {
-        alert("请输入数量（必填）");
-        return false;
-      }
+        if (!productId) {
+          return formError(
+            form,
+            "#outbound-product-select-container",
+            "请选择商品（必填）",
+          );
+        }
+        if (!quantityStr) {
+          return formError(form, '[name="quantity"]', "请输入数量（必填）");
+        }
 
-      const product = mockData.products.find((item) => item.id === productId);
-      if (!product) {
-        alert("商品无效，请重新选择");
-        return false;
-      }
+        const product = mockData.products.find((item) => item.id === productId);
+        if (!product) {
+          alert("商品无效，请重新选择");
+          return false;
+        }
 
-      const quantity = parseInt(quantityStr, 10);
-      if (Number.isNaN(quantity) || quantity <= 0) {
-        alert("请输入有效的数量");
-        return false;
-      }
+        const quantity = parseInt(quantityStr, 10);
+        if (Number.isNaN(quantity) || quantity <= 0) {
+          return formError(form, '[name="quantity"]', "请输入有效的数量");
+        }
 
-      const warehouseStock =
-        typeof global.getLedgerQuantity === "function"
-          ? global.getLedgerQuantity(product.id, warehouseId)
-          : Number(product.stockQuantity || 0);
-      const availableStock = warehouseStock;
-      if (availableStock < quantity) {
-        alert(`商品库存不足！当前可用库存：${availableStock}`);
-        return false;
-      }
+        const warehouseStock =
+          typeof global.getLedgerQuantity === "function"
+            ? global.getLedgerQuantity(product.id, warehouseId)
+            : Number(product.stockQuantity || 0);
+        const availableStock = warehouseStock;
+        if (availableStock < quantity) {
+          return formError(
+            form,
+            '[name="quantity"]',
+            `商品库存不足！当前可用库存：${availableStock}`,
+          );
+        }
 
-      const previousStockQuantity = product.stockQuantity;
-      const previousUpdatedAt = product.updatedAt;
-      product.stockQuantity -= quantity;
-      product.updatedAt = getLocalISOString();
+        const previousStockQuantity = product.stockQuantity;
+        const previousUpdatedAt = product.updatedAt;
+        product.stockQuantity -= quantity;
+        product.updatedAt = getLocalISOString();
 
-      const record = {
-        id: createRuntimeId("SM"),
-        type: "outbound",
-        status: "confirmed",
-        productId: product.id,
-        productName: product.name,
-        quantity,
-        unit: product.unit,
-        operator: currentUser.name,
-        warehouseId,
-        locationCode: getSingleLocationCode(warehouseId),
-        batchNo: "",
-        expiryDate: null,
-        remark: formData.get("remark") || "出货出库",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      stockMovementData.unshift(record);
+        const record = {
+          id: createRuntimeId("SM"),
+          type: "outbound",
+          status: "confirmed",
+          productId: product.id,
+          productName: product.name,
+          quantity,
+          unit: product.unit,
+          operator: currentUser.name,
+          warehouseId,
+          locationCode: getSingleLocationCode(warehouseId),
+          batchNo: "",
+          expiryDate: null,
+          remark: formData.get("remark") || "出货出库",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        stockMovementData.unshift(record);
 
-      const auditLogs = stageAuditLogs({
-        actionType: "add",
-        objectType: "stock_movement",
-        objectName: product.name,
-        details: `出货 ${quantity} ${product.unit}`,
-      });
-      const saved = await saveMockData();
-      if (saved === false) {
-        rollbackStagedAuditLogs(auditLogs);
-        stockMovementData.shift();
-        product.stockQuantity = previousStockQuantity;
-        product.updatedAt = previousUpdatedAt;
+        const auditLogs = stageAuditLogs({
+          actionType: "add",
+          objectType: "stock_movement",
+          objectName: product.name,
+          details: `出货 ${quantity} ${product.unit}`,
+        });
+        const saved = await saveMockData();
+        if (saved === false) {
+          rollbackStagedAuditLogs(auditLogs);
+          stockMovementData.shift();
+          product.stockQuantity = previousStockQuantity;
+          product.updatedAt = previousUpdatedAt;
+          refreshActiveStockTable();
+          updateInventoryTable();
+          renderDashboardActivity();
+          alert("出货失败：数据未能保存，本次库存变更已回滚。");
+          return false;
+        }
+
+        finalizeStagedAuditLogs(auditLogs);
         refreshActiveStockTable();
         updateInventoryTable();
         renderDashboardActivity();
-        alert("出货失败：数据未能保存，本次库存变更已回滚。");
-        return false;
-      }
 
-      finalizeStagedAuditLogs(auditLogs);
-      refreshActiveStockTable();
-      updateInventoryTable();
-      renderDashboardActivity();
-
-      alert("出货记录添加成功");
-      return true;
-    });
+        alert("出货记录添加成功");
+        return true;
+      },
+      {
+        confirmText: "保存并返回",
+        allowContinue: true,
+        continueText: "保存并继续出货",
+        onContinue: showAddOutboundModal,
+      },
+    );
 
     const productOptions = mockData.products
       .filter(
@@ -932,237 +978,267 @@
     const defaultCompanyId = companyOptions[0]?.value || "";
     let lastLoadedProductId = "";
 
-    showBusinessEditor("新增进货 / 商品", content, async function onConfirm() {
-      const form = document.getElementById("add-inbound-form");
-      const formData = new FormData(form);
-      const getPendingSelectText = (containerId) =>
-        String(
-          document
-            .getElementById(containerId)
-            ?.querySelector(".ant-select-selection-search-input")?.value || "",
+    showBusinessEditor(
+      "新增进货 / 商品",
+      content,
+      async function onConfirm() {
+        const form = document.getElementById("add-inbound-form");
+        const formData = new FormData(form);
+        const getPendingSelectText = (containerId) =>
+          String(
+            document
+              .getElementById(containerId)
+              ?.querySelector(".ant-select-selection-search-input")?.value ||
+              "",
+          ).trim();
+        const pendingProductName = getPendingSelectText(
+          "inbound-product-select-container",
+        );
+        const pendingCategory = getPendingSelectText(
+          "inbound-category-select-container",
+        );
+        const selectedProductValue = String(
+          document.getElementById("inbound-product-choice-input")?.value ||
+            pendingProductName,
         ).trim();
-      const pendingProductName = getPendingSelectText(
-        "inbound-product-select-container",
-      );
-      const pendingCategory = getPendingSelectText(
-        "inbound-category-select-container",
-      );
-      const selectedProductValue = String(
-        document.getElementById("inbound-product-choice-input")?.value ||
-          pendingProductName,
-      ).trim();
-      const selectedProduct = mockData.products.find(
-        (item) => item.id === selectedProductValue,
-      );
-      const productName = String(
-        formData.get("name") || selectedProduct?.name || pendingProductName,
-      ).trim();
-      const category = String(
-        formData.get("category") || pendingCategory,
-      ).trim();
-      const supplierId = String(formData.get("supplierId") || "").trim();
-      const companyId = String(formData.get("companyId") || "").trim();
-      const unit = String(formData.get("unit") || "").trim();
-      const quantityStr = String(formData.get("quantity") || "").trim();
-      const costPriceStr = String(formData.get("costPrice") || "").trim();
-      const retailPriceStr = String(formData.get("retailPrice") || "").trim();
-      const minStockStr = String(formData.get("minStock") || "").trim();
-      const maxStockStr = String(formData.get("maxStock") || "").trim();
-      const warehouseId = getSingleWarehouseId();
-      const locationCode = getSingleLocationCode(warehouseId);
+        const selectedProduct = mockData.products.find(
+          (item) => item.id === selectedProductValue,
+        );
+        const productName = String(
+          formData.get("name") || selectedProduct?.name || pendingProductName,
+        ).trim();
+        const category = String(
+          formData.get("category") || pendingCategory,
+        ).trim();
+        const supplierId = String(formData.get("supplierId") || "").trim();
+        const companyId = String(formData.get("companyId") || "").trim();
+        const unit = String(formData.get("unit") || "").trim();
+        const quantityStr = String(formData.get("quantity") || "").trim();
+        const costPriceStr = String(formData.get("costPrice") || "").trim();
+        const retailPriceStr = String(formData.get("retailPrice") || "").trim();
+        const minStockStr = String(formData.get("minStock") || "").trim();
+        const maxStockStr = String(formData.get("maxStock") || "").trim();
+        const warehouseId = getSingleWarehouseId();
+        const locationCode = getSingleLocationCode(warehouseId);
 
-      if (!productName) {
-        alert("请输入商品名称");
-        return false;
-      }
-      if (!category) {
-        alert("请选择分类");
-        return false;
-      }
-      if (!quantityStr) {
-        alert("请输入数量");
-        return false;
-      }
-      if (!costPriceStr) {
-        alert("请输入成本单价");
-        return false;
-      }
-      if (!retailPriceStr) {
-        alert("请输入销售单价");
-        return false;
-      }
-      if (!supplierId) {
-        alert("请选择供应商");
-        return false;
-      }
-      if (!companyId) {
-        alert("请选择入库公司");
-        return false;
-      }
-      if (!unit) {
-        alert("请输入单位");
-        return false;
-      }
-      const quantity = parseInt(quantityStr, 10);
-      if (Number.isNaN(quantity) || quantity <= 0) {
-        alert("请输入有效的数量");
-        return false;
-      }
+        if (!productName) {
+          return formError(
+            form,
+            "#inbound-product-select-container",
+            "请输入商品名称",
+          );
+        }
+        if (!category) {
+          return formError(
+            form,
+            "#inbound-category-select-container",
+            "请选择分类",
+          );
+        }
+        if (!quantityStr) {
+          return formError(form, '[name="quantity"]', "请输入数量");
+        }
+        if (!costPriceStr) {
+          return formError(form, '[name="costPrice"]', "请输入成本单价");
+        }
+        if (!retailPriceStr) {
+          return formError(form, '[name="retailPrice"]', "请输入销售单价");
+        }
+        if (!supplierId) {
+          return formError(
+            form,
+            "#inbound-supplier-select-container",
+            "请选择供应商",
+          );
+        }
+        if (!companyId) {
+          return formError(
+            form,
+            "#inbound-company-select-container",
+            "请选择入库公司",
+          );
+        }
+        if (!unit) {
+          return formError(form, '[name="unit"]', "请输入单位");
+        }
+        const quantity = parseInt(quantityStr, 10);
+        if (Number.isNaN(quantity) || quantity <= 0) {
+          return formError(form, '[name="quantity"]', "请输入有效的数量");
+        }
 
-      const costPrice = parseFloat(costPriceStr);
-      if (Number.isNaN(costPrice) || costPrice < 0) {
-        alert("请输入有效的成本单价");
-        return false;
-      }
+        const costPrice = parseFloat(costPriceStr);
+        if (Number.isNaN(costPrice) || costPrice < 0) {
+          return formError(form, '[name="costPrice"]', "请输入有效的成本单价");
+        }
 
-      const retailPrice = parseFloat(retailPriceStr);
-      if (Number.isNaN(retailPrice) || retailPrice < 0) {
-        alert("请输入有效的销售单价");
-        return false;
-      }
+        const retailPrice = parseFloat(retailPriceStr);
+        if (Number.isNaN(retailPrice) || retailPrice < 0) {
+          return formError(
+            form,
+            '[name="retailPrice"]',
+            "请输入有效的销售单价",
+          );
+        }
 
-      const minStock = Number(minStockStr);
-      const maxStock = Number(maxStockStr);
-      if (!Number.isInteger(minStock) || minStock < 0) {
-        alert("请输入有效的最低库存");
-        return false;
-      }
-      if (!Number.isInteger(maxStock) || maxStock <= minStock) {
-        alert("最高库存必须是大于最低库存的整数");
-        return false;
-      }
+        const minStock = Number(minStockStr);
+        const maxStock = Number(maxStockStr);
+        if (!Number.isInteger(minStock) || minStock < 0) {
+          return formError(form, '[name="minStock"]', "请输入有效的最低库存");
+        }
+        if (!Number.isInteger(maxStock) || maxStock <= minStock) {
+          return formError(
+            form,
+            '[name="maxStock"]',
+            "最高库存必须是大于最低库存的整数",
+          );
+        }
 
-      const supplier = mockData.suppliers.find(
-        (item) => item.id === supplierId,
-      );
-      if (!supplier) {
-        alert("供应商无效，请重新选择");
-        return false;
-      }
-      const company = mockData.companies.find((item) => item.id === companyId);
-      if (!company) {
-        alert("入库公司无效，请重新选择");
-        return false;
-      }
+        const supplier = mockData.suppliers.find(
+          (item) => item.id === supplierId,
+        );
+        if (!supplier) {
+          return formError(
+            form,
+            "#inbound-supplier-select-container",
+            "供应商无效，请重新选择",
+          );
+        }
+        const company = mockData.companies.find(
+          (item) => item.id === companyId,
+        );
+        if (!company) {
+          return formError(
+            form,
+            "#inbound-company-select-container",
+            "入库公司无效，请重新选择",
+          );
+        }
 
-      const now = getLocalISOString();
-      const previousProducts = mockData.products.slice();
-      const previousProductSnapshots = new Map(
-        mockData.products.map((product) => [
-          product.id,
-          {
-            ...product,
-            stockQuantity: Number(product.stockQuantity || 0),
-          },
-        ]),
-      );
-      let finalProduct =
-        mockData.products.find((item) => item.id === selectedProductValue) ||
-        mockData.products.find((item) => item.name === productName);
-      let createdProduct = false;
+        const now = getLocalISOString();
+        const previousProducts = mockData.products.slice();
+        const previousProductSnapshots = new Map(
+          mockData.products.map((product) => [
+            product.id,
+            {
+              ...product,
+              stockQuantity: Number(product.stockQuantity || 0),
+            },
+          ]),
+        );
+        let finalProduct =
+          mockData.products.find((item) => item.id === selectedProductValue) ||
+          mockData.products.find((item) => item.name === productName);
+        let createdProduct = false;
 
-      if (!finalProduct) {
-        finalProduct = {
-          id: createSequentialId(mockData.products, "P"),
-          name: productName,
-          category,
-          unit,
-          costPrice,
-          retailPrice,
-          stockQuantity: 0,
-          minStock,
-          maxStock,
-          supplierId,
-          status: "active",
-          createdAt: now,
-          updatedAt: now,
-        };
-        mockData.products.push(finalProduct);
-        createdProduct = true;
-      } else {
-        finalProduct.name = productName;
-        finalProduct.category = category;
-        finalProduct.unit = unit;
-        finalProduct.costPrice = costPrice;
-        finalProduct.retailPrice = retailPrice;
-        finalProduct.minStock = minStock;
-        finalProduct.maxStock = maxStock;
-        finalProduct.supplierId = supplierId;
+        if (!finalProduct) {
+          finalProduct = {
+            id: createSequentialId(mockData.products, "P"),
+            name: productName,
+            category,
+            unit,
+            costPrice,
+            retailPrice,
+            stockQuantity: 0,
+            minStock,
+            maxStock,
+            supplierId,
+            status: "active",
+            createdAt: now,
+            updatedAt: now,
+          };
+          mockData.products.push(finalProduct);
+          createdProduct = true;
+        } else {
+          finalProduct.name = productName;
+          finalProduct.category = category;
+          finalProduct.unit = unit;
+          finalProduct.costPrice = costPrice;
+          finalProduct.retailPrice = retailPrice;
+          finalProduct.minStock = minStock;
+          finalProduct.maxStock = maxStock;
+          finalProduct.supplierId = supplierId;
+          finalProduct.updatedAt = now;
+        }
+
+        finalProduct.stockQuantity =
+          Number(finalProduct.stockQuantity || 0) + quantity;
         finalProduct.updatedAt = now;
-      }
 
-      finalProduct.stockQuantity =
-        Number(finalProduct.stockQuantity || 0) + quantity;
-      finalProduct.updatedAt = now;
+        const remarkValue = String(formData.get("remark") || "").trim();
+        const record = {
+          id: createRuntimeId("SM"),
+          type: "inbound",
+          status: "confirmed",
+          productId: finalProduct.id,
+          productName: finalProduct.name,
+          quantity,
+          unit: finalProduct.unit,
+          supplierId: supplier.id,
+          supplierName: supplier.name,
+          companyId: company.id,
+          companyName: company.name,
+          price: costPrice,
+          priceType: "custom",
+          operator: currentUser.name,
+          warehouseId,
+          locationCode,
+          batchNo: "",
+          expiryDate: null,
+          remark: remarkValue || "-",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        stockMovementData.unshift(record);
 
-      const remarkValue = String(formData.get("remark") || "").trim();
-      const record = {
-        id: createRuntimeId("SM"),
-        type: "inbound",
-        status: "confirmed",
-        productId: finalProduct.id,
-        productName: finalProduct.name,
-        quantity,
-        unit: finalProduct.unit,
-        supplierId: supplier.id,
-        supplierName: supplier.name,
-        companyId: company.id,
-        companyName: company.name,
-        price: costPrice,
-        priceType: "custom",
-        operator: currentUser.name,
-        warehouseId,
-        locationCode,
-        batchNo: "",
-        expiryDate: null,
-        remark: remarkValue || "-",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      stockMovementData.unshift(record);
+        const auditLogs = stageAuditLogs([
+          createdProduct
+            ? {
+                actionType: "add",
+                objectType: "product",
+                objectName: finalProduct.name,
+                details: "自动创建新商品",
+              }
+            : null,
+          {
+            actionType: "add",
+            objectType: "stock_movement",
+            objectName: finalProduct.name,
+            details: `进货 ${quantity} ${finalProduct.unit}`,
+          },
+        ]);
+        const saved = await saveMockData();
+        if (saved === false) {
+          rollbackStagedAuditLogs(auditLogs);
+          stockMovementData.shift();
+          mockData.products = previousProducts;
+          mockData.products.forEach((product) => {
+            const snapshot = previousProductSnapshots.get(product.id);
+            if (snapshot) Object.assign(product, snapshot);
+          });
+          refreshActiveStockTable();
+          updateInventoryTable();
+          updateSupplierTable();
+          renderDashboardActivity();
+          alert("进货失败：数据未能保存，本次商品和库存变更已回滚。");
+          return false;
+        }
 
-      const auditLogs = stageAuditLogs([
-        createdProduct
-          ? {
-              actionType: "add",
-              objectType: "product",
-              objectName: finalProduct.name,
-              details: "自动创建新商品",
-            }
-          : null,
-        {
-          actionType: "add",
-          objectType: "stock_movement",
-          objectName: finalProduct.name,
-          details: `进货 ${quantity} ${finalProduct.unit}`,
-        },
-      ]);
-      const saved = await saveMockData();
-      if (saved === false) {
-        rollbackStagedAuditLogs(auditLogs);
-        stockMovementData.shift();
-        mockData.products = previousProducts;
-        mockData.products.forEach((product) => {
-          const snapshot = previousProductSnapshots.get(product.id);
-          if (snapshot) Object.assign(product, snapshot);
-        });
+        finalizeStagedAuditLogs(auditLogs);
         refreshActiveStockTable();
         updateInventoryTable();
         updateSupplierTable();
         renderDashboardActivity();
-        alert("进货失败：数据未能保存，本次商品和库存变更已回滚。");
-        return false;
-      }
 
-      finalizeStagedAuditLogs(auditLogs);
-      refreshActiveStockTable();
-      updateInventoryTable();
-      updateSupplierTable();
-      renderDashboardActivity();
-
-      alert(createdProduct ? "商品创建并入库成功" : "进货记录添加成功");
-      return true;
-    });
+        alert(createdProduct ? "商品创建并入库成功" : "进货记录添加成功");
+        return true;
+      },
+      {
+        confirmText: "入库并返回",
+        allowContinue: true,
+        continueText: "入库并继续新增",
+        onContinue: showAddInboundModal,
+      },
+    );
 
     const confirmBtn = document.getElementById("modal-confirm");
     const cancelBtn = document.getElementById("modal-cancel");
@@ -1179,9 +1255,9 @@
     }
 
     if (confirmBtn) {
-      confirmBtn.textContent = "入库并保存";
+      confirmBtn.textContent = "入库并返回";
     }
-    global.configureBusinessFormPage?.("入库并保存");
+    global.configureBusinessFormPage?.("入库并返回");
 
     if (cancelBtn) {
       cancelBtn.classList.remove("hidden");
@@ -1625,283 +1701,328 @@
       if (summary) summary.textContent = `当前 ${batchRows.length} 条商品`;
     };
 
-    showBusinessEditor("批量新增进货", content, async function onConfirm() {
-      syncAllRows();
-      const companyId = String(
-        document.getElementById("inbound-batch-company-id")?.value || "",
-      ).trim();
-      const supplierId = String(
-        document.getElementById("inbound-batch-supplier-id")?.value || "",
-      ).trim();
-      const batchRemark = String(
-        document.getElementById("inbound-batch-remark")?.value || "",
-      ).trim();
-      const company = activeCompanies.find((item) => item.id === companyId);
-      const supplier = activeSuppliers.find((item) => item.id === supplierId);
-
-      if (!company) {
-        alert("请选择有效的入库公司。");
-        return false;
-      }
-      if (!supplier) {
-        alert("请选择本批进货的供应商。");
-        return false;
-      }
-
-      const normalizedRows = [];
-      const productKeys = new Set();
-      for (let index = 0; index < batchRows.length; index += 1) {
-        const row = batchRows[index];
-        const selectedProduct = activeProducts.find(
-          (item) => item.id === row.productValue,
-        );
-        const enteredProductName = String(
-          selectedProduct?.name || row.productName || row.productValue,
+    showBusinessEditor(
+      "批量新增进货",
+      content,
+      async function onConfirm() {
+        syncAllRows();
+        const form = document.getElementById("add-inbound-batch-form");
+        const companyId = String(
+          document.getElementById("inbound-batch-company-id")?.value || "",
         ).trim();
-        const existingProduct =
-          selectedProduct ||
-          activeProducts.find(
-            (item) =>
-              String(item.name || "").toLocaleLowerCase("zh-CN") ===
-              enteredProductName.toLocaleLowerCase("zh-CN"),
+        const supplierId = String(
+          document.getElementById("inbound-batch-supplier-id")?.value || "",
+        ).trim();
+        const batchRemark = String(
+          document.getElementById("inbound-batch-remark")?.value || "",
+        ).trim();
+        const company = activeCompanies.find((item) => item.id === companyId);
+        const supplier = activeSuppliers.find((item) => item.id === supplierId);
+
+        if (!company) {
+          return formError(
+            form,
+            "#inbound-batch-company-container",
+            "请选择有效的入库公司。",
           );
-        const productName = existingProduct?.name || enteredProductName;
-        const quantity = Number(row.quantity);
-        const costPrice = Number(row.costPrice);
-        const retailPrice = Number(row.retailPrice);
-        const minStock = Number(row.minStock);
-        const maxStock = Number(row.maxStock);
-        const lineNumber = index + 1;
-
-        if (!productName) {
-          alert(`请为第 ${lineNumber} 行选择或输入商品名称。`);
-          return false;
         }
-        if (!row.category) {
-          alert(`请填写商品“${productName}”的分类。`);
-          return false;
-        }
-        if (!row.unit) {
-          alert(`请填写商品“${productName}”的单位。`);
-          return false;
-        }
-        if (!Number.isInteger(quantity) || quantity <= 0) {
-          alert(`商品“${productName}”的数量必须是大于 0 的整数。`);
-          return false;
-        }
-        if (!Number.isFinite(costPrice) || costPrice < 0) {
-          alert(`商品“${productName}”的进货单价无效。`);
-          return false;
-        }
-        if (!Number.isFinite(retailPrice) || retailPrice < 0) {
-          alert(`商品“${productName}”的销售单价无效。`);
-          return false;
-        }
-        if (!Number.isInteger(minStock) || minStock < 0) {
-          alert(`商品“${productName}”的最低库存无效。`);
-          return false;
-        }
-        if (!Number.isInteger(maxStock) || maxStock <= minStock) {
-          alert(`商品“${productName}”的最高库存必须大于最低库存。`);
-          return false;
-        }
-
-        const productKey = existingProduct
-          ? `id:${existingProduct.id}`
-          : `name:${productName.toLocaleLowerCase("zh-CN")}`;
-        if (productKeys.has(productKey)) {
-          alert(`商品“${productName}”在本批进货中重复，请合并为一行。`);
-          return false;
-        }
-        productKeys.add(productKey);
-        normalizedRows.push({
-          ...row,
-          selectedProduct: existingProduct,
-          productName,
-          quantity,
-          costPrice,
-          retailPrice,
-          minStock,
-          maxStock,
-        });
-      }
-
-      const previousProducts = mockData.products.map((product) => ({
-        ...product,
-      }));
-      const previousStockMovements = stockMovementData.slice();
-      const previousDeliveryNotes = (mockData.deliveryNotes || []).slice();
-      const now = new Date();
-      const nowString = getLocalISOString();
-      const warehouseId = getSingleWarehouseId();
-      const locationCode = getSingleLocationCode(warehouseId);
-      const purchaseNoteId = createRuntimeId("PD");
-      const createdProductNames = [];
-      const records = [];
-      const details = [];
-
-      normalizedRows.forEach((row) => {
-        let product =
-          mockData.products.find(
-            (item) => item.id === row.selectedProduct?.id,
-          ) ||
-          mockData.products.find(
-            (item) =>
-              String(item.name || "").toLocaleLowerCase("zh-CN") ===
-              row.productName.toLocaleLowerCase("zh-CN"),
+        if (!supplier) {
+          return formError(
+            form,
+            "#inbound-batch-supplier-container",
+            "请选择本批进货的供应商。",
           );
-        if (!product) {
-          product = {
-            id: createSequentialId(mockData.products, "P"),
-            name: row.productName,
-            category: row.category,
-            unit: row.unit,
-            costPrice: row.costPrice,
-            retailPrice: row.retailPrice,
-            stockQuantity: 0,
-            minStock: row.minStock,
-            maxStock: row.maxStock,
-            supplierId: supplier.id,
-            status: "active",
-            createdAt: nowString,
-            updatedAt: nowString,
-          };
-          mockData.products.push(product);
-          createdProductNames.push(product.name);
-        } else {
-          Object.assign(product, {
-            name: row.productName,
-            category: row.category,
-            unit: row.unit,
-            costPrice: row.costPrice,
-            retailPrice: row.retailPrice,
-            minStock: row.minStock,
-            maxStock: row.maxStock,
-            supplierId: supplier.id,
-            status: "active",
-            updatedAt: nowString,
+        }
+
+        const normalizedRows = [];
+        const productKeys = new Set();
+        for (let index = 0; index < batchRows.length; index += 1) {
+          const row = batchRows[index];
+          const selectedProduct = activeProducts.find(
+            (item) => item.id === row.productValue,
+          );
+          const enteredProductName = String(
+            selectedProduct?.name || row.productName || row.productValue,
+          ).trim();
+          const existingProduct =
+            selectedProduct ||
+            activeProducts.find(
+              (item) =>
+                String(item.name || "").toLocaleLowerCase("zh-CN") ===
+                enteredProductName.toLocaleLowerCase("zh-CN"),
+            );
+          const productName = existingProduct?.name || enteredProductName;
+          const quantity = Number(row.quantity);
+          const costPrice = Number(row.costPrice);
+          const retailPrice = Number(row.retailPrice);
+          const minStock = Number(row.minStock);
+          const maxStock = Number(row.maxStock);
+          const lineNumber = index + 1;
+
+          if (!productName) {
+            return formError(
+              form,
+              `#inbound-batch-product-container-${row.id}`,
+              `请为第 ${lineNumber} 行选择或输入商品名称。`,
+            );
+          }
+          if (!row.category) {
+            return formError(
+              form,
+              `[data-inbound-row="${row.id}"] [data-field="category"]`,
+              `请填写商品“${productName}”的分类。`,
+            );
+          }
+          if (!row.unit) {
+            return formError(
+              form,
+              `[data-inbound-row="${row.id}"] [data-field="unit"]`,
+              `请填写商品“${productName}”的单位。`,
+            );
+          }
+          if (!Number.isInteger(quantity) || quantity <= 0) {
+            return formError(
+              form,
+              `[data-inbound-row="${row.id}"] [data-field="quantity"]`,
+              `商品“${productName}”的数量必须是大于 0 的整数。`,
+            );
+          }
+          if (!Number.isFinite(costPrice) || costPrice < 0) {
+            return formError(
+              form,
+              `[data-inbound-row="${row.id}"] [data-field="costPrice"]`,
+              `商品“${productName}”的进货单价无效。`,
+            );
+          }
+          if (!Number.isFinite(retailPrice) || retailPrice < 0) {
+            return formError(
+              form,
+              `[data-inbound-row="${row.id}"] [data-field="retailPrice"]`,
+              `商品“${productName}”的销售单价无效。`,
+            );
+          }
+          if (!Number.isInteger(minStock) || minStock < 0) {
+            return formError(
+              form,
+              `[data-inbound-row="${row.id}"] [data-field="minStock"]`,
+              `商品“${productName}”的最低库存无效。`,
+            );
+          }
+          if (!Number.isInteger(maxStock) || maxStock <= minStock) {
+            return formError(
+              form,
+              `[data-inbound-row="${row.id}"] [data-field="maxStock"]`,
+              `商品“${productName}”的最高库存必须大于最低库存。`,
+            );
+          }
+
+          const productKey = existingProduct
+            ? `id:${existingProduct.id}`
+            : `name:${productName.toLocaleLowerCase("zh-CN")}`;
+          if (productKeys.has(productKey)) {
+            return formError(
+              form,
+              `#inbound-batch-product-container-${row.id}`,
+              `商品“${productName}”在本批进货中重复，请合并为一行。`,
+            );
+          }
+          productKeys.add(productKey);
+          normalizedRows.push({
+            ...row,
+            selectedProduct: existingProduct,
+            productName,
+            quantity,
+            costPrice,
+            retailPrice,
+            minStock,
+            maxStock,
           });
         }
-        product.stockQuantity =
-          Number(product.stockQuantity || 0) + row.quantity;
 
-        const lineRemark = [batchRemark, row.remark]
-          .filter(Boolean)
-          .join(" / ");
-        records.push({
-          id: createRuntimeId("SM"),
-          type: "inbound",
-          status: "confirmed",
-          productId: product.id,
-          productName: product.name,
-          quantity: row.quantity,
-          unit: product.unit,
+        const previousProducts = mockData.products.map((product) => ({
+          ...product,
+        }));
+        const previousStockMovements = stockMovementData.slice();
+        const previousDeliveryNotes = (mockData.deliveryNotes || []).slice();
+        const now = new Date();
+        const nowString = getLocalISOString();
+        const warehouseId = getSingleWarehouseId();
+        const locationCode = getSingleLocationCode(warehouseId);
+        const purchaseNoteId = createRuntimeId("PD");
+        const createdProductNames = [];
+        const records = [];
+        const details = [];
+
+        normalizedRows.forEach((row) => {
+          let product =
+            mockData.products.find(
+              (item) => item.id === row.selectedProduct?.id,
+            ) ||
+            mockData.products.find(
+              (item) =>
+                String(item.name || "").toLocaleLowerCase("zh-CN") ===
+                row.productName.toLocaleLowerCase("zh-CN"),
+            );
+          if (!product) {
+            product = {
+              id: createSequentialId(mockData.products, "P"),
+              name: row.productName,
+              category: row.category,
+              unit: row.unit,
+              costPrice: row.costPrice,
+              retailPrice: row.retailPrice,
+              stockQuantity: 0,
+              minStock: row.minStock,
+              maxStock: row.maxStock,
+              supplierId: supplier.id,
+              status: "active",
+              createdAt: nowString,
+              updatedAt: nowString,
+            };
+            mockData.products.push(product);
+            createdProductNames.push(product.name);
+          } else {
+            Object.assign(product, {
+              name: row.productName,
+              category: row.category,
+              unit: row.unit,
+              costPrice: row.costPrice,
+              retailPrice: row.retailPrice,
+              minStock: row.minStock,
+              maxStock: row.maxStock,
+              supplierId: supplier.id,
+              status: "active",
+              updatedAt: nowString,
+            });
+          }
+          product.stockQuantity =
+            Number(product.stockQuantity || 0) + row.quantity;
+
+          const lineRemark = [batchRemark, row.remark]
+            .filter(Boolean)
+            .join(" / ");
+          records.push({
+            id: createRuntimeId("SM"),
+            type: "inbound",
+            status: "confirmed",
+            productId: product.id,
+            productName: product.name,
+            quantity: row.quantity,
+            unit: product.unit,
+            supplierId: supplier.id,
+            supplierName: supplier.name,
+            companyId: company.id,
+            companyName: company.name,
+            price: row.costPrice,
+            priceType: "custom",
+            operator: currentUser.name,
+            warehouseId,
+            locationCode,
+            batchNo: "",
+            expiryDate: null,
+            inboundOrderNo,
+            orderNo: inboundOrderNo,
+            deliveryNoteId: purchaseNoteId,
+            remark: lineRemark || "-",
+            createdAt: now,
+            updatedAt: now,
+          });
+          details.push({
+            id: createRuntimeId("PDD"),
+            deliveryId: purchaseNoteId,
+            productId: product.id,
+            productName: product.name,
+            productNameSnapshot: product.name,
+            quantity: row.quantity,
+            receivedQuantity: row.quantity,
+            unit: product.unit,
+            unitSnapshot: product.unit,
+            unitPrice: row.costPrice,
+            confirmedUnitPrice: row.costPrice,
+            lineAmount: Math.round(row.quantity * row.costPrice * 100) / 100,
+            totalAmount: Math.round(row.quantity * row.costPrice * 100) / 100,
+            notes: row.remark || "",
+            status: "received",
+          });
+        });
+
+        const totalAmount =
+          Math.round(
+            details.reduce((total, detail) => total + detail.lineAmount, 0) *
+              100,
+          ) / 100;
+        if (!Array.isArray(mockData.deliveryNotes)) mockData.deliveryNotes = [];
+        mockData.deliveryNotes.unshift({
+          id: purchaseNoteId,
+          type: "purchase",
+          orderNo: inboundOrderNo,
+          issueDate: compactDate,
+          deliveryDate: compactDate,
+          status: "received",
           supplierId: supplier.id,
           supplierName: supplier.name,
           companyId: company.id,
           companyName: company.name,
-          price: row.costPrice,
-          priceType: "custom",
-          operator: currentUser.name,
           warehouseId,
-          locationCode,
-          batchNo: "",
-          expiryDate: null,
-          inboundOrderNo,
-          orderNo: inboundOrderNo,
-          deliveryNoteId: purchaseNoteId,
-          remark: lineRemark || "-",
+          subtotal: totalAmount,
+          taxAmount: 0,
+          totalAmount,
+          notes: batchRemark,
           createdAt: now,
           updatedAt: now,
+          details,
         });
-        details.push({
-          id: createRuntimeId("PDD"),
-          deliveryId: purchaseNoteId,
-          productId: product.id,
-          productName: product.name,
-          productNameSnapshot: product.name,
-          quantity: row.quantity,
-          receivedQuantity: row.quantity,
-          unit: product.unit,
-          unitSnapshot: product.unit,
-          unitPrice: row.costPrice,
-          confirmedUnitPrice: row.costPrice,
-          lineAmount: Math.round(row.quantity * row.costPrice * 100) / 100,
-          totalAmount: Math.round(row.quantity * row.costPrice * 100) / 100,
-          notes: row.remark || "",
-          status: "received",
-        });
-      });
+        stockMovementData.unshift(...records);
 
-      const totalAmount =
-        Math.round(
-          details.reduce((total, detail) => total + detail.lineAmount, 0) * 100,
-        ) / 100;
-      if (!Array.isArray(mockData.deliveryNotes)) mockData.deliveryNotes = [];
-      mockData.deliveryNotes.unshift({
-        id: purchaseNoteId,
-        type: "purchase",
-        orderNo: inboundOrderNo,
-        issueDate: compactDate,
-        deliveryDate: compactDate,
-        status: "received",
-        supplierId: supplier.id,
-        supplierName: supplier.name,
-        companyId: company.id,
-        companyName: company.name,
-        warehouseId,
-        subtotal: totalAmount,
-        taxAmount: 0,
-        totalAmount,
-        notes: batchRemark,
-        createdAt: now,
-        updatedAt: now,
-        details,
-      });
-      stockMovementData.unshift(...records);
+        const auditLogs = stageAuditLogs([
+          ...createdProductNames.map((productName) => ({
+            actionType: "add",
+            objectType: "product",
+            objectName: productName,
+            details: `批量进货自动创建商品：${inboundOrderNo}`,
+          })),
+          {
+            actionType: "add",
+            objectType: "delivery-note",
+            objectName: inboundOrderNo,
+            details: `批量进货：${supplier.name} / ${records.length} 种商品`,
+          },
+        ]);
+        const saved = await saveMockData();
+        if (saved === false) {
+          rollbackStagedAuditLogs(auditLogs);
+          mockData.products = previousProducts;
+          mockData.deliveryNotes = previousDeliveryNotes;
+          stockMovementData = previousStockMovements;
+          refreshActiveStockTable();
+          updateInventoryTable();
+          updateSupplierTable();
+          renderDashboardActivity();
+          alert("批量进货保存失败，本批商品和库存变更已全部回滚。");
+          return false;
+        }
 
-      const auditLogs = stageAuditLogs([
-        ...createdProductNames.map((productName) => ({
-          actionType: "add",
-          objectType: "product",
-          objectName: productName,
-          details: `批量进货自动创建商品：${inboundOrderNo}`,
-        })),
-        {
-          actionType: "add",
-          objectType: "delivery-note",
-          objectName: inboundOrderNo,
-          details: `批量进货：${supplier.name} / ${records.length} 种商品`,
-        },
-      ]);
-      const saved = await saveMockData();
-      if (saved === false) {
-        rollbackStagedAuditLogs(auditLogs);
-        mockData.products = previousProducts;
-        mockData.deliveryNotes = previousDeliveryNotes;
-        stockMovementData = previousStockMovements;
+        finalizeStagedAuditLogs(auditLogs);
         refreshActiveStockTable();
         updateInventoryTable();
         updateSupplierTable();
         renderDashboardActivity();
-        alert("批量进货保存失败，本批商品和库存变更已全部回滚。");
-        return false;
-      }
-
-      finalizeStagedAuditLogs(auditLogs);
-      refreshActiveStockTable();
-      updateInventoryTable();
-      updateSupplierTable();
-      renderDashboardActivity();
-      const totalQuantity = normalizedRows.reduce(
-        (total, row) => total + row.quantity,
-        0,
-      );
-      alert(
-        `本批进货已保存：${normalizedRows.length} 种商品，合计数量 ${totalQuantity}（单位以各商品明细为准）。`,
-      );
-      return true;
-    });
+        const totalQuantity = normalizedRows.reduce(
+          (total, row) => total + row.quantity,
+          0,
+        );
+        alert(
+          `本批进货已保存：${normalizedRows.length} 种商品，合计数量 ${totalQuantity}（单位以各商品明细为准）。`,
+        );
+        return true;
+      },
+      {
+        confirmText: "整批入库并返回",
+        allowContinue: true,
+        continueText: "入库并继续下一批",
+        onContinue: showAddBatchInboundModal,
+      },
+    );
 
     const modalPanel = document.getElementById("modal-panel");
     const modalContent = document.getElementById("modal-content");
@@ -1915,8 +2036,8 @@
       modalContent.className =
         "p-3 md:p-4 max-h-[78vh] overflow-y-auto overflow-x-hidden";
     }
-    if (confirmButton) confirmButton.textContent = "整批入库并保存";
-    global.configureBusinessFormPage?.("整批入库并保存");
+    if (confirmButton) confirmButton.textContent = "整批入库并返回";
+    global.configureBusinessFormPage?.("整批入库并返回");
     if (cancelButton) {
       cancelButton.classList.remove("hidden");
       cancelButton.textContent = "取消";

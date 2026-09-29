@@ -13,6 +13,8 @@ const SERVER_FILES = [
   "js",
   "lib",
   "data",
+  "node_modules/fflate",
+  "node_modules/node-unrar-js",
 ];
 
 function copyProjectForServer() {
@@ -26,6 +28,7 @@ function copyProjectForServer() {
     const stat = fs.statSync(source);
 
     if (stat.isDirectory()) {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.cpSync(source, target, { recursive: true });
       return;
     }

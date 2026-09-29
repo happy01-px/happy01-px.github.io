@@ -36,9 +36,17 @@
     configureWideFormModal,
   } = core;
 
-  function showBusinessEditor(title, content, onConfirm) {
+  function showBusinessEditor(title, content, onConfirm, options = {}) {
     const open = global.showBusinessFormPage || global.showModal;
-    return open?.(title, content, onConfirm);
+    return open?.(title, content, onConfirm, options);
+  }
+
+  function formError(form, selector, message) {
+    if (typeof global.reportFormError === "function") {
+      return global.reportFormError(message, selector, form);
+    }
+    global.alert(message);
+    return false;
   }
 
   function showViewCompanyModal(companyId) {
@@ -196,7 +204,7 @@
       refreshBillDependencies();
       refreshStockDependencies();
       alert("客户编号已更新");
-      showViewCustomerModal(nextId);
+      document.getElementById("modal")?.classList.add("hidden");
       return true;
     };
 
@@ -464,63 +472,72 @@
             </form>
         `;
 
-    showBusinessEditor("新增公司", content, async function onConfirm() {
-      const form = document.getElementById("add-company-form");
-      const formData = new FormData(form);
-      const name = formData.get("name").trim();
-      const contactPerson = formData.get("contactPerson").trim();
-      const contactPhone = formData.get("contactPhone").trim();
-      const address = formData.get("address").trim();
-      const email = formData.get("email").trim();
+    showBusinessEditor(
+      "新增公司",
+      content,
+      async function onConfirm() {
+        const form = document.getElementById("add-company-form");
+        const formData = new FormData(form);
+        const name = formData.get("name").trim();
+        const contactPerson = formData.get("contactPerson").trim();
+        const contactPhone = formData.get("contactPhone").trim();
+        const address = formData.get("address").trim();
+        const email = formData.get("email").trim();
 
-      if (!name) {
-        alert("请输入公司名称");
-        return false;
-      }
-      if (!contactPerson) {
-        alert("请输入联系人");
-        return false;
-      }
-      if (!contactPhone) {
-        alert("请输入联系电话");
-        return false;
-      }
-      if (!address) {
-        alert("请输入公司地址");
-        return false;
-      }
-      if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
-        alert("请输入有效的国内联系电话（手机号或座机号）");
-        return false;
-      }
+        if (!name) {
+          return formError(form, '[name="name"]', "请输入公司名称");
+        }
+        if (!contactPerson) {
+          return formError(form, '[name="contactPerson"]', "请输入联系人");
+        }
+        if (!contactPhone) {
+          return formError(form, '[name="contactPhone"]', "请输入联系电话");
+        }
+        if (!address) {
+          return formError(form, '[name="address"]', "请输入公司地址");
+        }
+        if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
+          return formError(
+            form,
+            '[name="contactPhone"]',
+            "请输入有效的国内联系电话（手机号或座机号）",
+          );
+        }
 
-      const newCompany = {
-        id: createSequentialId(mockData.companies, "CO"),
-        name,
-        contactPerson,
-        contactPhone,
-        address,
-        email: email || "-",
-        status: "active",
-        createdAt: getLocalISOString(),
-        updatedAt: getLocalISOString(),
-      };
+        const newCompany = {
+          id: createSequentialId(mockData.companies, "CO"),
+          name,
+          contactPerson,
+          contactPhone,
+          address,
+          email: email || "-",
+          status: "active",
+          createdAt: getLocalISOString(),
+          updatedAt: getLocalISOString(),
+        };
 
-      const snapshot = createMasterDataSnapshot();
-      mockData.companies.push(newCompany);
-      const persisted = await persistMasterDataChanges(snapshot, "公司", {
-        actionType: "add",
-        objectType: "company",
-        objectName: name,
-        details: `新增公司，联系人：${contactPerson}`,
-      });
-      if (!persisted) return false;
-      updateCompanyTable();
-      alert("公司添加成功");
-      return true;
-    });
+        const snapshot = createMasterDataSnapshot();
+        mockData.companies.push(newCompany);
+        const persisted = await persistMasterDataChanges(snapshot, "公司", {
+          actionType: "add",
+          objectType: "company",
+          objectName: name,
+          details: `新增公司，联系人：${contactPerson}`,
+        });
+        if (!persisted) return false;
+        updateCompanyTable();
+        global.showAntdMessage?.("success", "公司添加成功");
+        return true;
+      },
+      {
+        confirmText: "保存并返回",
+        allowContinue: true,
+        continueText: "保存并继续新增",
+        onContinue: showAddCompanyModal,
+      },
+    );
 
-    configureWideFormModal("创建");
+    configureWideFormModal("保存并返回");
   }
 
   function showEditCompanyModal(companyId) {
@@ -575,7 +592,6 @@
 
     showBusinessEditor("编辑公司", content, async function onConfirm() {
       const form = document.getElementById("edit-company-form");
-      if (!form.reportValidity()) return false;
 
       const formData = new FormData(form);
       const name = normalizeTextValue(formData.get("name"));
@@ -588,24 +604,23 @@
         ) || "active";
 
       if (!name) {
-        alert("请输入公司名称");
-        return false;
+        return formError(form, '[name="name"]', "请输入公司名称");
       }
       if (!contactPerson) {
-        alert("请输入联系人");
-        return false;
+        return formError(form, '[name="contactPerson"]', "请输入联系人");
       }
       if (!contactPhone) {
-        alert("请输入联系电话");
-        return false;
+        return formError(form, '[name="contactPhone"]', "请输入联系电话");
       }
       if (!address) {
-        alert("请输入公司地址");
-        return false;
+        return formError(form, '[name="address"]', "请输入公司地址");
       }
       if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
-        alert("请输入有效的国内联系电话（手机号或座机号）");
-        return false;
+        return formError(
+          form,
+          '[name="contactPhone"]',
+          "请输入有效的国内联系电话（手机号或座机号）",
+        );
       }
       if (!ensureUniqueName(mockData.companies, company.id, name, "公司")) {
         return false;
@@ -685,6 +700,7 @@
       const safeStatusLabel = escapeHTML(statusMeta.label);
 
       const row = document.createElement("tr");
+      row.dataset.recordId = company.id;
       row.innerHTML = `
                 <td class="px-6 py-4 align-middle">
                     <div class="table-long-text company-cell-wrap text-sm font-medium text-gray-900" title="${safeCompanyName}">${safeCompanyName}</div>
@@ -779,63 +795,73 @@
             </form>
         `;
 
-    showBusinessEditor("新增供应商", content, async function onConfirm() {
-      const form = document.getElementById("add-supplier-form");
-      const formData = new FormData(form);
-      const name = formData.get("name").trim();
-      const contactPerson = formData.get("contactPerson").trim();
-      const contactPhone = formData.get("contactPhone").trim();
-      const address = formData.get("address").trim();
-      const paymentTerms = document.getElementById(
-        "add-supplier-payment-input",
-      ).value;
+    showBusinessEditor(
+      "新增供应商",
+      content,
+      async function onConfirm() {
+        const form = document.getElementById("add-supplier-form");
+        const formData = new FormData(form);
+        const name = formData.get("name").trim();
+        const contactPerson = formData.get("contactPerson").trim();
+        const contactPhone = formData.get("contactPhone").trim();
+        const address = formData.get("address").trim();
+        const paymentTerms = document.getElementById(
+          "add-supplier-payment-input",
+        ).value;
 
-      if (!name) {
-        alert("请输入供应商名称");
-        return false;
-      }
-      if (!contactPerson) {
-        alert("请输入联系人");
-        return false;
-      }
-      if (!contactPhone) {
-        alert("请输入联系电话");
-        return false;
-      }
-      if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
-        alert("请输入有效的国内联系电话（手机号或座机号）");
-        return false;
-      }
+        if (!name) {
+          return formError(form, '[name="name"]', "请输入供应商名称");
+        }
+        if (!contactPerson) {
+          return formError(form, '[name="contactPerson"]', "请输入联系人");
+        }
+        if (!contactPhone) {
+          return formError(form, '[name="contactPhone"]', "请输入联系电话");
+        }
+        if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
+          return formError(
+            form,
+            '[name="contactPhone"]',
+            "请输入有效的国内联系电话（手机号或座机号）",
+          );
+        }
 
-      const newSupplier = {
-        id: createSequentialId(mockData.suppliers, "S"),
-        name,
-        contactPerson,
-        contactPhone,
-        email: "-",
-        address: address || "-",
-        paymentTerms: paymentTerms || "Net 30",
-        creditLimit: 0,
-        status: "active",
-        createdAt: getLocalISOString(),
-        updatedAt: getLocalISOString(),
-      };
+        const newSupplier = {
+          id: createSequentialId(mockData.suppliers, "S"),
+          name,
+          contactPerson,
+          contactPhone,
+          email: "-",
+          address: address || "-",
+          paymentTerms: paymentTerms || "Net 30",
+          creditLimit: 0,
+          status: "active",
+          createdAt: getLocalISOString(),
+          updatedAt: getLocalISOString(),
+        };
 
-      const snapshot = createMasterDataSnapshot();
-      mockData.suppliers.push(newSupplier);
-      const persisted = await persistMasterDataChanges(snapshot, "供应商", {
-        actionType: "add",
-        objectType: "supplier",
-        objectName: name,
-        details: `新增供应商，联系人：${contactPerson}`,
-      });
-      if (!persisted) return false;
-      updateSupplierTable();
-      alert("供应商添加成功");
-      return true;
-    });
+        const snapshot = createMasterDataSnapshot();
+        mockData.suppliers.push(newSupplier);
+        const persisted = await persistMasterDataChanges(snapshot, "供应商", {
+          actionType: "add",
+          objectType: "supplier",
+          objectName: name,
+          details: `新增供应商，联系人：${contactPerson}`,
+        });
+        if (!persisted) return false;
+        updateSupplierTable();
+        global.showAntdMessage?.("success", "供应商添加成功");
+        return true;
+      },
+      {
+        confirmText: "保存并返回",
+        allowContinue: true,
+        continueText: "保存并继续新增",
+        onContinue: showAddSupplierModal,
+      },
+    );
 
-    configureWideFormModal("创建");
+    configureWideFormModal("保存并返回");
     renderAntdSelect(
       "add-supplier-payment-container",
       "add-supplier-payment-input",
@@ -904,7 +930,6 @@
 
     showBusinessEditor("编辑供应商", content, async function onConfirm() {
       const form = document.getElementById("edit-supplier-form");
-      if (!form.reportValidity()) return false;
 
       const formData = new FormData(form);
       const name = normalizeTextValue(formData.get("name"));
@@ -920,20 +945,20 @@
         ) || "active";
 
       if (!name) {
-        alert("请输入供应商名称");
-        return false;
+        return formError(form, '[name="name"]', "请输入供应商名称");
       }
       if (!contactPerson) {
-        alert("请输入联系人");
-        return false;
+        return formError(form, '[name="contactPerson"]', "请输入联系人");
       }
       if (!contactPhone) {
-        alert("请输入联系电话");
-        return false;
+        return formError(form, '[name="contactPhone"]', "请输入联系电话");
       }
       if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
-        alert("请输入有效的国内联系电话（手机号或座机号）");
-        return false;
+        return formError(
+          form,
+          '[name="contactPhone"]',
+          "请输入有效的国内联系电话（手机号或座机号）",
+        );
       }
       if (!ensureUniqueName(mockData.suppliers, supplier.id, name, "供应商")) {
         return false;
@@ -1097,110 +1122,131 @@
             </form>
         `;
 
-    showBusinessEditor("新增客户", content, async function onConfirm() {
-      const form = document.getElementById("add-customer-form");
-      const formData = new FormData(form);
+    showBusinessEditor(
+      "新增客户",
+      content,
+      async function onConfirm() {
+        const form = document.getElementById("add-customer-form");
+        const formData = new FormData(form);
 
-      const id = normalizeTextValue(formData.get("id"));
-      const name = formData.get("name").trim();
-      const contactPerson = formData.get("contactPerson").trim();
-      const contactPhone = formData.get("contactPhone").trim();
-      const address = formData.get("address").trim();
-      const hasTaxRate = normalizeTextValue(formData.get("hasTaxRate"));
-      const taxRateCoefficientText = normalizeTextValue(
-        formData.get("taxRateCoefficient"),
-      );
-      const paymentTerms = document.getElementById(
-        "add-customer-payment-input",
-      ).value;
-      const priceTaxMode = normalizeTextValue(formData.get("priceTaxMode"));
-      let taxRateCoefficient = null;
-      let defaultTaxRate = 0;
+        const id = normalizeTextValue(formData.get("id"));
+        const name = formData.get("name").trim();
+        const contactPerson = formData.get("contactPerson").trim();
+        const contactPhone = formData.get("contactPhone").trim();
+        const address = formData.get("address").trim();
+        const hasTaxRate = normalizeTextValue(formData.get("hasTaxRate"));
+        const taxRateCoefficientText = normalizeTextValue(
+          formData.get("taxRateCoefficient"),
+        );
+        const paymentTerms = document.getElementById(
+          "add-customer-payment-input",
+        ).value;
+        const priceTaxMode = normalizeTextValue(formData.get("priceTaxMode"));
+        let taxRateCoefficient = null;
+        let defaultTaxRate = 0;
 
-      if (!id) {
-        alert("请输入客户编号");
-        return false;
-      }
-      if (!name) {
-        alert("请输入客户名称");
-        return false;
-      }
-      if (!contactPerson) {
-        alert("请输入联系人");
-        return false;
-      }
-      if (!contactPhone) {
-        alert("请输入联系电话");
-        return false;
-      }
-      if (!address) {
-        alert("请输入客户地址");
-        return false;
-      }
-      if (!paymentTerms) {
-        alert("请选择付款条件");
-        return false;
-      }
-      if (!hasTaxRate) {
-        alert("请选择是否有税点");
-        return false;
-      }
-      if (hasTaxRate === "yes") {
-        if (!taxRateCoefficientText) {
-          alert("请输入税点，例如 7");
+        if (!id) {
+          return formError(form, '[name="id"]', "请输入客户编号");
+        }
+        if (!name) {
+          return formError(form, '[name="name"]', "请输入客户名称");
+        }
+        if (!contactPerson) {
+          return formError(form, '[name="contactPerson"]', "请输入联系人");
+        }
+        if (!contactPhone) {
+          return formError(form, '[name="contactPhone"]', "请输入联系电话");
+        }
+        if (!address) {
+          return formError(form, '[name="address"]', "请输入客户地址");
+        }
+        if (!paymentTerms) {
+          return formError(
+            form,
+            "#add-customer-payment-container",
+            "请选择付款条件",
+          );
+        }
+        if (!hasTaxRate) {
+          return formError(
+            form,
+            "#add-customer-tax-rate-choice-container",
+            "请选择是否有税点",
+          );
+        }
+        if (hasTaxRate === "yes") {
+          if (!taxRateCoefficientText) {
+            return formError(
+              form,
+              "#add-customer-tax-rate-input-container",
+              "请输入税点，例如 7",
+            );
+          }
+
+          const taxPoint = Number(taxRateCoefficientText);
+          if (!Number.isFinite(taxPoint) || taxPoint <= 0 || taxPoint > 100) {
+            return formError(
+              form,
+              "#add-customer-tax-rate-input-container",
+              "税点必须大于 0 且不超过 100",
+            );
+          }
+          defaultTaxRate = taxPoint / 100;
+          taxRateCoefficient = 1 + defaultTaxRate;
+        }
+        if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
+          return formError(
+            form,
+            '[name="contactPhone"]',
+            "请输入有效的国内联系电话（手机号或座机号）",
+          );
+        }
+        if (!ensureUniqueRecordId(mockData.customers, null, id, "客户")) {
           return false;
         }
 
-        const taxPoint = Number(taxRateCoefficientText);
-        if (!Number.isFinite(taxPoint) || taxPoint <= 0 || taxPoint > 100) {
-          alert("税点必须大于 0 且不超过 100");
-          return false;
-        }
-        defaultTaxRate = taxPoint / 100;
-        taxRateCoefficient = 1 + defaultTaxRate;
-      }
-      if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
-        alert("请输入有效的国内联系电话（手机号或座机号）");
-        return false;
-      }
-      if (!ensureUniqueRecordId(mockData.customers, null, id, "客户")) {
-        return false;
-      }
+        const newCustomer = {
+          id,
+          name,
+          contactPerson,
+          contactPhone,
+          address,
+          email: "-",
+          paymentTerms,
+          hasTaxRate: hasTaxRate === "yes",
+          taxRateCoefficient,
+          defaultTaxRate,
+          priceTaxMode:
+            priceTaxMode === "inclusive" ? "inclusive" : "exclusive",
+          creditLimit: 0,
+          status: "active",
+          createdAt: getLocalISOString(),
+          updatedAt: getLocalISOString(),
+        };
 
-      const newCustomer = {
-        id,
-        name,
-        contactPerson,
-        contactPhone,
-        address,
-        email: "-",
-        paymentTerms,
-        hasTaxRate: hasTaxRate === "yes",
-        taxRateCoefficient,
-        defaultTaxRate,
-        priceTaxMode: priceTaxMode === "inclusive" ? "inclusive" : "exclusive",
-        creditLimit: 0,
-        status: "active",
-        createdAt: getLocalISOString(),
-        updatedAt: getLocalISOString(),
-      };
+        const snapshot = createMasterDataSnapshot();
+        mockData.customers.push(newCustomer);
+        const persisted = await persistMasterDataChanges(snapshot, "客户", {
+          actionType: "add",
+          objectType: "customer",
+          objectName: name,
+          details: `新增客户，联系人：${contactPerson}`,
+        });
+        if (!persisted) return false;
+        updateCustomerTable();
 
-      const snapshot = createMasterDataSnapshot();
-      mockData.customers.push(newCustomer);
-      const persisted = await persistMasterDataChanges(snapshot, "客户", {
-        actionType: "add",
-        objectType: "customer",
-        objectName: name,
-        details: `新增客户，联系人：${contactPerson}`,
-      });
-      if (!persisted) return false;
-      updateCustomerTable();
+        global.showAntdMessage?.("success", "客户添加成功");
+        return true;
+      },
+      {
+        confirmText: "保存并返回",
+        allowContinue: true,
+        continueText: "保存并继续新增",
+        onContinue: showAddCustomerModal,
+      },
+    );
 
-      alert("客户添加成功");
-      return true;
-    });
-
-    configureWideFormModal("创建");
+    configureWideFormModal("保存并返回");
     renderAntdSelect(
       "add-customer-payment-container",
       "add-customer-payment-input",
@@ -1286,7 +1332,6 @@
 
     showBusinessEditor("编辑客户", content, async function onConfirm() {
       const form = document.getElementById("edit-customer-form");
-      if (!form.reportValidity()) return false;
 
       const formData = new FormData(form);
       const name = normalizeTextValue(formData.get("name"));
@@ -1309,46 +1354,53 @@
         ) || "active";
 
       if (!name) {
-        alert("请输入客户名称");
-        return false;
+        return formError(form, '[name="name"]', "请输入客户名称");
       }
       if (!contactPerson) {
-        alert("请输入联系人");
-        return false;
+        return formError(form, '[name="contactPerson"]', "请输入联系人");
       }
       if (!contactPhone) {
-        alert("请输入联系电话");
-        return false;
+        return formError(form, '[name="contactPhone"]', "请输入联系电话");
       }
       if (!address) {
-        alert("请输入客户地址");
-        return false;
+        return formError(form, '[name="address"]', "请输入客户地址");
       }
       if (!paymentTerms) {
-        alert("请选择付款条件");
-        return false;
+        return formError(
+          form,
+          "#edit-customer-payment-container",
+          "请选择付款条件",
+        );
       }
       if (!hasTaxRate) {
-        alert("请选择是否有税点");
-        return false;
+        return formError(form, '[name="hasTaxRate"]', "请选择是否有税点");
       }
       if (hasTaxRate === "yes") {
         if (!taxRateCoefficientText) {
-          alert("请输入税点，例如 7");
-          return false;
+          return formError(
+            form,
+            '[name="taxRateCoefficient"]',
+            "请输入税点，例如 7",
+          );
         }
 
         const taxPoint = Number(taxRateCoefficientText);
         if (!Number.isFinite(taxPoint) || taxPoint <= 0 || taxPoint > 100) {
-          alert("税点必须大于 0 且不超过 100");
-          return false;
+          return formError(
+            form,
+            '[name="taxRateCoefficient"]',
+            "税点必须大于 0 且不超过 100",
+          );
         }
         defaultTaxRate = taxPoint / 100;
         taxRateCoefficient = 1 + defaultTaxRate;
       }
       if (!DOMESTIC_PHONE_REGEX.test(contactPhone)) {
-        alert("请输入有效的国内联系电话（手机号或座机号）");
-        return false;
+        return formError(
+          form,
+          '[name="contactPhone"]',
+          "请输入有效的国内联系电话（手机号或座机号）",
+        );
       }
       if (!ensureUniqueName(mockData.customers, customer.id, name, "客户")) {
         return false;
@@ -1450,6 +1502,7 @@
       const safeStatusLabel = escapeHTML(statusMeta.label);
 
       const row = document.createElement("tr");
+      row.dataset.recordId = customer.id;
       row.innerHTML = `
                 <td class="px-6 py-4 align-middle whitespace-nowrap text-sm font-medium text-gray-900">${safeCustomerId}</td>
                 <td class="px-6 py-4 align-middle">
@@ -1484,6 +1537,7 @@
                     <div class="table-action-links customer-row-actions">
                         <button type="button" class="text-blue-600 hover:text-blue-900" data-action="view">查看</button>
                         <button type="button" class="text-emerald-600 hover:text-emerald-800" data-action="prices">价目表</button>
+                        <button type="button" class="text-orange-600 hover:text-orange-800" data-action="bill">对账</button>
                         <button type="button" class="text-primary hover:text-primary-dark" data-action="edit">编辑</button>
                         <button type="button" class="text-danger hover:text-danger-dark" data-action="delete">删除</button>
                     </div>
@@ -1491,6 +1545,7 @@
             `;
       const viewButton = row.querySelector('[data-action="view"]');
       const pricesButton = row.querySelector('[data-action="prices"]');
+      const billButton = row.querySelector('[data-action="bill"]');
       const editButton = row.querySelector('[data-action="edit"]');
       const deleteButton = row.querySelector('[data-action="delete"]');
       if (viewButton) {
@@ -1501,6 +1556,11 @@
       if (pricesButton) {
         pricesButton.addEventListener("click", () =>
           global.showCustomerPriceListModal?.(customer.id),
+        );
+      }
+      if (billButton) {
+        billButton.addEventListener("click", () =>
+          global.openCreateBillForCustomer?.(customer.id),
         );
       }
       if (editButton) {
@@ -1568,6 +1628,7 @@
       const safeStatusLabel = escapeHTML(statusMeta.label);
 
       const row = document.createElement("tr");
+      row.dataset.recordId = supplier.id;
       row.innerHTML = `
                 <td class="px-6 py-4 align-middle">
                     <div class="table-long-text supplier-cell-wrap text-sm font-medium text-gray-900" title="${safeSupplierName}">${safeSupplierName}</div>
@@ -1599,17 +1660,24 @@
                 <td class="table-action-cell px-6 py-4 align-middle whitespace-nowrap text-left text-sm font-medium">
                     <div class="table-action-links">
                         <button type="button" class="text-blue-600 hover:text-blue-900" data-action="view">查看</button>
+                        <button type="button" class="text-orange-600 hover:text-orange-800" data-action="bill">对账</button>
                         <button type="button" class="text-primary hover:text-primary-dark" data-action="edit">编辑</button>
                         <button type="button" class="text-danger hover:text-danger-dark" data-action="delete">删除</button>
                     </div>
                 </td>
             `;
       const viewButton = row.querySelector('[data-action="view"]');
+      const billButton = row.querySelector('[data-action="bill"]');
       const editButton = row.querySelector('[data-action="edit"]');
       const deleteButton = row.querySelector('[data-action="delete"]');
       if (viewButton) {
         viewButton.addEventListener("click", () =>
           showViewSupplierModal(supplier.id),
+        );
+      }
+      if (billButton) {
+        billButton.addEventListener("click", () =>
+          global.openCreateBillForSupplier?.(supplier.id),
         );
       }
       if (editButton) {

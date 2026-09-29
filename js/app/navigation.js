@@ -14,6 +14,7 @@
 
   let desktopSidebarMenuSelectedKey = "dashboard";
   let desktopSidebarMenuOpenKeys = [DESKTOP_SIDEBAR_SUBMENU_KEY];
+  let desktopSidebarCollapsed = false;
 
   const WORKFLOW_TARGETS = Object.freeze({
     company: {
@@ -494,6 +495,7 @@
         React.createElement(Menu, {
           theme: "light",
           mode: "inline",
+          inlineCollapsed: desktopSidebarCollapsed,
           inlineIndent: 20,
           triggerSubMenuAction: "click",
           style: {
@@ -503,7 +505,7 @@
           },
           items: getDesktopSidebarMenuItems(),
           selectedKeys: [desktopSidebarMenuSelectedKey],
-          openKeys: desktopSidebarMenuOpenKeys,
+          openKeys: desktopSidebarCollapsed ? [] : desktopSidebarMenuOpenKeys,
           onOpenChange: handleOpenChange,
           onClick: handleClick,
         }),
@@ -511,6 +513,41 @@
     );
 
     return true;
+  }
+
+  function setDesktopSidebarCollapsed(collapsed) {
+    desktopSidebarCollapsed = Boolean(collapsed);
+
+    const desktopSidebar = document.getElementById("desktop-sidebar");
+    const sidebarToggleButton = document.getElementById(
+      "sidebar-toggle-button",
+    );
+
+    if (desktopSidebar) {
+      desktopSidebar.classList.toggle("is-collapsed", desktopSidebarCollapsed);
+      desktopSidebar.dataset.collapsed = String(desktopSidebarCollapsed);
+      desktopSidebar.setAttribute(
+        "aria-hidden",
+        String(desktopSidebarCollapsed),
+      );
+    }
+
+    if (sidebarToggleButton) {
+      const actionLabel = desktopSidebarCollapsed ? "展开侧边栏" : "收起侧边栏";
+      sidebarToggleButton.classList.toggle(
+        "is-collapsed",
+        desktopSidebarCollapsed,
+      );
+      sidebarToggleButton.setAttribute(
+        "aria-expanded",
+        String(!desktopSidebarCollapsed),
+      );
+      sidebarToggleButton.setAttribute("aria-label", actionLabel);
+      sidebarToggleButton.title = actionLabel;
+    }
+
+    renderDesktopSidebarMenu();
+    return desktopSidebarCollapsed;
   }
 
   function bindElementEventOnce(element, datasetKey, eventName, handler) {
@@ -671,10 +708,7 @@
         function onSidebarToggle() {
           const isDesktop = global.innerWidth > 900;
           if (isDesktop) {
-            const desktopSidebar = document.getElementById("desktop-sidebar");
-            if (!desktopSidebar) return;
-            desktopSidebar.style.display =
-              desktopSidebar.style.display === "none" ? "" : "none";
+            setDesktopSidebarCollapsed(!desktopSidebarCollapsed);
             return;
           }
 
@@ -1083,6 +1117,7 @@
   global.setLegacyDesktopNavState = setLegacyDesktopNavState;
   global.setMobileNavState = setMobileNavState;
   global.renderDesktopSidebarMenu = renderDesktopSidebarMenu;
+  global.setDesktopSidebarCollapsed = setDesktopSidebarCollapsed;
   global.bindElementEventOnce = bindElementEventOnce;
   global.bindDocumentEventOnce = bindDocumentEventOnce;
   global.resolveWorkflowPrerequisite = resolveWorkflowPrerequisite;

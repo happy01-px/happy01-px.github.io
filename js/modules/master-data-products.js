@@ -550,6 +550,7 @@
       );
 
       const row = document.createElement("tr");
+      row.dataset.recordId = product.id;
       row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap overflow-hidden">
                     <div class="min-w-0 overflow-hidden">
@@ -581,8 +582,8 @@
                         </div>
                     </div>
                 </td>
-                <td class="table-action-cell px-6 py-4 text-sm font-medium text-left align-middle min-w-[210px]">
-                    <div class="table-action-links flex items-center justify-start gap-4 whitespace-nowrap">
+                <td class="table-action-cell px-6 py-4 text-sm font-medium text-left align-middle">
+                    <div class="table-action-links flex items-center gap-4 whitespace-nowrap">
                         <button type="button" class="inline-flex items-center justify-center text-blue-600 hover:text-blue-900" data-action="view">查看</button>
                         <button type="button" class="inline-flex items-center justify-center text-primary hover:text-primary-dark" data-action="edit">编辑</button>
                         <button type="button" class="inline-flex items-center justify-center text-danger hover:text-danger-dark" data-action="delete">删除</button>

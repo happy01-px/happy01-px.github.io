@@ -120,7 +120,7 @@ test("index.html boots from the real page markup and renders data-aware sections
   );
   assert.equal(document.title, "仓库库存管理系统");
   assert.match(readProjectFile("css/design-preview.css"), /--brand:\s*#654df1/);
-  assert.match(readProjectFile("css/design-preview.css"), /flex:\s*0 0 180px/);
+  assert.match(readProjectFile("css/design-preview.css"), /flex:\s*0 0 168px/);
   assert.match(
     readProjectFile("css/design-preview.css"),
     /\.design-v2 header \{[\s\S]*?min-height:\s*60px/,
@@ -158,22 +158,38 @@ test("index.html boots from the real page markup and renders data-aware sections
   assert.equal(
     document.querySelector(".business-data-table--customer col:nth-child(2)")
       .style.width,
-    "16%",
+    "15%",
   );
   assert.equal(
     document.querySelector(".business-data-table--customer col:nth-child(5)")
       .style.width,
-    "15%",
+    "14%",
   );
   assert.equal(
     document.querySelector(".business-data-table--customer col:nth-child(8)")
       .style.width,
-    "18%",
+    "21%",
   );
   assert.equal(
     document.querySelector(".business-data-table--customer col:nth-child(9)")
       .style.width,
-    "17%",
+    "230px",
+  );
+  [
+    ["supplier", "176px"],
+    ["company", "136px"],
+    ["customer", "230px"],
+  ].forEach(([tableType, expectedWidth]) => {
+    assert.equal(
+      document.querySelector(
+        `.business-data-table--${tableType} col:last-child`,
+      ).style.width,
+      expectedWidth,
+    );
+  });
+  assert.equal(
+    document.querySelector(".inventory-data-table col:last-child").style.width,
+    "136px",
   );
   assert.ok(document.getElementById("suppliers-pagination-container"));
   assert.equal(
@@ -222,6 +238,14 @@ test("index.html boots from the real page markup and renders data-aware sections
   });
   assert.match(
     readProjectFile("css/design-preview.css"),
+    /\.table-action-header,[\s\S]*?width:\s*1%\s*!important;[\s\S]*?text-align:\s*left\s*!important;/,
+  );
+  assert.match(
+    readProjectFile("css/design-preview.css"),
+    /> \.table-action-links \{[\s\S]*?justify-content:\s*flex-start\s*!important;[\s\S]*?margin-left:\s*0;/,
+  );
+  assert.match(
+    readProjectFile("css/design-preview.css"),
     /\.data-table-card thead tr \{[\s\S]*?height:\s*52px/,
   );
   assert.match(
@@ -240,9 +264,41 @@ test("index.html boots from the real page markup and renders data-aware sections
     readProjectFile("css/design-preview.css"),
     /\.business-data-table \.app-empty-table-row > td:last-child \{[\s\S]*?position:\s*static !important;/,
   );
+  assert.match(
+    readProjectFile("css/design-preview.css"),
+    /#desktop-sidebar\.is-collapsed \{[\s\S]*?width:\s*0 !important;[\s\S]*?flex-basis:\s*0;/,
+  );
+  assert.match(
+    readProjectFile("css/design-preview.css"),
+    /\.design-v2 main \{[\s\S]*?padding:\s*18px 16px 28px !important;/,
+  );
+  assert.match(
+    readProjectFile("css/design-preview.css"),
+    /\.design-v2 \.page-section \{[\s\S]*?max-width:\s*none;/,
+  );
 
   assert.ok(
     document.querySelector('#desktop-sidebar-menu [data-menu-key="dashboard"]'),
+  );
+  const sidebarToggleButton = document.getElementById("sidebar-toggle-button");
+  sidebarToggleButton.click();
+  await flushAsyncTasks();
+  assert.equal(
+    document
+      .getElementById("desktop-sidebar")
+      .classList.contains("is-collapsed"),
+    true,
+  );
+  assert.ok(
+    document.querySelector("#desktop-sidebar-menu .ant-menu-inline-collapsed"),
+  );
+  sidebarToggleButton.click();
+  await flushAsyncTasks();
+  assert.equal(
+    document
+      .getElementById("desktop-sidebar")
+      .classList.contains("is-collapsed"),
+    false,
   );
   assert.ok(document.getElementById("inventoryValueChart"));
   assert.ok(document.getElementById("inventoryTurnoverRankingChart"));
@@ -332,7 +388,7 @@ test("a direct sales-order route restores its document copy and form rows", asyn
   harness.close();
 });
 
-test("a direct history import route shows recovery actions after refresh", async () => {
+test("a direct history import route without a draft returns to import settings", async () => {
   const harness = await bootRealIndexPage({
     hash: "#history-import-workflow",
   });
@@ -342,22 +398,24 @@ test("a direct history import route shows recovery actions after refresh", async
     document
       .getElementById("history-import-workflow")
       .classList.contains("hidden"),
+    true,
+  );
+  assert.equal(
+    document.getElementById("settings").classList.contains("hidden"),
     false,
   );
-  assert.match(
-    document.getElementById("delivery-import-workflow-content").textContent,
-    /没有待处理的导入任务/,
+  const historyTab = document.querySelector(
+    '#settings-tabs button[data-target="settings-history-import"]',
   );
-  assert.equal(
-    document.getElementById("delivery-import-workflow-primary").textContent,
-    "选择送货单 / 对账单文件",
-  );
+  assert.equal(historyTab.classList.contains("active"), true);
+  assert.equal(historyTab.getAttribute("aria-selected"), "true");
   assert.equal(
     document
-      .getElementById("delivery-import-workflow-actions")
+      .getElementById("settings-history-import")
       .classList.contains("hidden"),
     false,
   );
+  assert.equal(harness.window.location.hash, "#settings");
 
   harness.close();
 });
@@ -556,6 +614,88 @@ test("business form route returns to its source from back and cancel", async () 
   harness.close();
 });
 
+test("business form route exits to its source after a successful save", async () => {
+  const harness = await bootRealIndexPage();
+  const { document } = harness.window;
+
+  harness.window.showSection("inventory");
+  harness.window.showBusinessFormPage(
+    "编辑商品",
+    '<form id="edit-product-test"><input name="name" value="测试商品"></form>',
+    async () => {
+      harness.window.alert("商品信息已更新");
+      return true;
+    },
+  );
+
+  document.getElementById("business-form-workflow-confirm").click();
+  await flushAsyncTasks(4);
+
+  assert.equal(
+    document.getElementById("inventory").classList.contains("hidden"),
+    false,
+  );
+  assert.equal(
+    document
+      .getElementById("business-form-workflow")
+      .classList.contains("hidden"),
+    true,
+  );
+  assert.match(
+    String(harness.antdMessages.at(-1)?.content || ""),
+    /商品信息已更新/,
+  );
+
+  harness.close();
+});
+
+test("business form supports save-and-return and save-and-continue", async () => {
+  const harness = await bootRealIndexPage();
+  const { document } = harness.window;
+  let saveCount = 0;
+  let continueCount = 0;
+
+  harness.window.showSection("companies");
+  harness.window.showBusinessFormPage(
+    "新增公司",
+    '<form id="add-company-test"><input name="name" value="测试公司"></form>',
+    async () => {
+      saveCount += 1;
+      return true;
+    },
+    {
+      allowContinue: true,
+      onContinue: () => {
+        continueCount += 1;
+      },
+    },
+  );
+
+  const continueButton = document.getElementById(
+    "business-form-workflow-confirm-continue",
+  );
+  assert.equal(continueButton.hidden, false);
+  continueButton.click();
+  await flushAsyncTasks(4);
+  assert.equal(saveCount, 1);
+  assert.equal(continueCount, 1);
+  assert.equal(
+    document
+      .getElementById("business-form-workflow")
+      .classList.contains("hidden"),
+    false,
+  );
+
+  document.getElementById("business-form-workflow-confirm").click();
+  await flushAsyncTasks(4);
+  assert.equal(saveCount, 2);
+  assert.equal(
+    document.getElementById("companies").classList.contains("hidden"),
+    false,
+  );
+  harness.close();
+});
+
 test("index.html uses the Ant Design modal host for secondary confirmations", async () => {
   const harness = await bootRealIndexPage();
   const confirmationPromise = harness.window.showAntdConfirm({
@@ -627,6 +767,72 @@ test("history import tab owns test and clear actions and shows its selected stat
     document.querySelector("#settings-history-import #clear-all-data-button"),
   );
   assert.equal(document.querySelector("aside #seed-test-data-button"), null);
+
+  harness.close();
+});
+
+test("archive review uses an Ant Design navigation menu", async () => {
+  const harness = await bootRealIndexPage();
+  const { document } = harness.window;
+  loadScripts(harness.window, ["lib/antd.min.js"]);
+  const documentData = {
+    ok: true,
+    fileName: "客户甲AA26-001.xlsx",
+    sourceFileName: "客户甲AA26-001.xlsx",
+    sheetName: "Sheet1",
+    errors: [],
+    warnings: [],
+    metadata: {
+      orderNo: "AA26-001",
+      issueDate: "2026-08-01",
+      companyName: "测试公司",
+      companyContact: "",
+      companyPhone: "",
+      companyAddress: "",
+      customerName: "测试客户",
+      customerContact: "",
+      customerPhone: "",
+      customerAddress: "",
+      paymentTerms: "月结",
+    },
+    priceTaxMode: "exclusive",
+    calculatedTotal: 10,
+    items: [
+      {
+        productName: "测试商品",
+        specification: "",
+        unit: "个",
+        quantity: 1,
+        unitPrice: 10,
+        notes: "",
+      },
+    ],
+  };
+
+  harness.window.DeliveryNoteImport.showBatchReviewPage([
+    {
+      archiveName: "销售出货单.rar",
+      relativePath: "客户甲/送货单.xlsx",
+      fileName: "送货单.xlsx",
+      status: "pending",
+      documentCount: 1,
+      itemCount: 1,
+      documents: [documentData],
+      errors: [],
+      warnings: [],
+    },
+  ]);
+  await flushAsyncTasks(4);
+
+  assert.ok(
+    document.querySelector("#delivery-import-batch-menu .ant-menu-inline"),
+  );
+  assert.equal(
+    document.querySelector(
+      "#delivery-import-batch-menu .ant-menu-item-selected [data-batch-record-id]",
+    ).dataset.batchRecordId,
+    "batch-file-1",
+  );
 
   harness.close();
 });

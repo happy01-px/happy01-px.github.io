@@ -3,8 +3,10 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const { DatabaseSync } = require("node:sqlite");
+const { zipSync } = require("fflate");
 const { startPreviewServer } = require("./helpers/server-harness");
 const AppDataSchema = require("../js/modules/data-schema.js");
+const XLSX = require(path.join(__dirname, "..", "lib", "xlsx.full.min.js"));
 
 let server;
 
@@ -44,6 +46,77 @@ test("preview_server exposes the authoritative dataset snapshot", async () => {
   assert.equal(body.revision, 0);
   assert.ok(Array.isArray(body.dataset.products));
   assert.ok(Array.isArray(body.dataset.logs));
+});
+
+test("preview_server parses an uploaded archive into a per-file queue", async () => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([
+      ["示例供货公司"],
+      ["销售出库单 制单日期：20260926"],
+      ["地 址：示例园区 订货电话：010-00000000 13800000000联系人甲"],
+      ["收货单位：示例客户", "收货地址：示例地址"],
+      ["收货人：联系人乙 13800000001 结款方式：月结 NO:API26-001"],
+      ["序号", "产品名称", "规格", "单位", "出库数量", "单价", "金额"],
+      ["1", "测试商品", "", "kg", "2", "10", "20"],
+      ["合计金额：", "", "￥20.00", "", "大写", "RMB20"],
+    ]),
+    "Sheet1",
+  );
+  const workbookBytes = XLSX.write(workbook, {
+    type: "buffer",
+    bookType: "xlsx",
+  });
+  const archiveBytes = zipSync({
+    "月份/送货单.xlsx": new Uint8Array(workbookBytes),
+  });
+  const response = await fetch(`${server.baseUrl}/api/import/archive`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/octet-stream",
+      "X-Archive-Name": encodeURIComponent("送货单.zip"),
+    },
+    body: Buffer.from(archiveBytes),
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.success, true);
+  assert.equal(body.workbookCount, 1);
+  assert.equal(body.records[0].relativePath, "月份/送货单.xlsx");
+  assert.equal(body.records[0].documents[0].metadata.orderNo, "API26-001");
+
+  const progressResponse = await fetch(`${server.baseUrl}/api/import/archive`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/octet-stream",
+      "X-Archive-Name": encodeURIComponent("progress.zip"),
+      "X-Progress-Stream": "1",
+    },
+    body: Buffer.from(archiveBytes),
+  });
+  const events = (await progressResponse.text())
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+
+  assert.match(
+    progressResponse.headers.get("content-type"),
+    /application\/x-ndjson/,
+  );
+  assert.deepEqual(
+    events
+      .filter((event) => event.type === "progress")
+      .map((event) => event.phase),
+    ["extracting", "extracted", "parsing", "complete"],
+  );
+  const parsingEvent = events.find((event) => event.phase === "parsing");
+  assert.equal(parsingEvent.current, 1);
+  assert.equal(parsingEvent.total, 1);
+  assert.match(parsingEvent.fileName, /\.xlsx$/);
+  assert.equal(events.at(-1).type, "complete");
+  assert.equal(events.at(-1).result.workbookCount, 1);
 });
 
 test("preview_server migrates the latest legacy snapshot into SQLite once", async () => {

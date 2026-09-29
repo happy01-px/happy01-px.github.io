@@ -1037,6 +1037,13 @@ test("showViewCustomerModal updates customer id and related records", async () =
     harness.window.document.querySelector("#customers tbody").textContent,
     /VIP-009/,
   );
+  assert.equal(
+    harness.window.document
+      .getElementById("modal")
+      .classList.contains("hidden"),
+    true,
+    "saving the inline customer id should exit the detail dialog",
+  );
 
   harness.close();
 });

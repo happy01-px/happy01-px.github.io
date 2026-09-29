@@ -211,6 +211,31 @@ function initLogFilters() {
 // 导航、路由、图表和 bootstrap 已迁移到 js/app/*。
 
 let activeBusinessFormOrigin = "dashboard";
+let activeBusinessFormContext = null;
+
+function getBusinessFormSnapshot() {
+  const form = document.querySelector("#business-form-workflow-content form");
+  if (!form) return "";
+  return JSON.stringify(
+    Array.from(form.elements || []).map((field) => [
+      field.name || field.id || "",
+      field.type === "checkbox" || field.type === "radio"
+        ? Boolean(field.checked)
+        : String(field.value ?? ""),
+    ]),
+  );
+}
+
+function isBusinessFormDirty() {
+  return Boolean(
+    activeBusinessFormContext?.initialSnapshot &&
+    getBusinessFormSnapshot() !== activeBusinessFormContext.initialSnapshot,
+  );
+}
+
+function discardBusinessFormChanges() {
+  activeBusinessFormContext = null;
+}
 
 function prepareBusinessFormLayout(container) {
   const managedForms = container.querySelectorAll(
@@ -243,12 +268,53 @@ function prepareBusinessFormLayout(container) {
 }
 
 function closeBusinessFormPage() {
+  const section = document.getElementById("business-form-workflow");
   const target =
-    activeBusinessFormOrigin &&
+    section?.dataset.returnSection ||
+    (activeBusinessFormOrigin &&
     activeBusinessFormOrigin !== "business-form-workflow"
       ? activeBusinessFormOrigin
-      : "dashboard";
-  window.showSection?.(target);
+      : "dashboard");
+  const normalizedTarget =
+    target && target !== "business-form-workflow" ? target : "dashboard";
+  const context = activeBusinessFormContext;
+  window.showSection?.(normalizedTarget, { preserveScroll: true });
+  requestAnimationFrame(() => {
+    const main = document.querySelector("main");
+    if (main && Number.isFinite(context?.scrollTop)) {
+      main.scrollTop = context.scrollTop;
+    }
+    if (context?.recordId) {
+      const escapedId =
+        typeof window.CSS?.escape === "function"
+          ? window.CSS.escape(context.recordId)
+          : context.recordId.replace(/["\\]/g, "\\$&");
+      const row = document.querySelector(`[data-record-id="${escapedId}"]`);
+      row?.classList.add("app-return-row-highlight");
+      row?.scrollIntoView?.({ block: "nearest" });
+      window.setTimeout(
+        () => row?.classList.remove("app-return-row-highlight"),
+        1900,
+      );
+    }
+  });
+  activeBusinessFormContext = null;
+}
+
+async function requestCloseBusinessFormPage() {
+  if (!isBusinessFormDirty()) {
+    closeBusinessFormPage();
+    return true;
+  }
+  const confirmed = await window.showAntdConfirm?.({
+    title: "放弃未保存的修改？",
+    content: "当前表单还有未保存的内容，退出后这些修改不会保留。",
+    okText: "放弃修改",
+    cancelText: "继续填写",
+    okType: "danger",
+  });
+  if (confirmed) closeBusinessFormPage();
+  return Boolean(confirmed);
 }
 
 function configureBusinessFormPage(confirmText = "保存") {
@@ -262,17 +328,37 @@ function showBusinessFormPage(title, content, confirmCallback, options = {}) {
   const section = document.getElementById("business-form-workflow");
   const pageContent = document.getElementById("business-form-workflow-content");
   if (!section || !pageContent) {
-    showModal(title, content, confirmCallback);
+    showModal(title, content, confirmCallback, options);
     return false;
   }
 
   const visibleSection = window.getVisiblePageSectionId?.();
+  const focusedRow = document.activeElement?.closest?.("[data-record-id]");
+  const originMain = document.querySelector("main");
   activeBusinessFormOrigin =
     options.returnSection ||
     (visibleSection && visibleSection !== "business-form-workflow"
       ? visibleSection
       : activeBusinessFormOrigin);
+  section.dataset.returnSection = activeBusinessFormOrigin || "dashboard";
   section.dataset.navSection = options.navSection || activeBusinessFormOrigin;
+  if (
+    visibleSection !== "business-form-workflow" ||
+    !activeBusinessFormContext
+  ) {
+    activeBusinessFormContext = {
+      scrollTop: Number(originMain?.scrollTop || 0),
+      recordId:
+        options.returnRecordId ||
+        (focusedRow instanceof HTMLElement
+          ? focusedRow.dataset.recordId
+          : "") ||
+        "",
+      initialSnapshot: "",
+    };
+  } else {
+    activeBusinessFormContext.initialSnapshot = "";
+  }
 
   document.getElementById("business-form-workflow-title").textContent = title;
   document.getElementById("business-form-workflow-subtitle").textContent =
@@ -291,33 +377,54 @@ function showBusinessFormPage(title, content, confirmCallback, options = {}) {
   const confirmButton = document.getElementById(
     "business-form-workflow-confirm",
   );
+  const continueButton = document.getElementById(
+    "business-form-workflow-confirm-continue",
+  );
   if (cancelButton) {
     cancelButton.textContent = options.cancelText || "取消";
-    cancelButton.onclick = closeBusinessFormPage;
+    cancelButton.onclick = requestCloseBusinessFormPage;
   }
-  if (backButton) backButton.onclick = closeBusinessFormPage;
-  if (confirmButton) {
-    confirmButton.textContent = options.confirmText || "保存";
-    const confirmHandler = async () => {
-      const originalText = confirmButton.textContent;
-      try {
+  if (backButton) backButton.onclick = requestCloseBusinessFormPage;
+  const submitBusinessForm = async (button, shouldContinue) => {
+    const originalText = button.textContent;
+    try {
+      button.disabled = true;
+      section.setAttribute("aria-busy", "true");
+      if (confirmButton && confirmButton !== button)
         confirmButton.disabled = true;
-        const result = await confirmCallback?.();
-        if (result === false) return false;
+      if (continueButton && continueButton !== button)
+        continueButton.disabled = true;
+      const result = await confirmCallback?.();
+      if (result === false) return false;
+      if (shouldContinue) {
+        options.onContinue?.();
+      } else {
         closeBusinessFormPage();
-        return true;
-      } catch (error) {
-        console.error("Business form submission failed:", error);
-        alert("操作失败，请重试。");
-        return false;
-      } finally {
-        if (confirmButton.onclick === confirmHandler) {
-          confirmButton.disabled = false;
-          confirmButton.textContent = originalText;
-        }
       }
-    };
-    confirmButton.onclick = confirmHandler;
+      return true;
+    } catch (error) {
+      console.error("Business form submission failed:", error);
+      alert("操作失败，请重试。");
+      return false;
+    } finally {
+      section.removeAttribute("aria-busy");
+      button.disabled = false;
+      button.textContent = originalText;
+      if (confirmButton) confirmButton.disabled = false;
+      if (continueButton) continueButton.disabled = false;
+    }
+  };
+  if (confirmButton) {
+    confirmButton.textContent = options.confirmText || "保存并返回";
+    confirmButton.onclick = () => submitBusinessForm(confirmButton, false);
+  }
+  if (continueButton) {
+    continueButton.hidden = !options.allowContinue;
+    continueButton.classList.toggle("hidden", !options.allowContinue);
+    continueButton.textContent = options.continueText || "保存并继续新增";
+    continueButton.onclick = options.allowContinue
+      ? () => submitBusinessForm(continueButton, true)
+      : null;
   }
 
   window.showSection?.("business-form-workflow", {
@@ -325,18 +432,68 @@ function showBusinessFormPage(title, content, confirmCallback, options = {}) {
   });
   const main = document.querySelector("main");
   if (main && typeof main.scrollTo === "function") main.scrollTo(0, 0);
+  window.setTimeout(() => {
+    if (activeBusinessFormContext) {
+      activeBusinessFormContext.initialSnapshot = getBusinessFormSnapshot();
+    }
+    pageContent
+      .querySelector(
+        "input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled])",
+      )
+      ?.focus?.({ preventScroll: true });
+  }, 0);
   return true;
 }
 
 window.showBusinessFormPage = showBusinessFormPage;
 window.configureBusinessFormPage = configureBusinessFormPage;
 window.closeBusinessFormPage = closeBusinessFormPage;
+window.requestCloseBusinessFormPage = requestCloseBusinessFormPage;
+window.addEventListener("beforeunload", (event) => {
+  if (
+    !isBusinessFormDirty() &&
+    !window.isBillsCreateDirty?.() &&
+    !window.hasUnsavedSalesOrder?.()
+  ) {
+    return;
+  }
+  event.preventDefault();
+  event.returnValue = "";
+});
+
+function requestAppNavigation(callback) {
+  const hasUnsavedChanges =
+    isBusinessFormDirty() ||
+    window.isBillsCreateDirty?.() ||
+    window.hasUnsavedSalesOrder?.();
+  if (!hasUnsavedChanges) return true;
+  Promise.resolve(
+    window.showAntdConfirm?.({
+      title: "放弃未保存的修改？",
+      content: "当前页面还有未保存内容，离开后这些修改不会保留。",
+      okText: "放弃并离开",
+      cancelText: "继续填写",
+      okType: "danger",
+    }),
+  ).then((confirmed) => {
+    if (!confirmed) return;
+    discardBusinessFormChanges();
+    window.discardBillsCreateChanges?.();
+    window.discardSalesOrderChanges?.();
+    callback?.();
+  });
+  return false;
+}
+
+window.requestAppNavigation = requestAppNavigation;
+window.discardBusinessFormChanges = discardBusinessFormChanges;
 
 // 显示模态框
-function showModal(title, content, confirmCallback) {
+function showModal(title, content, confirmCallback, options = {}) {
   const modal = document.getElementById("modal");
   const modalPanel = document.getElementById("modal-panel");
   const modalContent = document.getElementById("modal-content");
+  document.getElementById("delivery-note-create-bill")?.remove();
 
   if (modalPanel) {
     modalPanel.className =
@@ -398,34 +555,98 @@ function showModal(title, content, confirmCallback) {
 
   // 设置确认按钮回调
   const confirmBtn = document.getElementById("modal-confirm");
+  const continueBtn = document.getElementById("modal-confirm-continue");
   const cancelBtn = document.getElementById("modal-cancel");
   const closeBtn = document.getElementById("close-modal");
   const hideModal = () => modal.classList.add("hidden");
+  const modalForm = modalContent.querySelector("form");
+  const getModalSnapshot = () =>
+    modalForm
+      ? JSON.stringify(
+          Array.from(modalForm.elements || []).map((field) => [
+            field.name || field.id || "",
+            field.type === "checkbox" || field.type === "radio"
+              ? Boolean(field.checked)
+              : String(field.value ?? ""),
+          ]),
+        )
+      : "";
+  let initialModalSnapshot = "";
+  window.setTimeout(() => {
+    initialModalSnapshot = getModalSnapshot();
+  }, 0);
+  const requestHideModal = async () => {
+    if (
+      !initialModalSnapshot ||
+      getModalSnapshot() === initialModalSnapshot ||
+      typeof window.showAntdConfirm !== "function"
+    ) {
+      hideModal();
+      return true;
+    }
+    const confirmed = await window.showAntdConfirm({
+      title: "放弃未保存的修改？",
+      content: "当前窗口还有未保存的内容，关闭后这些修改不会保留。",
+      okText: "放弃修改",
+      cancelText: "继续填写",
+      okType: "danger",
+    });
+    if (confirmed) hideModal();
+    return Boolean(confirmed);
+  };
   if (confirmBtn) {
-    confirmBtn.textContent = "确认";
+    confirmBtn.textContent = options.confirmText || "确认";
+  }
+  if (continueBtn) {
+    continueBtn.hidden = !options.allowContinue;
+    continueBtn.classList.toggle("hidden", !options.allowContinue);
+    continueBtn.textContent = options.continueText || "保存并继续新增";
   }
   if (cancelBtn) {
     cancelBtn.textContent = "取消";
     cancelBtn.classList.remove("hidden");
-    cancelBtn.onclick = hideModal;
+    cancelBtn.onclick = requestHideModal;
   }
-  if (closeBtn) closeBtn.onclick = hideModal;
-  // Remove old event listener by cloning node or just setting onclick (simpler for now)
-  confirmBtn.onclick = async function () {
-    const originalText = confirmBtn.textContent;
+  if (closeBtn) closeBtn.onclick = requestHideModal;
+  const submitModal = async (button, shouldContinue) => {
+    const originalText = button.textContent;
     try {
-      confirmBtn.disabled = true;
+      button.disabled = true;
+      if (confirmBtn && confirmBtn !== button) confirmBtn.disabled = true;
+      if (continueBtn && continueBtn !== button) continueBtn.disabled = true;
       if (typeof confirmCallback === "function") {
         const result = await confirmCallback();
-        if (result === false) return; // 如果回调返回false，则阻止关闭
+        if (result === false) return false;
       }
-      hideModal();
+      if (shouldContinue) {
+        options.onContinue?.();
+      } else {
+        hideModal();
+      }
+      return true;
     } catch (error) {
       console.error("Modal confirmation failed:", error);
       alert("操作失败，请重试。");
+      return false;
     } finally {
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = originalText;
+      button.disabled = false;
+      button.textContent = originalText;
+      if (confirmBtn) confirmBtn.disabled = false;
+      if (continueBtn) continueBtn.disabled = false;
     }
   };
+  if (confirmBtn) {
+    confirmBtn.onclick = () => submitModal(confirmBtn, false);
+  }
+  if (continueBtn) {
+    continueBtn.onclick = options.allowContinue
+      ? () => submitModal(continueBtn, true)
+      : null;
+  }
+  window.setTimeout(() => {
+    const firstField = modalForm?.querySelector(
+      "input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled])",
+    );
+    firstField?.focus?.({ preventScroll: true });
+  }, 0);
 }

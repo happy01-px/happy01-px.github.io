@@ -31,12 +31,15 @@
       <!-- 侧边栏 -->
       <aside
         id="desktop-sidebar"
+        aria-hidden="false"
         class="w-48 bg-dark text-white hidden md:flex flex-col"
       >
         <div
           class="h-16 flex items-center justify-center border-b border-gray-700 px-3"
         >
-          <h1 class="text-xl font-bold text-center">库存管理系统</h1>
+          <h1 class="text-xl font-bold text-center">
+            <span>库存管理系统</span>
+          </h1>
         </div>
         <nav class="desktop-antd-menu flex-1 overflow-y-auto py-4">
           <div id="desktop-sidebar-menu" class="px-2"></div>
@@ -190,6 +193,11 @@
               </button>
               <button
                 id="sidebar-toggle-button"
+                type="button"
+                aria-controls="desktop-sidebar"
+                aria-expanded="true"
+                aria-label="收起侧边栏"
+                title="收起侧边栏"
                 class="hidden md:inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all-300"
               >
                 <i class="fa fa-bars text-lg"></i>
@@ -706,41 +714,52 @@
               class="data-table-card bg-white rounded-lg shadow-card overflow-hidden"
             >
               <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 table-fixed">
+                <table
+                  class="inventory-data-table min-w-full divide-y divide-gray-200 table-fixed"
+                >
+                  <colgroup>
+                    <col style="width: 20%" />
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                    <col style="width: 260px" />
+                    <col style="width: 136px" />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4 min-w-[220px]"
+                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         商品名称
                       </th>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32"
+                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         分类
                       </th>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32"
+                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         当前库存
                       </th>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24"
+                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         状态
                       </th>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32"
+                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         供应商
                       </th>
                       <th
-                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-56"
+                        class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         创建与更新
                       </th>
                       <th
-                        class="table-action-header px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48"
+                        class="table-action-header px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         操作
                       </th>
@@ -901,6 +920,13 @@
                   class="customer-price-pair-actions flex flex-wrap justify-end gap-2"
                   id="customer-price-pair-actions"
                 >
+                  <button
+                    id="reuse-customer-price-pair"
+                    type="button"
+                    class="hidden rounded-lg border border-purple-200 bg-purple-50 px-4 py-2.5 font-medium text-purple-700 transition hover:border-primary hover:text-primary"
+                  >
+                    使用上次组合
+                  </button>
                   <button
                     id="reset-customer-price-pair"
                     type="button"
@@ -1623,13 +1649,13 @@
                   class="business-data-table business-data-table--supplier min-w-full divide-y divide-gray-200"
                 >
                   <colgroup>
-                    <col style="width: 20%" />
-                    <col style="width: 9%" />
-                    <col style="width: 12%" />
-                    <col style="width: 12%" />
+                    <col style="width: 23%" />
+                    <col style="width: 10%" />
+                    <col style="width: 13%" />
+                    <col style="width: 13%" />
                     <col style="width: 7%" />
                     <col style="width: 24%" />
-                    <col style="width: 16%" />
+                    <col style="width: 176px" />
                   </colgroup>
                   <thead>
                     <tr>
@@ -1711,13 +1737,13 @@
                   class="business-data-table business-data-table--company min-w-full divide-y divide-gray-200"
                 >
                   <colgroup>
-                    <col style="width: 18%" />
+                    <col style="width: 20%" />
                     <col style="width: 8%" />
-                    <col style="width: 11%" />
-                    <col style="width: 18%" />
+                    <col style="width: 12%" />
+                    <col style="width: 20%" />
                     <col style="width: 7%" />
                     <col style="width: 23%" />
-                    <col style="width: 15%" />
+                    <col style="width: 136px" />
                   </colgroup>
                   <thead>
                     <tr>
@@ -1943,15 +1969,15 @@
                   class="business-data-table business-data-table--customer min-w-full divide-y divide-gray-200"
                 >
                   <colgroup>
-                    <col style="width: 7%" />
-                    <col style="width: 16%" />
                     <col style="width: 6%" />
-                    <col style="width: 9%" />
                     <col style="width: 15%" />
                     <col style="width: 6%" />
-                    <col style="width: 6%" />
-                    <col style="width: 18%" />
-                    <col style="width: 17%" />
+                    <col style="width: 8%" />
+                    <col style="width: 14%" />
+                    <col style="width: 5%" />
+                    <col style="width: 5%" />
+                    <col style="width: 21%" />
+                    <col style="width: 230px" />
                   </colgroup>
                   <thead>
                     <tr>
@@ -3194,16 +3220,17 @@
                     class="bg-primary hover:bg-primary-dark text-white px-5 py-2.5 rounded-lg flex items-center transition-all-300"
                   >
                     <i class="fa fa-file-excel-o mr-2"></i>
-                    选择历史送货单 / 对账单 Excel
+                    选择 Excel 或整包导入 RAR / ZIP
                   </button>
                   <span class="text-xs text-gray-500"
-                    >支持 .xlsx / .xls，可一次选择多个文件</span
+                    >压缩包会按内部 Excel
+                    文件建立核对队列，每个文件确认后才允许导入</span
                   >
                   <input
                     id="historical-business-import-input"
                     class="hidden"
                     type="file"
-                    accept=".xlsx,.xls"
+                    accept=".xlsx,.xls,.rar,.zip"
                     multiple
                   />
                 </div>
@@ -3276,11 +3303,18 @@
                   取消
                 </button>
                 <button
+                  id="business-form-workflow-confirm-continue"
+                  type="button"
+                  class="hidden rounded-lg border border-primary bg-white px-5 py-2.5 font-medium text-primary transition-colors hover:bg-purple-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  保存并继续新增
+                </button>
+                <button
                   id="business-form-workflow-confirm"
                   type="button"
                   class="rounded-lg bg-primary px-5 py-2.5 font-medium text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  保存
+                  保存并返回
                 </button>
               </div>
             </div>
@@ -3339,6 +3373,13 @@
                   class="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-gray-700 transition-colors hover:border-primary hover:text-primary"
                 >
                   取消
+                </button>
+                <button
+                  id="delivery-import-workflow-partial"
+                  type="button"
+                  class="hidden rounded-lg border border-primary bg-white px-5 py-2.5 font-medium text-primary transition-colors hover:bg-purple-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  暂时导入已确认文件
                 </button>
                 <button
                   id="delivery-import-workflow-primary"
@@ -3626,6 +3667,13 @@
             class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg mr-2 transition-all-300"
           >
             取消
+          </button>
+          <button
+            id="modal-confirm-continue"
+            type="button"
+            class="hidden bg-white hover:bg-purple-50 text-primary border border-primary px-4 py-2 rounded-lg mr-2 transition-all-300 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            保存并继续新增
           </button>
           <button
             id="modal-confirm"

@@ -203,6 +203,15 @@
       parseBillsRouteHash(global.location.hash) || state.currentBillsRoute;
     const targetRouteState = buildBillsRouteState(route, config);
 
+    if (
+      state.currentBillsRoute?.type === "list" &&
+      targetRouteState?.type !== "list"
+    ) {
+      state.listScrollTop = Number(
+        document.querySelector("main")?.scrollTop || 0,
+      );
+    }
+
     if (currentRouteState && targetRouteState) {
       const currentKey = getBillsRouteStateKey(currentRouteState);
       const targetKey = getBillsRouteStateKey(targetRouteState);
@@ -225,6 +234,26 @@
       initBillFiltersOverride();
       updateBillsTableOverride();
       showBillsSection("bills", "#/bills");
+      global.requestAnimationFrame?.(() => {
+        const main = document.querySelector("main");
+        if (main && Number.isFinite(state.listScrollTop)) {
+          main.scrollTop = state.listScrollTop;
+        }
+        if (!state.listReturnRecordId) return;
+        const escapedId =
+          typeof global.CSS?.escape === "function"
+            ? global.CSS.escape(state.listReturnRecordId)
+            : String(state.listReturnRecordId).replace(/["\\]/g, "\\$&");
+        const row = document.querySelector(
+          `#bills-table-body [data-record-id="${escapedId}"]`,
+        );
+        row?.classList.add("app-return-row-highlight");
+        row?.scrollIntoView?.({ block: "nearest" });
+        global.setTimeout(
+          () => row?.classList.remove("app-return-row-highlight"),
+          1900,
+        );
+      });
       return;
     }
 
@@ -761,6 +790,54 @@
     };
   }
 
+  function getCreateDraftSnapshot(draft) {
+    const value = draft || {};
+    return JSON.stringify({
+      statementType: value.statementType || "",
+      companyId: value.companyId || "",
+      partyId: value.partyId || "",
+      statementDate: value.statementDate || "",
+      periodStart: value.periodStart || "",
+      periodEnd: value.periodEnd || "",
+      taxRate: String(value.taxRate || ""),
+      includeArrears: Boolean(value.includeArrears),
+    });
+  }
+
+  function isBillsCreateDirty() {
+    if (state.currentBillsRoute?.type !== "create") return false;
+    if (!state.createInitialDraftSnapshot) return false;
+    if (!document.getElementById("bill-create-type")) return false;
+    return (
+      getCreateDraftSnapshot(getCreateDraftFromModal()) !==
+      state.createInitialDraftSnapshot
+    );
+  }
+
+  function discardBillsCreateChanges() {
+    state.createInitialDraftSnapshot = "";
+    state.pendingDraft = null;
+  }
+
+  async function requestBillsCreateExit(callback) {
+    if (!isBillsCreateDirty()) {
+      discardBillsCreateChanges();
+      callback?.();
+      return true;
+    }
+    const confirmed = await global.showAntdConfirm?.({
+      title: "放弃未保存的对账单？",
+      content: "当前对账条件还没有生成对账单，离开后本次填写不会保留。",
+      okText: "放弃并离开",
+      cancelText: "继续填写",
+      okType: "danger",
+    });
+    if (!confirmed) return false;
+    discardBillsCreateChanges();
+    callback?.();
+    return true;
+  }
+
   function openDuplicatePromptModal(formData, duplicate) {
     openBillsModal({
       title: "发现重复对账单",
@@ -885,7 +962,299 @@
 
   function openCreateBillModal(draft) {
     state.pendingDraft = buildCreateBillDraft(draft);
+    if (state.currentBillsRoute?.type !== "create") {
+      state.createInitialDraftSnapshot = getCreateDraftSnapshot(
+        state.pendingDraft,
+      );
+    }
     navigateToBillsRoute({ type: "create" }, { draft: state.pendingDraft });
+  }
+
+  function buildContextBillDraft(statementType, partyId) {
+    const today = formatBillDateOnly(new Date());
+    const matchingNotes = global
+      .normalizeList(global.mockData?.deliveryNotes)
+      .filter((note) =>
+        statementType === "customer"
+          ? note.type === "sales" && note.customerId === partyId
+          : note.type === "purchase" && note.supplierId === partyId,
+      );
+    const matchingInbound =
+      statementType === "supplier"
+        ? global
+            .normalizeList(global.stockMovementData)
+            .filter(
+              (record) =>
+                record.type === "inbound" && record.supplierId === partyId,
+            )
+        : [];
+    const sources = matchingNotes
+      .map((note) => ({
+        companyId: note.companyId,
+        date: note.deliveryDate || note.expectedDate || note.createdAt,
+      }))
+      .concat(
+        matchingInbound.map((record) => ({
+          companyId: record.companyId,
+          date: record.createdAt || record.updatedAt,
+        })),
+      )
+      .filter((source) => source.date)
+      .sort(
+        (left, right) =>
+          new Date(right.date).getTime() - new Date(left.date).getTime(),
+      );
+    const sourceDate = sources[0]?.date || today;
+    const parsedDate = new Date(sourceDate);
+    const periodDate = Number.isNaN(parsedDate.getTime())
+      ? new Date()
+      : parsedDate;
+    const year = periodDate.getFullYear();
+    const month = periodDate.getMonth();
+    const periodStart = formatBillDateOnly(new Date(year, month, 1));
+    const periodEnd = formatBillDateOnly(new Date(year, month + 1, 0));
+    const activeCompanies = global
+      .normalizeList(global.mockData?.companies)
+      .filter((company) => company.status !== "inactive");
+    const companyId =
+      sources.find((source) =>
+        activeCompanies.some((company) => company.id === source.companyId),
+      )?.companyId ||
+      (activeCompanies.length === 1 ? activeCompanies[0].id : "");
+    const customer = global
+      .normalizeList(global.mockData?.customers)
+      .find((record) => record.id === partyId);
+    const taxRate =
+      statementType === "customer"
+        ? Number(customer?.taxRateCoefficient) ||
+          (Number(customer?.defaultTaxRate) > 0
+            ? 1 + Number(customer.defaultTaxRate)
+            : 1)
+        : 1;
+    return {
+      statementType,
+      companyId,
+      partyId,
+      statementDate: today,
+      periodStart,
+      periodEnd,
+      taxRate: String(taxRate),
+      includeArrears: false,
+    };
+  }
+
+  function openCreateBillForCustomer(customerId) {
+    state.activeTab = "customer";
+    openCreateBillModal(buildContextBillDraft("customer", customerId));
+    global.showAntdMessage?.(
+      "info",
+      "已带入客户及最近业务账期，请核对公司、账期和税率后生成",
+    );
+  }
+
+  function openCreateBillForSupplier(supplierId) {
+    state.activeTab = "supplier";
+    openCreateBillModal(buildContextBillDraft("supplier", supplierId));
+    global.showAntdMessage?.(
+      "info",
+      "已带入供应商及最近业务账期，请核对公司和账期后生成",
+    );
+  }
+
+  function openCreateBillFromSource(source) {
+    const statementType =
+      source?.type === "purchase" || source?.supplierId
+        ? "supplier"
+        : "customer";
+    const partyId =
+      statementType === "supplier" ? source?.supplierId : source?.customerId;
+    if (!partyId) {
+      global.showAntdMessage?.(
+        "warning",
+        "当前单据缺少对账对象，无法生成对账单",
+      );
+      return false;
+    }
+    const draft = buildContextBillDraft(statementType, partyId);
+    const sourceDate = new Date(
+      source.deliveryDate || source.issueDate || source.createdAt || new Date(),
+    );
+    if (!Number.isNaN(sourceDate.getTime())) {
+      draft.periodStart = formatBillDateOnly(
+        new Date(sourceDate.getFullYear(), sourceDate.getMonth(), 1),
+      );
+      draft.periodEnd = formatBillDateOnly(
+        new Date(sourceDate.getFullYear(), sourceDate.getMonth() + 1, 0),
+      );
+    }
+    if (source.companyId) draft.companyId = source.companyId;
+    state.activeTab = statementType;
+    openCreateBillModal(draft);
+    global.showAntdMessage?.(
+      "info",
+      "已按该单据带入账期；生成时会合并账期内尚未对账的同对象单据",
+    );
+    return true;
+  }
+
+  function getBulkUnbilledGroups(statementType) {
+    const activeStatements = getStatementRecords().filter(
+      (record) => normalizeBillStatus(record.status) !== "cancelled",
+    );
+    const occupiedIds = new Set(
+      activeStatements.flatMap((record) =>
+        global
+          .normalizeList(record.sourceDocumentIds)
+          .map((id) => String(id || "").trim())
+          .filter(Boolean),
+      ),
+    );
+    const activeCompanies = global
+      .normalizeList(global.mockData?.companies)
+      .filter((record) => record.status !== "inactive");
+    const defaultCompanyId =
+      activeCompanies.length === 1 ? activeCompanies[0].id : "";
+    const sources =
+      statementType === "supplier"
+        ? global
+            .normalizeList(global.stockMovementData)
+            .filter((record) => record.type === "inbound")
+            .map((record) => ({
+              id: record.id,
+              companyId: record.companyId || defaultCompanyId,
+              partyId: record.supplierId,
+              date: record.createdAt || record.updatedAt,
+            }))
+        : global
+            .normalizeList(global.mockData?.deliveryNotes)
+            .filter(
+              (record) =>
+                (record.type === "sales" || record.customerId) &&
+                !["draft", "voided"].includes(record.status),
+            )
+            .map((record) => ({
+              id: record.id,
+              companyId: record.companyId || defaultCompanyId,
+              partyId: record.customerId,
+              date: record.deliveryDate || record.issueDate || record.createdAt,
+            }));
+    const groups = new Map();
+    sources.forEach((source) => {
+      const id = String(source.id || "").trim();
+      const date = formatBillDateOnly(source.date);
+      if (
+        !id ||
+        occupiedIds.has(id) ||
+        !source.companyId ||
+        !source.partyId ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(date)
+      ) {
+        return;
+      }
+      const month = date.slice(0, 7);
+      const key = `${source.companyId}::${source.partyId}::${month}`;
+      if (!groups.has(key)) {
+        const monthDate = new Date(`${month}-01T00:00:00`);
+        groups.set(key, {
+          statementType,
+          companyId: source.companyId,
+          partyId: source.partyId,
+          statementDate: formatBillDateOnly(new Date()),
+          periodStart: `${month}-01`,
+          periodEnd: formatBillDateOnly(
+            new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0),
+          ),
+          sourceCount: 0,
+        });
+      }
+      groups.get(key).sourceCount += 1;
+    });
+    return Array.from(groups.values());
+  }
+
+  async function bulkCreateUnbilledStatements() {
+    const statementType =
+      state.activeTab === "supplier" ? "supplier" : "customer";
+    const groups = getBulkUnbilledGroups(statementType);
+    if (!groups.length) {
+      global.showAntdMessage?.("info", "当前没有可批量生成的未对账账期。");
+      return false;
+    }
+    const sourceCount = groups.reduce(
+      (sum, group) => sum + group.sourceCount,
+      0,
+    );
+    const confirmed = await global.showAntdConfirm?.({
+      title: `批量生成 ${groups.length} 张对账单？`,
+      content: `将按公司、${statementType === "supplier" ? "供应商" : "客户"}和月份分组，处理 ${sourceCount} 张尚未对账的来源单据。`,
+      okText: "确认批量生成",
+      cancelText: "取消",
+      okType: "primary",
+    });
+    if (!confirmed) return false;
+
+    const previousBills = global.normalizeList(global.mockData?.bills).slice();
+    const stagedLogs = [];
+    const created = [];
+    groups.forEach((group) => {
+      const party = global
+        .normalizeList(
+          statementType === "supplier"
+            ? global.mockData?.suppliers
+            : global.mockData?.customers,
+        )
+        .find((record) => record.id === group.partyId);
+      const taxRate =
+        statementType === "customer"
+          ? Number(party?.taxRateCoefficient) ||
+            (Number(party?.defaultTaxRate) > 0
+              ? 1 + Number(party.defaultTaxRate)
+              : 1)
+          : 1;
+      const formData = {
+        ...group,
+        taxRate: String(taxRate),
+        includeArrears: false,
+      };
+      const statement =
+        statementType === "supplier"
+          ? buildSupplierStatementFromForm(formData)
+          : buildCustomerStatementFromForm(formData);
+      if (!statement?.sourceDocumentIds?.length || !statement.details?.length) {
+        return;
+      }
+      global.mockData.bills.push(statement);
+      created.push(statement);
+      const logs = global.stageAuditLogs?.({
+        actionType: "add",
+        objectType: "statement",
+        objectName: statement.id,
+        details: `批量生成${getBillsMeta(statementType).label}：${statement.partyNameSnapshot} / ${formatStatementPeriod(statement.periodStart, statement.periodEnd)}`,
+      });
+      if (Array.isArray(logs)) stagedLogs.push(...logs);
+    });
+    if (!created.length) {
+      global.mockData.bills = previousBills;
+      global.showAntdMessage?.("info", "未找到可写入的未对账明细。");
+      return false;
+    }
+    const saved =
+      typeof global.saveMockData === "function"
+        ? await global.saveMockData()
+        : true;
+    if (saved === false) {
+      global.mockData.bills = previousBills;
+      global.rollbackStagedAuditLogs?.(stagedLogs);
+      global.showAntdMessage?.("error", "批量生成失败，本批数据已全部回滚。");
+      return false;
+    }
+    global.finalizeStagedAuditLogs?.(stagedLogs);
+    updateBillsTableOverride();
+    global.showAntdMessage?.(
+      "success",
+      `已批量生成 ${created.length} 张对账单，共纳入 ${created.reduce((sum, record) => sum + Number(record.documentCount || 0), 0)} 张来源单据。`,
+    );
+    return true;
   }
 
   function buildBillsRouteIntroCard(iconClass, title, description) {
@@ -904,7 +1273,7 @@
         `;
   }
 
-  async function createStatementFromDraft(formData) {
+  async function createStatementFromDraft(formData, options = {}) {
     const statement =
       formData.statementType === "supplier"
         ? buildSupplierStatementFromForm(formData)
@@ -924,8 +1293,16 @@
     }
     const saved = await persistStatement(statement);
     if (!saved) return false;
-    state.pendingDraft = null;
-    openStatementViewModal(statement);
+    discardBillsCreateChanges();
+    if (options.continueCreate) {
+      global.showAntdMessage?.("success", "对账单已生成，可以继续新增下一张。");
+      openCreateBillModal({
+        statementType: formData.statementType,
+        companyId: formData.companyId,
+      });
+    } else {
+      openStatementViewModal(statement);
+    }
     return true;
   }
 
@@ -1702,6 +2079,9 @@
           : "对账对象";
 
     state.pendingDraft = currentDraft;
+    if (!state.createInitialDraftSnapshot) {
+      state.createInitialDraftSnapshot = getCreateDraftSnapshot(currentDraft);
+    }
 
     section.innerHTML = `
             <div class="bills-route-shell">
@@ -1766,7 +2146,8 @@
                         <div class="bills-route-note">如果当前条件下已经存在相同账期的对账单，系统会优先提示你查看已有对账单，避免重复生成。</div>
                         <div class="bills-route-actions justify-end">
                             <button id="bill-create-cancel-btn" type="button" class="bills-outline-button">取消</button>
-                            <button id="bill-create-submit-btn" type="button" class="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg transition-all-300">生成对账单</button>
+                            <button id="bill-create-continue-btn" type="button" class="bills-outline-button">生成并继续新增</button>
+                            <button id="bill-create-submit-btn" type="button" class="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg transition-all-300">生成并查看</button>
                         </div>
                     </div>
                 </div>
@@ -1778,34 +2159,52 @@
 
     document
       .getElementById("bill-create-up-btn")
-      ?.addEventListener("click", () => {
-        const previousRoute = state.previousBillsRoute;
-        if (previousRoute?.type === "view" && previousRoute.statementId) {
-          navigateToBillsRoute(
-            { type: "view", statementId: previousRoute.statementId },
-            { returnTab: previousRoute.returnTab || listTab },
-          );
-          return;
-        }
+      ?.addEventListener("click", () =>
+        requestBillsCreateExit(() => {
+          const previousRoute = state.previousBillsRoute;
+          if (previousRoute?.type === "view" && previousRoute.statementId) {
+            navigateToBillsRoute(
+              { type: "view", statementId: previousRoute.statementId },
+              { returnTab: previousRoute.returnTab || listTab },
+            );
+            return;
+          }
 
-        if (previousRoute?.type === "list") {
-          navigateToBillsRoute(
-            { type: "list", tab: previousRoute.tab || listTab },
-            { tab: previousRoute.tab || listTab },
-          );
-          return;
-        }
+          if (previousRoute?.type === "list") {
+            navigateToBillsRoute(
+              { type: "list", tab: previousRoute.tab || listTab },
+              { tab: previousRoute.tab || listTab },
+            );
+            return;
+          }
 
-        navigateToBillsRoute({ type: "list", tab: listTab }, { tab: listTab });
-      });
+          navigateToBillsRoute(
+            { type: "list", tab: listTab },
+            { tab: listTab },
+          );
+        }),
+      );
     document
       .getElementById("bill-create-cancel-btn")
       ?.addEventListener("click", () =>
-        navigateToBillsRoute({ type: "list" }, { tab: listTab }),
+        requestBillsCreateExit(() =>
+          navigateToBillsRoute({ type: "list" }, { tab: listTab }),
+        ),
       );
+    document
+      .getElementById("bill-create-continue-btn")
+      ?.addEventListener("click", () => {
+        const submit = document.getElementById("bill-create-submit-btn");
+        if (!submit) return;
+        submit.dataset.continueCreate = "true";
+        submit.click();
+      });
     document
       .getElementById("bill-create-submit-btn")
       ?.addEventListener("click", async () => {
+        const submitButton = document.getElementById("bill-create-submit-btn");
+        const continueCreate = submitButton?.dataset.continueCreate === "true";
+        if (submitButton) delete submitButton.dataset.continueCreate;
         const formData = getCreateDraftFromModal();
         state.pendingDraft = formData;
 
@@ -1818,18 +2217,63 @@
           !formData.periodEnd ||
           !formData.taxRate
         ) {
-          alert("请先完整选择对账类型、公司、对象、对账日期、账期和税率系数");
+          const missingField = [
+            [
+              formData.statementType,
+              "#bill-create-type-container",
+              "请选择对账类型",
+            ],
+            [
+              formData.companyId,
+              "#bill-create-company-container",
+              "请选择我方公司",
+            ],
+            [
+              formData.partyId,
+              "#bill-create-party-container",
+              `请选择${partyLabel}`,
+            ],
+            [
+              formData.statementDate,
+              "#bill-create-date-container",
+              "请选择对账日期",
+            ],
+            [
+              formData.periodStart,
+              "#bill-create-period-start-container",
+              "请选择周期开始日期",
+            ],
+            [
+              formData.periodEnd,
+              "#bill-create-period-end-container",
+              "请选择周期结束日期",
+            ],
+            [formData.taxRate, "#bill-create-tax-rate", "请输入税率系数"],
+          ].find(([value]) => !value);
+          global.reportFormError?.(
+            missingField?.[2] || "请完整填写对账信息",
+            missingField?.[1],
+            section,
+          );
           return;
         }
 
         const taxRate = Number(formData.taxRate);
         if (!Number.isFinite(taxRate) || taxRate < 1) {
-          alert("请输入有效的税率系数");
+          global.reportFormError?.(
+            "请输入有效的税率系数",
+            "#bill-create-tax-rate",
+            section,
+          );
           return;
         }
 
         if (formData.periodStart > formData.periodEnd) {
-          alert("周期开始不能晚于周期结束");
+          global.reportFormError?.(
+            "周期开始不能晚于周期结束",
+            "#bill-create-period-start-container",
+            section,
+          );
           return;
         }
 
@@ -1840,7 +2284,7 @@
           return;
         }
 
-        await createStatementFromDraft(formData);
+        await createStatementFromDraft(formData, { continueCreate });
       });
   }
 
@@ -1850,6 +2294,19 @@
     if (!tbody) return;
 
     tbody.addEventListener("click", (event) => {
+      const viewLink = event.target.closest('a[href^="#/bills/view/"]');
+      if (viewLink) {
+        state.listScrollTop = Number(
+          document.querySelector("main")?.scrollTop || 0,
+        );
+        state.listReturnRecordId = decodeURIComponent(
+          String(viewLink.getAttribute("href") || "").replace(
+            "#/bills/view/",
+            "",
+          ),
+        );
+        return;
+      }
       const button = event.target.closest("button[data-action]");
       if (!button) return;
       const record = getStatementRecords().find(
@@ -1913,6 +2370,11 @@
       openCreateBillModal();
     });
     state.addButtonBound = true;
+    const bulkButton = document.getElementById("bulk-create-bills-btn");
+    if (bulkButton && !bulkButton.dataset.bound) {
+      bulkButton.dataset.bound = "true";
+      bulkButton.addEventListener("click", bulkCreateUnbilledStatements);
+    }
   }
 
   async function initBillsModule() {
@@ -1936,6 +2398,12 @@
     exportStatementAsExcel,
     exportStatementAsPdf,
   });
+  global.openCreateBillForCustomer = openCreateBillForCustomer;
+  global.openCreateBillForSupplier = openCreateBillForSupplier;
+  global.openCreateBillFromSource = openCreateBillFromSource;
+  global.bulkCreateUnbilledStatements = bulkCreateUnbilledStatements;
+  global.isBillsCreateDirty = isBillsCreateDirty;
+  global.discardBillsCreateChanges = discardBillsCreateChanges;
 
   document.addEventListener("DOMContentLoaded", function () {
     initBillsModule().catch((error) => {

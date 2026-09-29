@@ -111,6 +111,20 @@
   function showSection(sectionId, options = {}) {
     console.log("Showing section:", sectionId);
     const config = options || {};
+    const visibleSectionId = document.querySelector(
+      ".page-section:not(.hidden)",
+    )?.id;
+    if (
+      !config.skipUnsavedCheck &&
+      visibleSectionId &&
+      visibleSectionId !== sectionId &&
+      typeof global.requestAppNavigation === "function"
+    ) {
+      const canNavigate = global.requestAppNavigation(() =>
+        showSection(sectionId, { ...config, skipUnsavedCheck: true }),
+      );
+      if (canNavigate === false) return;
+    }
     const targetSection = document.getElementById(sectionId);
     if (!targetSection) {
       console.error("Target section not found:", sectionId);
@@ -134,6 +148,16 @@
     });
 
     targetSection.classList.remove("hidden");
+
+    if (!config.preserveScroll) {
+      const main = document.querySelector("main");
+      if (main) {
+        main.scrollTop = 0;
+        if (typeof main.scrollTo === "function") {
+          main.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        }
+      }
+    }
 
     const nextHash = config.routeHash || `#${sectionId}`;
     if (!config.skipHashSync && global.location.hash !== nextHash) {

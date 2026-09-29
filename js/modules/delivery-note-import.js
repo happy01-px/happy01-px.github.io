@@ -18,6 +18,9 @@
     const IMPORT_SUPPLIER_NAME = "历史送货单导入";
     const MAX_FILE_COUNT = 50;
     const MAX_FILE_SIZE = 15 * 1024 * 1024;
+    const MAX_ARCHIVE_COUNT = 4;
+    const MAX_ARCHIVE_SIZE = 80 * 1024 * 1024;
+    const BATCH_PAGE_SIZE = 40;
     const WORKFLOW_DRAFT_KEY = "inventory-system.history-import-draft.v1";
     const WORKFLOW_DRAFT_VERSION = 1;
     const DOCUMENT_DRAFT_FIELDS = Object.freeze([
@@ -48,6 +51,9 @@
       "notes",
     ]);
     let activeWorkflowState = null;
+    let archiveImportEndpoint = "";
+    let batchNavigationRoot = null;
+    let batchNavigationHost = null;
 
     function getWorkflowStorage() {
       try {
@@ -246,6 +252,24 @@
       return (row || []).findIndex((value) => matcher(compact(value)));
     }
 
+    function isProductNameHeader(value) {
+      return (
+        value.includes("产品名称") ||
+        value.includes("货品名称") ||
+        value.includes("品名规格") ||
+        value === "品名" ||
+        value === "名称"
+      );
+    }
+
+    function isUnitPriceHeader(value) {
+      return (
+        value.includes("单价") ||
+        value.includes("含税价") ||
+        value.includes("未税价")
+      );
+    }
+
     function parseDeliverySheetRows(rows, options = {}) {
       const usefulRows = (rows || []).map((row) =>
         Array.isArray(row) ? row : [],
@@ -254,7 +278,7 @@
       const headerRowIndex = usefulRows.findIndex((row) => {
         const normalized = row.map(compact);
         return (
-          normalized.some((value) => value.includes("产品名称")) &&
+          normalized.some(isProductNameHeader) &&
           normalized.some(
             (value) => value.includes("出库数量") || value === "数量",
           )
@@ -275,16 +299,14 @@
       const header = usefulRows[headerRowIndex];
       const indexes = {
         sequence: findHeaderIndex(header, (value) => value === "序号"),
-        productName: findHeaderIndex(header, (value) =>
-          value.includes("产品名称"),
-        ),
+        productName: findHeaderIndex(header, isProductNameHeader),
         specification: findHeaderIndex(header, (value) => value === "规格"),
         unit: findHeaderIndex(header, (value) => value === "单位"),
         quantity: findHeaderIndex(
           header,
           (value) => value.includes("出库数量") || value === "数量",
         ),
-        unitPrice: findHeaderIndex(header, (value) => value.includes("单价")),
+        unitPrice: findHeaderIndex(header, isUnitPriceHeader),
         amount: findHeaderIndex(header, (value) => value.includes("金额")),
         notes: findHeaderIndex(header, (value) => value === "备注"),
       };
@@ -510,7 +532,8 @@
       const source = compact(value);
       let match = source.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
       if (match) {
-        const year = Number(match[3]) < 100 ? 2000 + Number(match[3]) : match[3];
+        const year =
+          Number(match[3]) < 100 ? 2000 + Number(match[3]) : match[3];
         return `${year}-${String(match[1]).padStart(2, "0")}-${String(match[2]).padStart(2, "0")}`;
       }
       match = source.match(/(\d{1,2})[-/.](\d{1,2})/);
@@ -521,11 +544,10 @@
     function parseStatementPeriod(rows) {
       for (const row of rows || []) {
         for (const value of row || []) {
-          const match = compact(value).match(
-            /(\d{2,4})年(\d{1,2})月对账单/,
-          );
+          const match = compact(value).match(/(\d{2,4})年(\d{1,2})月对账单/);
           if (!match) continue;
-          const year = Number(match[1]) < 100 ? 2000 + Number(match[1]) : Number(match[1]);
+          const year =
+            Number(match[1]) < 100 ? 2000 + Number(match[1]) : Number(match[1]);
           return { year, month: Number(match[2]) };
         }
       }
@@ -568,9 +590,9 @@
       const hasStatementHeader = (rows || []).some((row) => {
         const cells = (row || []).map(compact);
         return (
-          cells.some((value) => value === "送货日期") &&
+          cells.some((value) => value === "送货日期" || value === "日期") &&
           cells.some((value) => value === "送货单号") &&
-          cells.some((value) => value.includes("产品名称"))
+          cells.some(isProductNameHeader)
         );
       });
       return hasStatementTitle && hasStatementHeader;
@@ -583,9 +605,9 @@
       const headerRowIndex = usefulRows.findIndex((row) => {
         const cells = row.map(compact);
         return (
-          cells.some((value) => value === "送货日期") &&
+          cells.some((value) => value === "送货日期" || value === "日期") &&
           cells.some((value) => value === "送货单号") &&
-          cells.some((value) => value.includes("产品名称"))
+          cells.some(isProductNameHeader)
         );
       });
       if (headerRowIndex < 0) {
@@ -601,15 +623,16 @@
 
       const header = usefulRows[headerRowIndex];
       const indexes = {
-        deliveryDate: findHeaderIndex(header, (value) => value === "送货日期"),
-        orderNo: findHeaderIndex(header, (value) => value === "送货单号"),
-        productName: findHeaderIndex(header, (value) =>
-          value.includes("产品名称"),
+        deliveryDate: findHeaderIndex(
+          header,
+          (value) => value === "送货日期" || value === "日期",
         ),
+        orderNo: findHeaderIndex(header, (value) => value === "送货单号"),
+        productName: findHeaderIndex(header, isProductNameHeader),
         specification: findHeaderIndex(header, (value) => value === "规格"),
         unit: findHeaderIndex(header, (value) => value === "单位"),
         quantity: findHeaderIndex(header, (value) => value === "数量"),
-        unitPrice: findHeaderIndex(header, (value) => value.includes("单价")),
+        unitPrice: findHeaderIndex(header, isUnitPriceHeader),
         amount: findHeaderIndex(header, (value) => value.includes("金额")),
         notes: findHeaderIndex(header, (value) => value === "备注"),
       };
@@ -623,7 +646,9 @@
         titlePeriod.year,
       );
       const fallbackYear =
-        Number(statementDate.slice(0, 4)) || titlePeriod.year || new Date().getFullYear();
+        Number(statementDate.slice(0, 4)) ||
+        titlePeriod.year ||
+        new Date().getFullYear();
       const companyName =
         metadataRows
           .flatMap((row) => row.map(text))
@@ -632,7 +657,10 @@
         .map(rowText)
         .find((value) => compact(value).startsWith("电话"));
       const companyPhones = findPhones(companyLine || "");
-      let companyContact = compact(companyLine || "").replace(/^电话[:：]?/, "");
+      let companyContact = compact(companyLine || "").replace(
+        /^电话[:：]?/,
+        "",
+      );
       companyPhones.forEach((phone) => {
         companyContact = companyContact.replace(phone, "");
       });
@@ -771,9 +799,7 @@
       usefulRows.slice(footerStartIndex).forEach((row) => {
         const source = compact(rowText(row));
         if (!source) return;
-        const monthMatch = source.match(
-          /(\d{2,4})年(\d{1,2})月(?:货款|合计)/,
-        );
+        const monthMatch = source.match(/(\d{2,4})年(\d{1,2})月(?:货款|合计)/);
         if (monthMatch) {
           const year =
             Number(monthMatch[1]) < 100
@@ -814,10 +840,7 @@
           `表内含税金额 ${parsedTaxedAmount.toFixed(2)} 与明细重算 ${amountWithTax.toFixed(2)} 不一致。`,
         );
       }
-      if (
-        parsedTotalAmount &&
-        Math.abs(parsedTotalAmount - totalAmount) > 1
-      ) {
+      if (parsedTotalAmount && Math.abs(parsedTotalAmount - totalAmount) > 1) {
         warningMessages.push(
           `表内总额 ${parsedTotalAmount.toFixed(2)} 与明细及往期余额重算 ${totalAmount.toFixed(2)} 不一致。`,
         );
@@ -1057,6 +1080,11 @@
         "delivery-import-workflow-content",
       );
       if (!container) return null;
+      if (batchNavigationRoot) {
+        batchNavigationRoot.unmount?.();
+        batchNavigationRoot = null;
+        batchNavigationHost = null;
+      }
       if (global.Node && content instanceof global.Node) {
         container.replaceChildren(content);
       } else if (typeof global.setSafeInnerHTML === "function") {
@@ -1091,7 +1119,12 @@
       secondaryText,
       onPrimary,
       onSecondary,
+      preserveScroll = false,
     }) {
+      const main = global.document?.querySelector("main");
+      const preservedScrollTop = preserveScroll
+        ? Number(main?.scrollTop) || 0
+        : 0;
       const container = setWorkflowContent(content);
       if (!container) {
         global.alert?.("未找到历史导入页面，请刷新页面后重试。");
@@ -1110,6 +1143,9 @@
       const primary = global.document?.getElementById(
         "delivery-import-workflow-primary",
       );
+      const partial = global.document?.getElementById(
+        "delivery-import-workflow-partial",
+      );
       const secondary = global.document?.getElementById(
         "delivery-import-workflow-secondary",
       );
@@ -1117,6 +1153,11 @@
       if (subtitleElement) subtitleElement.textContent = subtitle;
       setWorkflowStep(step);
       actions?.classList.remove("hidden");
+      if (partial) {
+        partial.classList.add("hidden");
+        partial.disabled = true;
+        partial.onclick = null;
+      }
 
       if (secondary) {
         secondary.textContent = secondaryText;
@@ -1143,9 +1184,19 @@
         primary.onclick = primaryHandler;
       }
 
-      global.showSection?.("history-import-workflow");
-      const main = global.document?.querySelector("main");
-      if (main && typeof main.scrollTo === "function") main.scrollTo(0, 0);
+      global.showSection?.("history-import-workflow", {
+        preserveScroll: true,
+      });
+      if (main) {
+        const restoreScroll = () => {
+          main.scrollTop = preservedScrollTop;
+          if (typeof main.scrollTo === "function") {
+            main.scrollTo(0, preservedScrollTop);
+          }
+        };
+        restoreScroll();
+        if (preserveScroll) global.requestAnimationFrame?.(restoreScroll);
+      }
       return true;
     }
 
@@ -1229,6 +1280,1600 @@
       bindReviewDraftPersistence(activeWorkflowState.reviewRoot);
       if (options.persist !== false) persistActiveWorkflowDraft("review");
       return matchedDocuments;
+    }
+
+    function getBatchStatusMeta(status) {
+      const values = {
+        pending: { label: "待确认", className: "is-pending" },
+        confirmed: { label: "已确认", className: "is-confirmed" },
+        error: { label: "识别失败", className: "is-error" },
+        excluded: { label: "已排除", className: "is-excluded" },
+      };
+      return values[status] || values.pending;
+    }
+
+    function getBatchCounts(records) {
+      const counts = {
+        total: records.length,
+        pending: 0,
+        confirmed: 0,
+        error: 0,
+        excluded: 0,
+        documents: 0,
+        items: 0,
+      };
+      records.forEach((record) => {
+        const status = record.reviewStatus || "pending";
+        counts[status] = (counts[status] || 0) + 1;
+        counts.documents += Number(record.documentCount) || 0;
+        counts.items += Number(record.itemCount) || 0;
+      });
+      counts.unresolved = counts.pending + counts.error;
+      return counts;
+    }
+
+    function batchKindLabel(record) {
+      if (record.importKind === "customer-statement") return "对账单";
+      if (record.reviewStatus === "error") return "待识别";
+      return "送货单";
+    }
+
+    function createArchiveEntryKey(archiveName, relativePath) {
+      const archive = text(archiveName).toLowerCase();
+      const entry = text(relativePath).replace(/\\/g, "/").toLowerCase();
+      if (!archive || !entry || archive === "单独选择的 excel") return "";
+      return `${archive}::${entry}`;
+    }
+
+    function attachBatchSource(documentData, record) {
+      const sourceArchiveEntryKey = createArchiveEntryKey(
+        record.archiveName,
+        record.relativePath,
+      );
+      if (!sourceArchiveEntryKey) return documentData;
+      return {
+        ...documentData,
+        sourceArchiveName: record.archiveName,
+        sourceRelativePath: record.relativePath,
+        sourceArchiveEntryKey,
+      };
+    }
+
+    function filterPreviouslyImportedArchiveRecords(records, data) {
+      const notes = Array.isArray(data?.deliveryNotes)
+        ? data.deliveryNotes
+        : [];
+      const processedEntryKeys = new Set(
+        notes
+          .flatMap((note) => [
+            note.sourceArchiveEntryKey ||
+              createArchiveEntryKey(
+                note.sourceArchiveName,
+                note.sourceRelativePath,
+              ),
+            ...(Array.isArray(note.sourceArchiveEntryKeys)
+              ? note.sourceArchiveEntryKeys
+              : []),
+          ])
+          .filter(Boolean),
+      );
+      const importedOrderNumbers = new Set(
+        notes
+          .map((note) => normalizeMatchValue(note.orderNo || note.customerNo))
+          .filter(Boolean),
+      );
+      const pending = [];
+      const skipped = [];
+      (records || []).forEach((record) => {
+        const entryKey = createArchiveEntryKey(
+          record.archiveName,
+          record.relativePath,
+        );
+        const orderNumbers = (record.documents || [])
+          .map((documentData) =>
+            normalizeMatchValue(
+              documentData.orderNo || documentData.metadata?.orderNo,
+            ),
+          )
+          .filter(Boolean);
+        const processedByOrderNumber =
+          orderNumbers.length > 0 &&
+          orderNumbers.every((orderNo) => importedOrderNumbers.has(orderNo));
+        if (
+          (entryKey && processedEntryKeys.has(entryKey)) ||
+          processedByOrderNumber
+        ) {
+          skipped.push(record);
+        } else {
+          pending.push(record);
+        }
+      });
+      return { pending, skipped };
+    }
+
+    function classifyArchiveScreeningRecords(records, skippedRecords = []) {
+      const recognized = [];
+      const unrecognized = [];
+      (records || []).forEach((record) => {
+        if (
+          record.status === "error" ||
+          !Array.isArray(record.documents) ||
+          !record.documents.length
+        ) {
+          unrecognized.push(record);
+        } else {
+          recognized.push(record);
+        }
+      });
+      return {
+        recognized,
+        unrecognized,
+        filtered: Array.isArray(skippedRecords) ? skippedRecords : [],
+      };
+    }
+
+    function getArchiveScreeningRecordMessage(record, category) {
+      if (category === "filtered") {
+        return "以前已成功导入，本次自动过滤";
+      }
+      if (category === "recognized") {
+        return `识别到 ${Number(record.documentCount) || record.documents?.length || 0} 张单据、${Number(record.itemCount) || 0} 条明细`;
+      }
+      const errors = Array.isArray(record.errors) ? record.errors : [];
+      return errors.filter(Boolean).join("；") || "没有识别到有效单据";
+    }
+
+    function buildArchiveScreeningRows(records, category) {
+      if (!records.length) {
+        const emptyText =
+          category === "filtered"
+            ? "本次没有自动过滤的文件"
+            : category === "recognized"
+              ? "本次没有识别成功的文件"
+              : "本次没有识别失败的文件";
+        return `<div class="delivery-import-screening-empty"><i class="fa fa-check-circle-o"></i>${emptyText}</div>`;
+      }
+      return `
+        <div class="delivery-import-screening-list" role="list">
+          ${records
+            .map(
+              (record) => `
+                <div class="delivery-import-screening-row" role="listitem">
+                  <span class="delivery-import-screening-file-icon is-${category}"><i class="fa ${category === "unrecognized" ? "fa-exclamation-triangle" : category === "filtered" ? "fa-filter" : "fa-file-excel-o"}"></i></span>
+                  <span class="delivery-import-screening-file">
+                    <strong title="${escapeHTML(record.relativePath || record.fileName)}">${escapeHTML(record.relativePath || record.fileName || "未命名文件")}</strong>
+                    <small>${escapeHTML(record.archiveName || "单独选择的 Excel")}</small>
+                  </span>
+                  <span class="delivery-import-screening-result is-${category}">${escapeHTML(getArchiveScreeningRecordMessage(record, category))}</span>
+                </div>`,
+            )
+            .join("")}
+        </div>`;
+    }
+
+    function buildArchiveScreeningMarkup(screening) {
+      const total =
+        screening.recognized.length +
+        screening.unrecognized.length +
+        screening.filtered.length;
+      const tabs = [
+        {
+          key: "recognized",
+          label: "识别成功",
+          count: screening.recognized.length,
+          icon: "fa-check-circle",
+        },
+        {
+          key: "unrecognized",
+          label: "识别失败",
+          count: screening.unrecognized.length,
+          icon: "fa-exclamation-circle",
+        },
+        {
+          key: "filtered",
+          label: "自动过滤",
+          count: screening.filtered.length,
+          icon: "fa-filter",
+        },
+      ];
+      const activeCategory = screening.unrecognized.length
+        ? "unrecognized"
+        : screening.filtered.length
+          ? "filtered"
+          : "recognized";
+      return `
+        <div id="delivery-import-archive-screening">
+          <div class="delivery-import-batch-notice">
+            <i class="fa fa-list-alt"></i>
+            <div><strong>压缩包解析结果</strong><p>请先查看自动过滤、识别成功和识别失败的文件；确认结果后再进入逐文件核对。</p></div>
+          </div>
+          <div class="delivery-import-screening-summary">
+            <div><span>解析 Excel 总数</span><strong>${total}</strong></div>
+            ${tabs
+              .map(
+                (tab) => `
+                  <button type="button" class="delivery-import-screening-tab${tab.key === activeCategory ? " is-active" : ""}" data-archive-screening-tab="${tab.key}" aria-selected="${tab.key === activeCategory ? "true" : "false"}">
+                    <i class="fa ${tab.icon}"></i><span>${tab.label}</span><strong>${tab.count}</strong>
+                  </button>`,
+              )
+              .join("")}
+          </div>
+          <div class="delivery-import-screening-panels">
+            ${tabs
+              .map(
+                (tab) => `
+                  <section data-archive-screening-panel="${tab.key}" ${tab.key === activeCategory ? "" : "hidden"}>
+                    <div class="delivery-import-screening-heading">
+                      <div><h3>${tab.label}文件</h3><p>共 ${tab.count} 个</p></div>
+                      <span>${tab.key === "recognized" ? "这些文件将进入逐一核对" : tab.key === "filtered" ? "这些文件不会重复导入" : "这些文件可在核对页排除或后续处理"}</span>
+                    </div>
+                    ${buildArchiveScreeningRows(screening[tab.key], tab.key)}
+                  </section>`,
+              )
+              .join("")}
+          </div>
+        </div>`;
+    }
+
+    function bindArchiveScreeningEvents() {
+      const tabs = Array.from(
+        global.document?.querySelectorAll("[data-archive-screening-tab]") || [],
+      );
+      const panels = Array.from(
+        global.document?.querySelectorAll("[data-archive-screening-panel]") ||
+          [],
+      );
+      tabs.forEach((tab) => {
+        tab.onclick = () => {
+          const category = tab.dataset.archiveScreeningTab;
+          tabs.forEach((item) => {
+            const selected = item === tab;
+            item.classList.toggle("is-active", selected);
+            item.setAttribute("aria-selected", String(selected));
+          });
+          panels.forEach((panel) => {
+            panel.hidden = panel.dataset.archiveScreeningPanel !== category;
+          });
+        };
+      });
+    }
+
+    function showArchiveScreeningPage(records, skippedRecords = []) {
+      const pendingRecords = Array.isArray(records) ? records : [];
+      const screening = classifyArchiveScreeningRecords(
+        pendingRecords,
+        skippedRecords,
+      );
+      const reviewableCount = pendingRecords.length;
+      activeWorkflowState = {
+        archiveScreening: screening,
+        skippedProcessedCount: screening.filtered.length,
+      };
+      showImportWorkflowPage({
+        title: "检查压缩包解析结果",
+        subtitle: "先确认哪些文件已过滤、已识别或未识别，再进入逐文件核对。",
+        step: "review",
+        content: buildArchiveScreeningMarkup(screening),
+        primaryText: reviewableCount
+          ? `进入逐文件核对（${reviewableCount} 个）`
+          : "完成并返回",
+        secondaryText: "取消本次导入",
+        onPrimary: () => {
+          if (!reviewableCount) {
+            returnToImportSettings({ clearState: true });
+            return false;
+          }
+          showBatchReviewPage(pendingRecords, {
+            skippedProcessedCount: screening.filtered.length,
+          });
+          return false;
+        },
+        onSecondary: () => returnToImportSettings({ clearState: true }),
+      });
+      bindArchiveScreeningEvents();
+      return screening;
+    }
+
+    function getBatchRecordMessages(record) {
+      return [
+        ...(record?.errors || []),
+        ...(record?.warnings || []),
+        ...(record?.documents || []).flatMap((documentData) => [
+          ...(documentData?.errors || []),
+          ...(documentData?.warnings || []),
+        ]),
+      ].filter(Boolean);
+    }
+
+    function getFilteredBatchRecords(records, filter, query) {
+      const keyword = normalizeMatchValue(query);
+      return records.filter((record) => {
+        if (filter === "warning" && !getBatchRecordMessages(record).length) {
+          return false;
+        }
+        if (
+          filter !== "all" &&
+          filter !== "warning" &&
+          record.reviewStatus !== filter
+        ) {
+          return false;
+        }
+        if (!keyword) return true;
+        return normalizeMatchValue(
+          `${record.relativePath} ${record.archiveName} ${record.fileName}`,
+        ).includes(keyword);
+      });
+    }
+
+    function getBatchRecordForPage(records, state, page) {
+      const filtered = getFilteredBatchRecords(
+        records,
+        state.batchFilter,
+        state.batchQuery,
+      );
+      const pageCount = Math.max(
+        1,
+        Math.ceil(filtered.length / BATCH_PAGE_SIZE),
+      );
+      const normalizedPage = Math.min(Math.max(1, page || 1), pageCount);
+      return filtered[(normalizedPage - 1) * BATCH_PAGE_SIZE] || null;
+    }
+
+    function getCurrentBatchPageRecords(records, state) {
+      const filtered = getFilteredBatchRecords(
+        records,
+        state.batchFilter,
+        state.batchQuery,
+      );
+      const pageStart =
+        (Math.max(1, state.batchPage || 1) - 1) * BATCH_PAGE_SIZE;
+      return filtered.slice(pageStart, pageStart + BATCH_PAGE_SIZE);
+    }
+
+    function getBatchDirectory(record) {
+      const path = text(record?.relativePath).replace(/\\/g, "/");
+      const separatorIndex = path.lastIndexOf("/");
+      return separatorIndex >= 0
+        ? path.slice(0, separatorIndex)
+        : "压缩包根目录";
+    }
+
+    function isBatchRecordSafeToConfirm(record) {
+      return (
+        record?.reviewStatus === "pending" &&
+        Boolean(record?.documents?.length) &&
+        getBatchRecordMessages(record).length === 0
+      );
+    }
+
+    function confirmSafeBatchRecords(records) {
+      let confirmed = 0;
+      let skipped = 0;
+      records.forEach((record) => {
+        if (!isBatchRecordSafeToConfirm(record)) {
+          skipped += 1;
+          return;
+        }
+        record.reviewedDocuments =
+          record.previewDocuments || record.documents || [];
+        record.reviewStatus = "confirmed";
+        record.editMode = false;
+        confirmed += 1;
+      });
+      return { confirmed, skipped };
+    }
+
+    function rerenderBatchReview(message, type = "success") {
+      const state = activeWorkflowState;
+      if (!Array.isArray(state?.batchRecords)) return;
+      state.selectedRecordIds = (state.selectedRecordIds || []).filter((id) =>
+        state.batchRecords.some((record) => record.id === id),
+      );
+      showBatchReviewPage(state.batchRecords, {
+        preserve: true,
+        activeRecordId: state.activeRecordId,
+        batchPage: state.batchPage,
+      });
+      if (message) global.showAntdMessage?.(type, message);
+    }
+
+    function buildBatchQueueMarkup(records, state) {
+      const filtered = getFilteredBatchRecords(
+        records,
+        state.batchFilter,
+        state.batchQuery,
+      );
+      const pageCount = Math.max(
+        1,
+        Math.ceil(filtered.length / BATCH_PAGE_SIZE),
+      );
+      state.batchPage = Math.min(Math.max(1, state.batchPage || 1), pageCount);
+      const pageStart = (state.batchPage - 1) * BATCH_PAGE_SIZE;
+      const pageRecords = filtered.slice(
+        pageStart,
+        pageStart + BATCH_PAGE_SIZE,
+      );
+      const selectedIds = new Set(state.selectedRecordIds || []);
+      const rows = pageRecords
+        .map((record) => {
+          const status = getBatchStatusMeta(record.reviewStatus);
+          const selected = record.id === state.activeRecordId;
+          const messageCount = getBatchRecordMessages(record).length;
+          return `
+            <div class="delivery-import-batch-row${selected ? " is-active" : ""}" data-batch-record-id="${escapeHTML(record.id)}">
+              <label class="delivery-import-batch-select" title="选择此文件">
+                <input type="checkbox" data-batch-select="${escapeHTML(record.id)}" ${selectedIds.has(record.id) ? "checked" : ""} aria-label="选择 ${escapeHTML(record.relativePath)}">
+              </label>
+              <button type="button" class="delivery-import-batch-row-open" data-batch-open="${escapeHTML(record.id)}" aria-current="${selected ? "true" : "false"}">
+                <span class="delivery-import-batch-row-main">
+                <strong title="${escapeHTML(record.relativePath)}">${escapeHTML(record.relativePath)}</strong>
+                <small>${escapeHTML(batchKindLabel(record))} · ${record.documentCount || 0} 张单据 · ${record.itemCount || 0} 条明细${messageCount ? ` · ${messageCount} 项提醒` : ""}</small>
+                </span>
+              </button>
+              <span class="delivery-import-batch-status ${status.className}" data-batch-status>${status.label}</span>
+            </div>`;
+        })
+        .join("");
+      return `
+        <div class="delivery-import-batch-toolbar">
+          <input id="delivery-import-batch-search" class="delivery-import-control" value="${escapeHTML(state.batchQuery || "")}" placeholder="搜索压缩包内路径或文件名">
+          <select id="delivery-import-batch-filter" class="delivery-import-control">
+            <option value="all" ${state.batchFilter === "all" ? "selected" : ""}>全部文件</option>
+            <option value="pending" ${state.batchFilter === "pending" ? "selected" : ""}>待确认</option>
+            <option value="confirmed" ${state.batchFilter === "confirmed" ? "selected" : ""}>已确认</option>
+            <option value="error" ${state.batchFilter === "error" ? "selected" : ""}>识别失败</option>
+            <option value="warning" ${state.batchFilter === "warning" ? "selected" : ""}>有异常提示</option>
+            <option value="excluded" ${state.batchFilter === "excluded" ? "selected" : ""}>已排除</option>
+          </select>
+        </div>
+        <div class="delivery-import-batch-queue">
+          <div id="delivery-import-batch-menu">
+            ${rows || '<div class="px-4 py-10 text-center text-sm text-gray-500">没有符合条件的文件</div>'}
+          </div>
+        </div>
+        <div class="delivery-import-batch-pagination">
+          <span>第 ${state.batchPage}/${pageCount} 页 · ${filtered.length} 个文件</span>
+          <span>
+            <button type="button" data-batch-page="prev" ${state.batchPage <= 1 ? "disabled" : ""}>上一页</button>
+            <button type="button" data-batch-page="next" ${state.batchPage >= pageCount ? "disabled" : ""}>下一页</button>
+          </span>
+        </div>`;
+    }
+
+    function renderBatchNavigationMenu(records, state) {
+      const host = global.document?.getElementById(
+        "delivery-import-batch-menu",
+      );
+      const React = global.React;
+      const Menu = global.antd?.Menu;
+      if (!host || !React || !Menu || !global.ReactDOM) {
+        return false;
+      }
+      const filtered = getFilteredBatchRecords(
+        records,
+        state.batchFilter,
+        state.batchQuery,
+      );
+      const pageStart = (state.batchPage - 1) * BATCH_PAGE_SIZE;
+      const pageRecords = filtered.slice(
+        pageStart,
+        pageStart + BATCH_PAGE_SIZE,
+      );
+      const selectedIds = new Set(state.selectedRecordIds || []);
+      const items = pageRecords.map((record) => {
+        const status = getBatchStatusMeta(record.reviewStatus);
+        const messageCount = getBatchRecordMessages(record).length;
+        return {
+          key: record.id,
+          icon: React.createElement("i", {
+            className: "fa fa-file-excel-o",
+            "aria-hidden": "true",
+          }),
+          label: React.createElement(
+            "div",
+            {
+              className: "delivery-import-batch-menu-label",
+              "data-batch-record-id": record.id,
+            },
+            React.createElement("input", {
+              type: "checkbox",
+              className: "delivery-import-batch-select-input",
+              checked: selectedIds.has(record.id),
+              "aria-label": `选择 ${record.relativePath}`,
+              onClick: (event) => event.stopPropagation(),
+              onChange: (event) => {
+                const next = new Set(state.selectedRecordIds || []);
+                if (event.target.checked) next.add(record.id);
+                else next.delete(record.id);
+                state.selectedRecordIds = Array.from(next);
+                const count = global.document?.getElementById(
+                  "delivery-import-batch-selected-count",
+                );
+                if (count) count.textContent = String(next.size);
+              },
+            }),
+            React.createElement(
+              "span",
+              { className: "delivery-import-batch-row-main" },
+              React.createElement(
+                "strong",
+                { title: record.relativePath },
+                record.relativePath,
+              ),
+              React.createElement(
+                "small",
+                null,
+                `${batchKindLabel(record)} · ${record.documentCount || 0} 张单据 · ${record.itemCount || 0} 条明细${messageCount ? ` · ${messageCount} 项提醒` : ""}`,
+              ),
+            ),
+            React.createElement(
+              "span",
+              {
+                className: `delivery-import-batch-status ${status.className}`,
+                "data-batch-status": "true",
+              },
+              status.label,
+            ),
+          ),
+        };
+      });
+      if (!batchNavigationRoot || batchNavigationHost !== host) {
+        if (typeof global.ReactDOM.createRoot === "function") {
+          batchNavigationRoot = global.ReactDOM.createRoot(host);
+        } else if (typeof global.ReactDOM.render === "function") {
+          batchNavigationRoot = {
+            render(node) {
+              global.ReactDOM.render(node, host);
+            },
+            unmount() {
+              global.ReactDOM.unmountComponentAtNode?.(host);
+            },
+          };
+        } else {
+          return false;
+        }
+        batchNavigationHost = host;
+      }
+      batchNavigationRoot.render(
+        React.createElement(Menu, {
+          mode: "inline",
+          items,
+          selectedKeys: state.activeRecordId ? [state.activeRecordId] : [],
+          inlineIndent: 12,
+          onClick: ({ key }) => openBatchRecord(String(key)),
+        }),
+      );
+      return true;
+    }
+
+    function revealActiveBatchRecord() {
+      const reveal = () => {
+        const queue = global.document?.querySelector(
+          ".delivery-import-batch-queue",
+        );
+        const activeRow = queue?.querySelector(
+          ".delivery-import-batch-row.is-active, .ant-menu-item-selected, .ant-menu-item-selected [data-batch-record-id]",
+        );
+        if (!queue || !activeRow) return;
+
+        const queueRect = queue.getBoundingClientRect?.();
+        const rowRect = activeRow.getBoundingClientRect?.();
+        if (!queueRect || !rowRect) return;
+        if (rowRect.top < queueRect.top) {
+          queue.scrollTop -= queueRect.top - rowRect.top;
+        } else if (rowRect.bottom > queueRect.bottom) {
+          queue.scrollTop += rowRect.bottom - queueRect.bottom;
+        }
+      };
+      reveal();
+      global.requestAnimationFrame?.(reveal);
+    }
+
+    function showImportConfirm(options = {}) {
+      if (typeof global.showAntdConfirm === "function") {
+        return global.showAntdConfirm(options);
+      }
+      const document = global.document;
+      if (!document?.body) return Promise.resolve(false);
+      return new Promise((resolve) => {
+        document.getElementById("delivery-import-confirm-dialog")?.remove();
+        const content = Array.isArray(options.content)
+          ? options.content
+          : [options.content];
+        const overlay = document.createElement("div");
+        overlay.id = "delivery-import-confirm-dialog";
+        overlay.className = "delivery-import-confirm-overlay";
+        overlay.innerHTML = `
+          <div class="delivery-import-confirm-card" role="dialog" aria-modal="true" aria-labelledby="delivery-import-confirm-title">
+            <span class="delivery-import-confirm-icon"><i class="fa fa-exclamation-triangle"></i></span>
+            <div class="delivery-import-confirm-copy">
+              <h3 id="delivery-import-confirm-title">${escapeHTML(options.title || "请确认")}</h3>
+              ${content
+                .filter(Boolean)
+                .map((line) => `<p>${escapeHTML(line)}</p>`)
+                .join("")}
+            </div>
+            <div class="delivery-import-confirm-actions">
+              <button type="button" data-import-confirm-cancel>${escapeHTML(options.cancelText || "取消")}</button>
+              <button type="button" class="is-danger" data-import-confirm-ok>${escapeHTML(options.okText || "确定")}</button>
+            </div>
+          </div>`;
+        document.body.appendChild(overlay);
+        const finish = (value) => {
+          document.removeEventListener("keydown", onKeyDown);
+          overlay.remove();
+          resolve(value);
+        };
+        const onKeyDown = (event) => {
+          if (event.key === "Escape") finish(false);
+        };
+        document.addEventListener("keydown", onKeyDown);
+        overlay.querySelector("[data-import-confirm-cancel]").onclick = () =>
+          finish(false);
+        overlay.querySelector("[data-import-confirm-ok]").onclick = () =>
+          finish(true);
+        overlay.onclick = (event) => {
+          if (event.target === overlay) finish(false);
+        };
+        overlay.querySelector("[data-import-confirm-cancel]")?.focus();
+      });
+    }
+
+    function buildBatchDocumentPreview(documentData, documentIndex) {
+      const metadata = documentData.metadata || {};
+      const orderNo = documentData.orderNo || metadata.orderNo || "-";
+      const issueDate = documentData.issueDate || metadata.issueDate || "-";
+      const companyName =
+        documentData.companyName || metadata.companyName || "未提供";
+      const customerName =
+        documentData.customerName || metadata.customerName || "未提供";
+      const customerContact =
+        documentData.customerContact || metadata.customerContact || "-";
+      const customerPhone =
+        documentData.customerPhone || metadata.customerPhone || "-";
+      const customerAddress =
+        documentData.customerAddress || metadata.customerAddress || "-";
+      const paymentTerms =
+        documentData.paymentTerms || metadata.paymentTerms || "-";
+      const items = documentData.items || [];
+      const totalAmount = items.reduce(
+        (sum, item) =>
+          sum + Number(item.quantity || 0) * Number(item.unitPrice || 0),
+        0,
+      );
+      return `
+        <article class="delivery-import-file-preview" data-batch-preview-document="${documentIndex}">
+          <div class="delivery-import-file-preview-heading">
+            <div>
+              <span>单据 ${documentIndex + 1}</span>
+              <strong>${escapeHTML(orderNo)}</strong>
+            </div>
+            <div class="delivery-import-file-preview-total">合计 ¥${roundMoney(totalAmount).toFixed(2)}</div>
+          </div>
+          <dl class="delivery-import-file-preview-meta">
+            <div><dt>制单日期</dt><dd>${escapeHTML(issueDate)}</dd></div>
+            <div><dt>发货公司</dt><dd>${escapeHTML(companyName)}</dd></div>
+            <div><dt>客户</dt><dd>${escapeHTML(customerName)}</dd></div>
+            <div><dt>价格类型</dt><dd>${documentData.priceTaxMode === "inclusive" ? "含税价" : "未税价"}</dd></div>
+            <div><dt>联系人</dt><dd>${escapeHTML(customerContact)}</dd></div>
+            <div><dt>联系电话</dt><dd>${escapeHTML(customerPhone)}</dd></div>
+            <div><dt>结款方式</dt><dd>${escapeHTML(paymentTerms)}</dd></div>
+            <div class="delivery-import-file-preview-wide"><dt>客户地址</dt><dd>${escapeHTML(customerAddress)}</dd></div>
+          </dl>
+          <div class="delivery-import-table-wrap delivery-import-file-preview-table">
+            <table class="delivery-import-table">
+              <thead><tr><th>商品名称</th><th>规格</th><th>单位</th><th>数量</th><th>单价</th><th>金额</th><th>备注</th></tr></thead>
+              <tbody>
+                ${items
+                  .map(
+                    (item) => `<tr>
+                      <td>${escapeHTML(item.productName || "-")}</td>
+                      <td>${escapeHTML(item.specification || "-")}</td>
+                      <td>${escapeHTML(item.unit || "-")}</td>
+                      <td>${escapeHTML(item.quantity)}</td>
+                      <td>¥${roundMoney(Number(item.unitPrice || 0)).toFixed(2)}</td>
+                      <td>¥${roundMoney(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toFixed(2)}</td>
+                      <td>${escapeHTML(item.notes || "-")}</td>
+                    </tr>`,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </article>`;
+    }
+
+    function buildBatchDetailMarkup(record, data) {
+      if (!record) {
+        return '<div class="delivery-import-batch-empty">请选择左侧文件进行核对。</div>';
+      }
+      const status = getBatchStatusMeta(record.reviewStatus);
+      const messages = getBatchRecordMessages(record);
+      if (record.reviewStatus === "error") {
+        return `
+          <div class="delivery-import-batch-detail-heading">
+            <div><span class="delivery-import-batch-status ${status.className}">${status.label}</span><h3>${escapeHTML(record.relativePath)}</h3></div>
+            <button type="button" class="delivery-import-batch-danger" data-batch-exclude>确认排除此文件</button>
+          </div>
+          <div class="delivery-import-batch-error"><i class="fa fa-exclamation-triangle"></i><div><strong>此文件无法安全自动识别</strong>${messages.map((message) => `<p>${escapeHTML(message)}</p>`).join("")}</div></div>
+          <p class="mt-3 text-xs leading-5 text-gray-500">最终导入前，必须先修正模板后重新选择压缩包，或明确排除此文件；系统不会静默跳过。</p>`;
+      }
+      if (record.reviewStatus === "excluded") {
+        return `
+          <div class="delivery-import-batch-detail-heading">
+            <div><span class="delivery-import-batch-status ${status.className}">${status.label}</span><h3>${escapeHTML(record.relativePath)}</h3></div>
+            <button type="button" class="delivery-import-batch-secondary" data-batch-restore>恢复核对</button>
+          </div>
+          <div class="delivery-import-batch-empty">该文件已明确排除，不会写入系统。</div>`;
+      }
+      const isEditing = record.editMode === true;
+      const previewDocuments =
+        record.previewDocuments || record.reviewedDocuments || record.documents;
+      const formMarkup = (record.documents || [])
+        .map((documentData, index) =>
+          buildDocumentMarkup(documentData, index, data),
+        )
+        .join("");
+      return `
+        <div class="delivery-import-batch-detail-heading">
+          <div>
+            <span class="delivery-import-batch-status ${status.className}" data-batch-active-status>${status.label}</span>
+            <h3>${escapeHTML(record.relativePath)}</h3>
+            <p>${escapeHTML(record.archiveName || "单独选择")} · ${record.documentCount || 0} 张单据 · ${record.itemCount || 0} 条明细</p>
+          </div>
+          <div class="delivery-import-batch-detail-actions">
+            ${
+              isEditing
+                ? `<button type="button" class="delivery-import-batch-secondary" data-batch-edit-cancel>取消编辑</button>
+                   <button type="button" class="delivery-import-batch-confirm" data-batch-edit-save>保存修改并返回预览</button>`
+                : `<button type="button" class="delivery-import-batch-danger" data-batch-exclude>排除此文件</button>
+                   <button type="button" class="delivery-import-batch-secondary" data-batch-edit>编辑</button>
+                   <button type="button" class="delivery-import-batch-confirm" data-batch-confirm>${record.reviewStatus === "confirmed" ? "再次确认并下一份" : "确认此文件并下一份"}</button>`
+            }
+          </div>
+        </div>
+        <div class="delivery-import-batch-mode-note">
+          <i class="fa ${isEditing ? "fa-pencil" : "fa-eye"}"></i>
+          <span>${isEditing ? "编辑模式：保存修改后会返回预览，仍需再次确认此文件。" : "预览模式：请先检查解析结果；需要调整时再进入编辑模式。"}</span>
+        </div>
+        <div class="delivery-import-batch-shortcuts" aria-label="键盘快捷键">
+          <span><kbd>Enter</kbd> 确认并下一份</span>
+          <span><kbd>E</kbd> 编辑</span>
+          <span><kbd>Esc</kbd> 退出编辑</span>
+          <span><kbd>Alt</kbd> + <kbd>X</kbd> 排除此文件</span>
+        </div>
+        <div id="delivery-import-batch-preview" class="${isEditing ? "hidden" : ""}">
+          ${(previewDocuments || []).map(buildBatchDocumentPreview).join("")}
+        </div>
+        <div id="delivery-import-batch-detail-form" class="${isEditing ? "" : "hidden"}" aria-hidden="${isEditing ? "false" : "true"}">
+          ${formMarkup}
+        </div>`;
+    }
+
+    function updateBatchPrimaryState() {
+      if (!Array.isArray(activeWorkflowState?.batchRecords)) return;
+      const counts = getBatchCounts(activeWorkflowState.batchRecords);
+      const primary = global.document?.getElementById(
+        "delivery-import-workflow-primary",
+      );
+      const partial = global.document?.getElementById(
+        "delivery-import-workflow-partial",
+      );
+      if (primary) {
+        primary.disabled = counts.unresolved > 0 || counts.confirmed === 0;
+        primary.textContent = counts.unresolved
+          ? `全部文件确认后可预览（还剩 ${counts.unresolved} 个）`
+          : `预览已确认文件（${counts.confirmed} 个）`;
+      }
+      if (partial) {
+        const canImportPartial = counts.confirmed > 0 && counts.unresolved > 0;
+        partial.classList.toggle("hidden", !canImportPartial);
+        partial.disabled = !canImportPartial;
+        partial.textContent = `暂时导入已确认文件（${counts.confirmed} 个）`;
+      }
+      Object.entries(counts).forEach(([name, value]) => {
+        const element = global.document?.querySelector(
+          `[data-batch-count="${name}"]`,
+        );
+        if (element) element.textContent = String(value);
+      });
+      const activeRecord = activeWorkflowState.batchRecords.find(
+        (record) => record.id === activeWorkflowState.activeRecordId,
+      );
+      if (activeRecord) {
+        const meta = getBatchStatusMeta(activeRecord.reviewStatus);
+        global.document
+          ?.querySelectorAll(
+            `[data-batch-record-id="${activeRecord.id}"] [data-batch-status], [data-batch-active-status]`,
+          )
+          .forEach((element) => {
+            element.textContent = meta.label;
+            element.className = `delivery-import-batch-status ${meta.className}`;
+          });
+      }
+    }
+
+    function saveActiveBatchRecordForm() {
+      if (!Array.isArray(activeWorkflowState?.batchRecords)) return;
+      const record = activeWorkflowState.batchRecords.find(
+        (item) => item.id === activeWorkflowState.activeRecordId,
+      );
+      const form = global.document?.getElementById(
+        "delivery-import-batch-detail-form",
+      );
+      if (record?.editMode) {
+        record.editMode = false;
+        return;
+      }
+      if (record && form) record.formState = captureReviewFormState(form);
+    }
+
+    function findNextBatchRecord(records, currentId) {
+      const currentIndex = Math.max(
+        0,
+        records.findIndex((record) => record.id === currentId),
+      );
+      for (let offset = 1; offset <= records.length; offset += 1) {
+        const record = records[(currentIndex + offset) % records.length];
+        if (["pending", "error"].includes(record.reviewStatus)) return record;
+      }
+      return records[currentIndex] || records[0];
+    }
+
+    function getConfirmedBatchDocuments(records) {
+      return records
+        .filter((record) => record.reviewStatus === "confirmed")
+        .flatMap((record) => record.reviewedDocuments || []);
+    }
+
+    function getImportItemMergeKey(item) {
+      return JSON.stringify([
+        normalizeMatchValue(item.productName),
+        normalizeMatchValue(item.specification),
+        normalizeMatchValue(item.unit),
+        Number(item.quantity) || 0,
+        roundMoney(Number(item.unitPrice) || 0),
+        normalizeMatchValue(item.notes),
+      ]);
+    }
+
+    function getDocumentSourceValues(documentData, pluralKey, singleKey) {
+      return Array.from(
+        new Set(
+          [
+            ...(Array.isArray(documentData[pluralKey])
+              ? documentData[pluralKey]
+              : []),
+            documentData[singleKey],
+          ]
+            .map((value) => text(value))
+            .filter(Boolean),
+        ),
+      );
+    }
+
+    function mergeDocumentsByOrderNumber(documents) {
+      const groups = new Map();
+      const passthrough = [];
+      const fillableFields = [
+        "issueDate",
+        "companyId",
+        "companyName",
+        "companyContact",
+        "companyPhone",
+        "companyAddress",
+        "customerId",
+        "customerName",
+        "customerContact",
+        "customerPhone",
+        "customerAddress",
+        "paymentTerms",
+        "priceTaxMode",
+        "importKind",
+        "statementGroupId",
+        "statementMeta",
+      ];
+
+      (documents || []).forEach((documentData, index) => {
+        const key = normalizeMatchValue(documentData.orderNo);
+        if (!key) {
+          passthrough.push({
+            ...documentData,
+            items: (documentData.items || []).map((item) => ({ ...item })),
+          });
+          return;
+        }
+
+        if (!groups.has(key)) {
+          const sourceFileNames = getDocumentSourceValues(
+            documentData,
+            "sourceFileNames",
+            "sourceFileName",
+          );
+          const sourceRelativePaths = getDocumentSourceValues(
+            documentData,
+            "sourceRelativePaths",
+            "sourceRelativePath",
+          );
+          const sourceArchiveEntryKeys = getDocumentSourceValues(
+            documentData,
+            "sourceArchiveEntryKeys",
+            "sourceArchiveEntryKey",
+          );
+          const merged = {
+            ...documentData,
+            items: (documentData.items || []).map((item) => ({ ...item })),
+            sourceFileNames,
+            sourceRelativePaths,
+            sourceArchiveEntryKeys,
+            mergedSourceCount: Math.max(
+              1,
+              Number(documentData.mergedSourceCount) || 1,
+            ),
+            mergedDuplicateItemCount:
+              Number(documentData.mergedDuplicateItemCount) || 0,
+          };
+          groups.set(key, {
+            index,
+            document: merged,
+            itemKeys: new Set(merged.items.map(getImportItemMergeKey)),
+          });
+          return;
+        }
+
+        const group = groups.get(key);
+        const merged = group.document;
+        merged.mergedSourceCount += Math.max(
+          1,
+          Number(documentData.mergedSourceCount) || 1,
+        );
+        fillableFields.forEach((field) => {
+          if (missing(merged[field]) && !missing(documentData[field])) {
+            merged[field] = documentData[field];
+          }
+        });
+        [
+          ["sourceFileNames", "sourceFileName"],
+          ["sourceRelativePaths", "sourceRelativePath"],
+          ["sourceArchiveEntryKeys", "sourceArchiveEntryKey"],
+        ].forEach(([pluralKey, singleKey]) => {
+          merged[pluralKey] = Array.from(
+            new Set([
+              ...(merged[pluralKey] || []),
+              ...getDocumentSourceValues(documentData, pluralKey, singleKey),
+            ]),
+          );
+        });
+        (documentData.items || []).forEach((item) => {
+          const itemKey = getImportItemMergeKey(item);
+          if (group.itemKeys.has(itemKey)) {
+            merged.mergedDuplicateItemCount += 1;
+            return;
+          }
+          group.itemKeys.add(itemKey);
+          merged.items.push({ ...item });
+        });
+      });
+
+      const groupedDocuments = Array.from(groups.values())
+        .sort((left, right) => left.index - right.index)
+        .map(({ document }) => ({
+          ...document,
+          sourceFileName:
+            document.sourceFileNames[0] || document.sourceFileName || "",
+          sourceRelativePath:
+            document.sourceRelativePaths[0] ||
+            document.sourceRelativePath ||
+            "",
+          sourceArchiveEntryKey:
+            document.sourceArchiveEntryKeys[0] ||
+            document.sourceArchiveEntryKey ||
+            "",
+        }));
+      const mergedDocuments = [...groupedDocuments, ...passthrough];
+      const mergedGroups = mergedDocuments.filter(
+        (documentData) => Number(documentData.mergedSourceCount) > 1,
+      );
+      return {
+        documents: mergedDocuments,
+        mergedOrderNumbers: mergedGroups.map(
+          (documentData) => documentData.orderNo,
+        ),
+        mergedDocumentCount: mergedGroups.reduce(
+          (sum, documentData) =>
+            sum + Math.max(0, Number(documentData.mergedSourceCount) - 1),
+          0,
+        ),
+        skippedDuplicateItemCount: mergedGroups.reduce(
+          (sum, documentData) =>
+            sum + Number(documentData.mergedDuplicateItemCount || 0),
+          0,
+        ),
+      };
+    }
+
+    function getMergeSummaryMessage(summary) {
+      if (!summary?.mergedDocumentCount) return "";
+      const orderNumbers = summary.mergedOrderNumbers || [];
+      const visibleOrders = orderNumbers.slice(0, 8).join("、");
+      const remaining = Math.max(0, orderNumbers.length - 8);
+      return `检测到 ${summary.mergedDocumentCount} 个重复单号文件，已按单号自动合并为 ${orderNumbers.length} 张送货单（${visibleOrders}${remaining ? ` 等 ${orderNumbers.length} 个单号` : ""}）。${summary.skippedDuplicateItemCount ? `同时去除 ${summary.skippedDuplicateItemCount} 条完全重复的商品明细。` : ""}`;
+    }
+
+    function advanceBatchToImportPreview({ allowPartial = false } = {}) {
+      saveActiveBatchRecordForm();
+      const records = activeWorkflowState?.batchRecords || [];
+      const counts = getBatchCounts(records);
+      if (counts.unresolved && !allowPartial) {
+        global.alert?.(
+          `还有 ${counts.unresolved} 个文件未确认或未处理，暂不能导入。`,
+        );
+        updateBatchPrimaryState();
+        return false;
+      }
+      const documents = getConfirmedBatchDocuments(records);
+      if (!documents.length) {
+        global.alert?.("没有已确认的文件可导入。");
+        updateBatchPrimaryState();
+        return false;
+      }
+      const mergeSummary = mergeDocumentsByOrderNumber(documents);
+      const mergedDocuments = mergeSummary.documents;
+      const mergeMessage = getMergeSummaryMessage(mergeSummary);
+      if (mergeMessage) global.showAntdMessage?.("info", mergeMessage);
+      activeWorkflowState.documents = mergedDocuments;
+      activeWorkflowState.documentCount = mergedDocuments.length;
+      activeWorkflowState.mergeSummary = mergeSummary;
+      showImportPlanPage(mergedDocuments, null, mergedDocuments.length, {
+        partialBatch: allowPartial && counts.unresolved > 0,
+        mergeSummary,
+      });
+      return false;
+    }
+
+    function openBatchRecord(recordId) {
+      const state = activeWorkflowState;
+      if (!Array.isArray(state?.batchRecords)) return;
+      if (!state.batchRecords.some((record) => record.id === recordId)) return;
+      saveActiveBatchRecordForm();
+      state.activeRecordId = recordId;
+      showBatchReviewPage(state.batchRecords, {
+        preserve: true,
+        activeRecordId: recordId,
+      });
+    }
+
+    function bindBatchReviewEvents() {
+      const state = activeWorkflowState;
+      if (!Array.isArray(state?.batchRecords)) return;
+      global.document
+        ?.querySelectorAll("[data-batch-select]")
+        .forEach((checkbox) => {
+          checkbox.onchange = (event) => {
+            event.stopPropagation();
+            const next = new Set(state.selectedRecordIds || []);
+            if (checkbox.checked) next.add(checkbox.dataset.batchSelect);
+            else next.delete(checkbox.dataset.batchSelect);
+            state.selectedRecordIds = Array.from(next);
+            const count = global.document?.getElementById(
+              "delivery-import-batch-selected-count",
+            );
+            if (count) count.textContent = String(next.size);
+          };
+        });
+      global.document
+        ?.querySelectorAll("[data-batch-open]")
+        .forEach((button) => {
+          button.onclick = () => openBatchRecord(button.dataset.batchOpen);
+        });
+      const selectPage = global.document?.getElementById(
+        "delivery-import-batch-select-page",
+      );
+      if (selectPage) {
+        selectPage.onchange = () => {
+          const next = new Set(state.selectedRecordIds || []);
+          getCurrentBatchPageRecords(state.batchRecords, state).forEach(
+            (record) => {
+              if (selectPage.checked) next.add(record.id);
+              else next.delete(record.id);
+            },
+          );
+          state.selectedRecordIds = Array.from(next);
+          rerenderBatchReview();
+        };
+      }
+      const confirmPageButton = global.document?.getElementById(
+        "delivery-import-batch-confirm-page",
+      );
+      if (confirmPageButton) {
+        confirmPageButton.onclick = () => {
+          saveActiveBatchRecordForm();
+          const result = confirmSafeBatchRecords(
+            getCurrentBatchPageRecords(state.batchRecords, state),
+          );
+          rerenderBatchReview(
+            result.confirmed
+              ? `本页已批量确认 ${result.confirmed} 个无异常文件${result.skipped ? `，跳过 ${result.skipped} 个需人工检查的文件` : ""}。`
+              : "本页没有可自动确认的无异常文件。",
+            result.confirmed ? "success" : "warning",
+          );
+        };
+      }
+      const confirmDirectoryButton = global.document?.getElementById(
+        "delivery-import-batch-confirm-directory",
+      );
+      if (confirmDirectoryButton) {
+        confirmDirectoryButton.onclick = () => {
+          saveActiveBatchRecordForm();
+          const activeRecord = state.batchRecords.find(
+            (record) => record.id === state.activeRecordId,
+          );
+          const directory = getBatchDirectory(activeRecord);
+          const records = state.batchRecords.filter(
+            (record) => getBatchDirectory(record) === directory,
+          );
+          const result = confirmSafeBatchRecords(records);
+          rerenderBatchReview(
+            result.confirmed
+              ? `“${directory}”已确认 ${result.confirmed} 个无异常文件${result.skipped ? `，跳过 ${result.skipped} 个需人工检查的文件` : ""}。`
+              : `“${directory}”没有可自动确认的无异常文件。`,
+            result.confirmed ? "success" : "warning",
+          );
+        };
+      }
+      const confirmSelectedButton = global.document?.getElementById(
+        "delivery-import-batch-confirm-selected",
+      );
+      if (confirmSelectedButton) {
+        confirmSelectedButton.onclick = () => {
+          saveActiveBatchRecordForm();
+          const selectedIds = new Set(state.selectedRecordIds || []);
+          const selectedRecords = state.batchRecords.filter((record) =>
+            selectedIds.has(record.id),
+          );
+          if (!selectedRecords.length) {
+            global.showAntdMessage?.("warning", "请先勾选要处理的文件。");
+            return;
+          }
+          const result = confirmSafeBatchRecords(selectedRecords);
+          state.selectedRecordIds = [];
+          rerenderBatchReview(
+            result.confirmed
+              ? `已确认 ${result.confirmed} 个选中的无异常文件${result.skipped ? `，跳过 ${result.skipped} 个需人工检查的文件` : ""}。`
+              : `选中的 ${result.skipped} 个文件均需人工检查，未执行批量确认。`,
+            result.confirmed ? "success" : "warning",
+          );
+        };
+      }
+      const excludeSelectedButton = global.document?.getElementById(
+        "delivery-import-batch-exclude-selected",
+      );
+      if (excludeSelectedButton) {
+        excludeSelectedButton.onclick = async () => {
+          const selectedIds = new Set(state.selectedRecordIds || []);
+          const selectedRecords = state.batchRecords.filter(
+            (record) =>
+              selectedIds.has(record.id) && record.reviewStatus !== "confirmed",
+          );
+          if (!selectedRecords.length) {
+            global.showAntdMessage?.(
+              "warning",
+              "请勾选尚未确认、需要排除的文件。",
+            );
+            return;
+          }
+          const confirmed = await showImportConfirm({
+            title: `排除选中的 ${selectedRecords.length} 个文件？`,
+            content:
+              "排除后这些文件不会写入系统；已确认文件不会被此批量操作影响。",
+            okText: "确认批量排除",
+            cancelText: "继续核对",
+            okType: "danger",
+          });
+          if (!confirmed) return;
+          selectedRecords.forEach((record) => {
+            record.reviewedDocuments = null;
+            record.reviewStatus = "excluded";
+            record.editMode = false;
+          });
+          state.selectedRecordIds = [];
+          rerenderBatchReview(
+            `已排除 ${selectedRecords.length} 个文件，已确认文件保持不变。`,
+          );
+        };
+      }
+      const search = global.document?.getElementById(
+        "delivery-import-batch-search",
+      );
+      if (search) {
+        search.onchange = () => {
+          saveActiveBatchRecordForm();
+          state.batchQuery = search.value;
+          state.batchPage = 1;
+          const firstRecord = getBatchRecordForPage(
+            state.batchRecords,
+            state,
+            1,
+          );
+          showBatchReviewPage(state.batchRecords, {
+            preserve: true,
+            activeRecordId: firstRecord?.id,
+            batchPage: 1,
+          });
+        };
+        search.onkeydown = (event) => {
+          if (event.key === "Enter") search.onchange();
+        };
+      }
+      const filter = global.document?.getElementById(
+        "delivery-import-batch-filter",
+      );
+      if (filter) {
+        filter.onchange = () => {
+          saveActiveBatchRecordForm();
+          state.batchFilter = filter.value;
+          state.batchPage = 1;
+          const firstRecord = getBatchRecordForPage(
+            state.batchRecords,
+            state,
+            1,
+          );
+          showBatchReviewPage(state.batchRecords, {
+            preserve: true,
+            activeRecordId: firstRecord?.id,
+            batchPage: 1,
+          });
+        };
+      }
+      global.document
+        ?.querySelectorAll("[data-batch-page]")
+        .forEach((button) => {
+          button.onclick = () => {
+            saveActiveBatchRecordForm();
+            const targetPage =
+              state.batchPage + (button.dataset.batchPage === "next" ? 1 : -1);
+            const firstRecord = getBatchRecordForPage(
+              state.batchRecords,
+              state,
+              targetPage,
+            );
+            showBatchReviewPage(state.batchRecords, {
+              preserve: true,
+              activeRecordId: firstRecord?.id,
+              batchPage: targetPage,
+            });
+          };
+        });
+      const activeRecord = state.batchRecords.find(
+        (record) => record.id === state.activeRecordId,
+      );
+      const detailForm = global.document?.getElementById(
+        "delivery-import-batch-detail-form",
+      );
+      const editButton = global.document?.querySelector("[data-batch-edit]");
+      if (editButton && activeRecord) {
+        editButton.onclick = () => {
+          activeRecord.editMode = true;
+          showBatchReviewPage(state.batchRecords, {
+            preserve: true,
+            activeRecordId: activeRecord.id,
+          });
+        };
+      }
+      const cancelEditButton = global.document?.querySelector(
+        "[data-batch-edit-cancel]",
+      );
+      if (cancelEditButton && activeRecord) {
+        cancelEditButton.onclick = () => {
+          activeRecord.editMode = false;
+          showBatchReviewPage(state.batchRecords, {
+            preserve: true,
+            activeRecordId: activeRecord.id,
+          });
+        };
+      }
+      const saveEditButton = global.document?.querySelector(
+        "[data-batch-edit-save]",
+      );
+      if (saveEditButton && activeRecord) {
+        saveEditButton.onclick = () => {
+          const reviewed = collectReviewedDocuments(
+            detailForm,
+            activeRecord.documents,
+          );
+          if (!reviewed.ok) {
+            global.alert?.(reviewed.message);
+            return;
+          }
+          activeRecord.formState = captureReviewFormState(detailForm);
+          activeRecord.previewDocuments = reviewed.documents;
+          activeRecord.reviewedDocuments = null;
+          activeRecord.reviewStatus = "pending";
+          activeRecord.editMode = false;
+          showBatchReviewPage(state.batchRecords, {
+            preserve: true,
+            activeRecordId: activeRecord.id,
+          });
+        };
+      }
+      const confirmButton = global.document?.querySelector(
+        "[data-batch-confirm]",
+      );
+      if (confirmButton && activeRecord) {
+        confirmButton.onclick = () => {
+          const reviewed = collectReviewedDocuments(
+            detailForm,
+            activeRecord.documents,
+          );
+          if (!reviewed.ok) {
+            global.alert?.(reviewed.message);
+            return;
+          }
+          activeRecord.formState = captureReviewFormState(detailForm);
+          activeRecord.reviewedDocuments = reviewed.documents;
+          activeRecord.reviewStatus = "confirmed";
+          const next = findNextBatchRecord(state.batchRecords, activeRecord.id);
+          state.activeRecordId = next?.id || activeRecord.id;
+          showBatchReviewPage(state.batchRecords, {
+            preserve: true,
+            activeRecordId: state.activeRecordId,
+          });
+        };
+      }
+      const excludeButton = global.document?.querySelector(
+        "[data-batch-exclude]",
+      );
+      if (excludeButton && activeRecord) {
+        excludeButton.onclick = async () => {
+          excludeButton.disabled = true;
+          const confirmed = await showImportConfirm({
+            title: "排除此文件？",
+            content: `确认排除“${activeRecord.fileName}”？排除后，该文件不会写入系统。`,
+            okText: "确认排除",
+            cancelText: "继续核对",
+            okType: "danger",
+          });
+          if (!confirmed) {
+            excludeButton.disabled = false;
+            return;
+          }
+          activeRecord.formState = detailForm
+            ? captureReviewFormState(detailForm)
+            : activeRecord.formState;
+          activeRecord.reviewedDocuments = null;
+          activeRecord.reviewStatus = "excluded";
+          const next = findNextBatchRecord(state.batchRecords, activeRecord.id);
+          state.activeRecordId = next?.id || activeRecord.id;
+          showBatchReviewPage(state.batchRecords, {
+            preserve: true,
+            activeRecordId: state.activeRecordId,
+          });
+        };
+      }
+      const restoreButton = global.document?.querySelector(
+        "[data-batch-restore]",
+      );
+      if (restoreButton && activeRecord) {
+        restoreButton.onclick = () => {
+          activeRecord.reviewStatus = activeRecord.documents?.length
+            ? "pending"
+            : "error";
+          showBatchReviewPage(state.batchRecords, {
+            preserve: true,
+            activeRecordId: activeRecord.id,
+          });
+        };
+      }
+      const partialButton = global.document?.getElementById(
+        "delivery-import-workflow-partial",
+      );
+      if (partialButton) {
+        partialButton.onclick = async () => {
+          const counts = getBatchCounts(state.batchRecords);
+          if (!counts.confirmed) return;
+          const confirmed = await showImportConfirm({
+            title: `暂时导入已确认的 ${counts.confirmed} 个文件？`,
+            content: `本次只会进入已确认文件的最终预览；剩余 ${counts.unresolved} 个待确认或失败文件不会保存，也不会写入系统。下次上传同一压缩包时，已成功导入的文件会自动过滤。`,
+            okText: "预览已确认文件",
+            cancelText: "继续核对",
+            okType: "primary",
+          });
+          if (confirmed) {
+            advanceBatchToImportPreview({ allowPartial: true });
+          }
+        };
+      }
+      updateBatchPrimaryState();
+      bindBatchReviewKeyboard();
+    }
+
+    function bindBatchReviewKeyboard() {
+      if (global.document?.documentElement?.dataset.batchKeyboardBound) return;
+      global.document.documentElement.dataset.batchKeyboardBound = "true";
+      global.document.addEventListener("keydown", (event) => {
+        if (!Array.isArray(activeWorkflowState?.batchRecords)) return;
+        const workflow = global.document.getElementById(
+          "history-import-workflow",
+        );
+        if (!workflow || workflow.classList.contains("hidden")) return;
+        if (
+          event.target?.closest?.(
+            "input, select, textarea, button, [contenteditable=true], .ant-modal-root",
+          )
+        ) {
+          return;
+        }
+        let button = null;
+        if (event.key === "Enter") {
+          button = global.document.querySelector("[data-batch-confirm]");
+        } else if (event.key.toLowerCase() === "e") {
+          button = global.document.querySelector("[data-batch-edit]");
+        } else if (event.key === "Escape") {
+          button = global.document.querySelector("[data-batch-edit-cancel]");
+        } else if (event.altKey && event.key.toLowerCase() === "x") {
+          button = global.document.querySelector("[data-batch-exclude]");
+        }
+        if (!button || button.disabled) return;
+        event.preventDefault();
+        button.click();
+      });
+    }
+
+    function showBatchReviewPage(records, options = {}) {
+      const data = global.mockData || {};
+      const previous = options.preserve ? activeWorkflowState || {} : {};
+      const currentQueue = global.document?.querySelector(
+        ".delivery-import-batch-queue",
+      );
+      const batchQueueScrollTop = options.preserve
+        ? Number(currentQueue?.scrollTop) ||
+          Number(previous.batchQueueScrollTop) ||
+          0
+        : 0;
+      const preparedRecords = options.preserve
+        ? records
+        : records.map((record, index) => ({
+            ...record,
+            id: `batch-file-${index + 1}`,
+            reviewStatus:
+              record.status === "error" || !record.documents?.length
+                ? "error"
+                : "pending",
+            editMode: false,
+            documents: (record.documents || []).map((documentData) =>
+              enrichMatches(attachBatchSource(documentData, record), data),
+            ),
+          }));
+      const hasRequestedActiveRecord = Object.prototype.hasOwnProperty.call(
+        options,
+        "activeRecordId",
+      );
+      let activeRecordId =
+        (hasRequestedActiveRecord
+          ? options.activeRecordId
+          : previous.activeRecordId) ||
+        preparedRecords.find((record) =>
+          ["pending", "error"].includes(record.reviewStatus),
+        )?.id ||
+        preparedRecords[0]?.id;
+      if (!preparedRecords.some((record) => record.id === activeRecordId)) {
+        activeRecordId = preparedRecords[0]?.id;
+      }
+      const batchFilter = previous.batchFilter || "all";
+      const batchQuery = previous.batchQuery || "";
+      const filteredRecords = getFilteredBatchRecords(
+        preparedRecords,
+        batchFilter,
+        batchQuery,
+      );
+      const pageCount = Math.max(
+        1,
+        Math.ceil(filteredRecords.length / BATCH_PAGE_SIZE),
+      );
+      let batchPage = Math.min(
+        Math.max(1, Number(options.batchPage || previous.batchPage || 1)),
+        pageCount,
+      );
+      const activeFilteredIndex = filteredRecords.findIndex(
+        (record) => record.id === activeRecordId,
+      );
+      if (hasRequestedActiveRecord && activeFilteredIndex >= 0) {
+        batchPage = Math.floor(activeFilteredIndex / BATCH_PAGE_SIZE) + 1;
+      }
+      const pageStart = (batchPage - 1) * BATCH_PAGE_SIZE;
+      const pageRecords = filteredRecords.slice(
+        pageStart,
+        pageStart + BATCH_PAGE_SIZE,
+      );
+      if (!pageRecords.some((record) => record.id === activeRecordId)) {
+        activeRecordId = pageRecords[0]?.id;
+      }
+      activeWorkflowState = {
+        ...previous,
+        batchRecords: preparedRecords,
+        activeRecordId,
+        batchFilter,
+        batchQuery,
+        batchPage,
+        batchQueueScrollTop,
+        selectedRecordIds: (previous.selectedRecordIds || []).filter((id) =>
+          preparedRecords.some((record) => record.id === id),
+        ),
+        skippedProcessedCount:
+          Number(options.skippedProcessedCount) ||
+          Number(previous.skippedProcessedCount) ||
+          0,
+        documentCount: preparedRecords.reduce(
+          (sum, record) => sum + (Number(record.documentCount) || 0),
+          0,
+        ),
+      };
+      const counts = getBatchCounts(preparedRecords);
+      const activeRecord = preparedRecords.find(
+        (record) => record.id === activeRecordId,
+      );
+      const currentPageRecords = getCurrentBatchPageRecords(
+        preparedRecords,
+        activeWorkflowState,
+      );
+      const selectedIds = new Set(activeWorkflowState.selectedRecordIds || []);
+      const isPageSelected =
+        currentPageRecords.length > 0 &&
+        currentPageRecords.every((record) => selectedIds.has(record.id));
+      const activeDirectory = getBatchDirectory(activeRecord);
+      const content = `
+        <div id="delivery-import-batch-review">
+          <div class="delivery-import-batch-notice">
+            <i class="fa fa-list-alt"></i>
+            <div><strong>压缩包按文件逐一核对</strong><p>每个 Excel 可以“确认”或明确“排除”；也可以先暂时导入已确认文件，其余文件不会保存。${activeWorkflowState.skippedProcessedCount ? ` 已自动过滤 ${activeWorkflowState.skippedProcessedCount} 个以前成功导入的文件。` : ""}</p></div>
+          </div>
+          <div class="delivery-import-summary delivery-import-batch-summary">
+            <div><div class="text-xs text-gray-500">压缩包内 Excel</div><div class="mt-1 text-xl font-semibold" data-batch-count="total">${counts.total}</div></div>
+            <div><div class="text-xs text-gray-500">已确认</div><div class="mt-1 text-xl font-semibold text-green-600" data-batch-count="confirmed">${counts.confirmed}</div></div>
+            <div><div class="text-xs text-gray-500">待确认 / 失败</div><div class="mt-1 text-xl font-semibold text-amber-600"><span data-batch-count="pending">${counts.pending}</span> / <span data-batch-count="error">${counts.error}</span></div></div>
+            <div><div class="text-xs text-gray-500">已排除</div><div class="mt-1 text-xl font-semibold text-gray-500" data-batch-count="excluded">${counts.excluded}</div></div>
+          </div>
+          <div class="delivery-import-batch-bulk-actions" aria-label="批量文件处理">
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input id="delivery-import-batch-select-page" type="checkbox" ${isPageSelected ? "checked" : ""}>
+              选择本页
+            </label>
+            <span class="selection-summary">已选 <strong id="delivery-import-batch-selected-count">${selectedIds.size}</strong> 个</span>
+            <button id="delivery-import-batch-confirm-page" type="button" class="rounded-lg border border-primary bg-white px-3 py-2 text-sm text-primary hover:bg-purple-50">确认本页无异常</button>
+            <button id="delivery-import-batch-confirm-directory" type="button" class="rounded-lg border border-primary bg-white px-3 py-2 text-sm text-primary hover:bg-purple-50" title="${escapeHTML(activeDirectory)}">确认同目录无异常</button>
+            <button id="delivery-import-batch-confirm-selected" type="button" class="rounded-lg bg-primary px-3 py-2 text-sm text-white hover:bg-primary-dark">确认选中无异常</button>
+            <button id="delivery-import-batch-exclude-selected" type="button" class="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-red-600 hover:bg-red-50">排除选中</button>
+          </div>
+          <div class="delivery-import-batch-layout">
+            <aside class="delivery-import-batch-sidebar">${buildBatchQueueMarkup(preparedRecords, activeWorkflowState)}</aside>
+            <section class="delivery-import-batch-detail">${buildBatchDetailMarkup(activeRecord, data)}</section>
+          </div>
+        </div>`;
+      showImportWorkflowPage({
+        title: `批量核对压缩包（${counts.total} 个 Excel）`,
+        subtitle: `已识别 ${counts.documents} 张单据、${counts.items} 条明细；逐个文件确认后才能导入。`,
+        step: "review",
+        content,
+        primaryText: "全部文件确认后可预览",
+        secondaryText: "取消整批导入",
+        onPrimary: () => advanceBatchToImportPreview(),
+        onSecondary: () => returnToImportSettings({ clearState: true }),
+        preserveScroll: Boolean(options.preserve),
+      });
+      if (activeRecord?.formState) {
+        applyReviewFormState(
+          global.document?.getElementById("delivery-import-batch-detail-form"),
+          activeRecord.formState,
+        );
+      }
+      bindBatchReviewEvents();
+      renderBatchNavigationMenu(preparedRecords, activeWorkflowState);
+      const restoredQueue = global.document?.querySelector(
+        ".delivery-import-batch-queue",
+      );
+      if (restoredQueue) restoredQueue.scrollTop = batchQueueScrollTop;
+      revealActiveBatchRecord();
+      return preparedRecords;
     }
 
     function restoreReviewPage(reviewRoot, documentCount) {
@@ -1358,6 +3003,7 @@
 
     function persistActiveWorkflowDraft(stage) {
       if (!activeWorkflowState) return false;
+      if (Array.isArray(activeWorkflowState.batchRecords)) return false;
       const reviewRoot =
         activeWorkflowState.reviewRoot ||
         global.document?.getElementById("delivery-import-review");
@@ -1386,8 +3032,10 @@
       reviewRoot.addEventListener("change", persistReview);
     }
 
-    function collectReviewedDocuments() {
-      const root = global.document?.getElementById("delivery-import-review");
+    function collectReviewedDocuments(rootOverride, reviewDocumentsOverride) {
+      const root =
+        rootOverride ||
+        global.document?.getElementById("delivery-import-review");
       if (!root) return { ok: false, message: "未找到导入核对内容。" };
       const documents = [];
       for (const documentElement of root.querySelectorAll(
@@ -1440,10 +3088,10 @@
             message: `送货单 ${orderNo} 没有启用的商品明细。`,
           };
         }
-        const originalDocument =
-          activeWorkflowState?.reviewDocuments?.[
-            Number(documentElement.dataset.importDocument)
-          ];
+        const originalDocument = (reviewDocumentsOverride ||
+          activeWorkflowState?.reviewDocuments)?.[
+          Number(documentElement.dataset.importDocument)
+        ];
         documents.push({
           orderNo,
           issueDate,
@@ -1466,6 +3114,9 @@
             originalDocument?.sourceFileName ||
             documentElement.querySelector("summary strong")?.textContent ||
             "",
+          sourceArchiveName: originalDocument?.sourceArchiveName || "",
+          sourceRelativePath: originalDocument?.sourceRelativePath || "",
+          sourceArchiveEntryKey: originalDocument?.sourceArchiveEntryKey || "",
           importKind: originalDocument?.importKind || "delivery-note",
           statementGroupId: originalDocument?.statementGroupId || "",
           statementMeta: originalDocument?.statementMeta || null,
@@ -1480,7 +3131,6 @@
           normalizeMatchValue(item.orderNo || item.customerNo),
         ),
       );
-      const seen = new Set();
       for (const item of documents) {
         const key = normalizeMatchValue(item.orderNo);
         if (existing.has(key)) {
@@ -1489,15 +3139,13 @@
             message: `送货单号 ${item.orderNo} 已存在，请取消该单导入或修改单号。`,
           };
         }
-        if (seen.has(key)) {
-          return {
-            ok: false,
-            message: `本次选择中存在重复送货单号 ${item.orderNo}。`,
-          };
-        }
-        seen.add(key);
       }
-      return { ok: true, documents };
+      const merged = mergeDocumentsByOrderNumber(documents);
+      return {
+        ok: true,
+        documents: merged.documents,
+        mergeSummary: merged,
+      };
     }
 
     function getNow() {
@@ -1712,6 +3360,21 @@
         details.reduce((sum, item) => sum + item.lineAmount, 0),
       );
       const historicalTime = `${documentData.issueDate}T12:00:00`;
+      const sourceFileNames = getDocumentSourceValues(
+        documentData,
+        "sourceFileNames",
+        "sourceFileName",
+      );
+      const sourceRelativePaths = getDocumentSourceValues(
+        documentData,
+        "sourceRelativePaths",
+        "sourceRelativePath",
+      );
+      const sourceArchiveEntryKeys = getDocumentSourceValues(
+        documentData,
+        "sourceArchiveEntryKeys",
+        "sourceArchiveEntryKey",
+      );
       return {
         id: deliveryNoteId,
         type: "sales",
@@ -1726,7 +3389,7 @@
         priceTaxModeSnapshot:
           documentData.priceTaxMode === "inclusive" ? "inclusive" : "exclusive",
         warehouseId: global.getDefaultWarehouseId?.() || "WH001",
-        notes: `历史送货单导入（不调整库存）${documentData.sourceFileName ? `；来源：${documentData.sourceFileName}` : ""}`,
+        notes: `历史送货单导入（不调整库存）${sourceFileNames.length ? `；来源：${sourceFileNames.join("、")}` : ""}`,
         companyId: company.id,
         companyName: documentData.companyName,
         companyAddress: documentData.companyAddress,
@@ -1741,6 +3404,12 @@
         customerNo: documentData.orderNo,
         importSource: "xlsx",
         sourceFileName: documentData.sourceFileName,
+        sourceArchiveName: documentData.sourceArchiveName || "",
+        sourceRelativePath: documentData.sourceRelativePath || "",
+        sourceArchiveEntryKey: documentData.sourceArchiveEntryKey || "",
+        sourceFileNames,
+        sourceRelativePaths,
+        sourceArchiveEntryKeys,
         historicalImport: true,
         inventoryEffect: "none",
         importedAt: now,
@@ -1772,9 +3441,9 @@
             notes: [],
           });
         }
-        groups.get(documentData.statementGroupId).notes.push(
-          deliveryNotes[index],
-        );
+        groups
+          .get(documentData.statementGroupId)
+          .notes.push(deliveryNotes[index]);
       });
 
       const statements = [];
@@ -1817,8 +3486,7 @@
               productId: detail.productId,
               productNameSnapshot:
                 detail.productNameSnapshot || detail.productName,
-              specSnapshot:
-                detail.specificationSnapshot || detail.spec || "",
+              specSnapshot: detail.specificationSnapshot || detail.spec || "",
               unitSnapshot: detail.unitSnapshot || detail.unit || "",
               quantity: Number(detail.quantity) || 0,
               unitPrice: Number(detail.unitPrice) || 0,
@@ -2234,6 +3902,7 @@
             <div class="font-semibold"><i class="fa fa-eye mr-1"></i>以下只是最终预览，尚未写入系统</div>
             <div class="mt-1 text-xs leading-5 text-blue-700">请确认新增和补充内容。只有点击“最终确认导入”后，下面的信息才会作为一笔事务保存。<span class="ml-2 inline-flex items-center gap-2"><span class="delivery-import-inline-legend is-create">新增</span><span class="delivery-import-inline-legend is-update">补充 / 调整</span></span></div>
           </div>
+          ${plan.mergeSummary?.mergedDocumentCount ? `<div class="rounded-xl border border-purple-100 bg-purple-50 px-4 py-3 text-sm text-purple-900" data-import-merge-summary><div class="font-semibold"><i class="fa fa-compress mr-1"></i>相同送货单号已自动合并</div><div class="mt-1 text-xs leading-5 text-purple-700">${escapeHTML(getMergeSummaryMessage(plan.mergeSummary))}</div></div>` : ""}
           ${summaryCards.length ? `<div class="delivery-import-change-summary">${summaryCards.join("")}</div>` : ""}
           ${buildMasterDataPreview(plan)}
           <section class="space-y-3"><div><h4 class="font-semibold text-gray-900">送货单与商品明细</h4><p class="mt-1 text-xs text-gray-500">下面的送货单会进入历史销售记录和后续客户对账来源。</p></div>${buildDeliveryPreview(plan)}</section>
@@ -2243,8 +3912,15 @@
         </div>`;
     }
 
-    function showImportPlanPage(documents, reviewRoot, documentCount) {
+    function showImportPlanPage(
+      documents,
+      reviewRoot,
+      documentCount,
+      options = {},
+    ) {
       const plan = createImportPlan(documents);
+      plan.mergeSummary =
+        options.mergeSummary || activeWorkflowState?.mergeSummary;
       activeWorkflowState = {
         ...activeWorkflowState,
         documentCount,
@@ -2258,10 +3934,15 @@
           activeWorkflowState?.formState ||
           [],
         reviewRoot,
+        mergeSummary: plan.mergeSummary,
       };
       showImportWorkflowPage({
-        title: "预览本次新增与补充内容",
-        subtitle: "这是写入前的最终预览；确认各项变更无误后再执行导入。",
+        title: options.partialBatch
+          ? "预览本次暂时导入的已确认文件"
+          : "预览本次新增与补充内容",
+        subtitle: options.partialBatch
+          ? "本次只写入已经确认的文件；其余文件不会保存，下次上传同一压缩包时可继续处理。"
+          : "这是写入前的最终预览；确认各项变更无误后再执行导入。",
         step: "preview",
         content: buildImportPlanMarkup(plan),
         primaryText: "最终确认导入",
@@ -2271,29 +3952,19 @@
           if (saved) returnToImportSettings({ clearState: true });
           return saved;
         },
-        onSecondary: () => restoreReviewPage(reviewRoot, documentCount),
+        onSecondary: () => {
+          if (Array.isArray(activeWorkflowState?.batchRecords)) {
+            showBatchReviewPage(activeWorkflowState.batchRecords, {
+              preserve: true,
+              activeRecordId: activeWorkflowState.activeRecordId,
+            });
+            return;
+          }
+          restoreReviewPage(reviewRoot, documentCount);
+        },
       });
       persistActiveWorkflowDraft("preview");
       return plan;
-    }
-
-    function showEmptyWorkflowState(message) {
-      activeWorkflowState = null;
-      return showImportWorkflowPage({
-        title: "历史送货单 / 对账单导入",
-        subtitle: "从系统设置选择 Excel 送货单或客户对账单，核对并预览后再确认写入。",
-        step: "review",
-        content: `
-          <div class="flex min-h-[240px] flex-col items-center justify-center px-6 py-12 text-center">
-            <span class="flex h-14 w-14 items-center justify-center rounded-full bg-purple-50 text-2xl text-primary"><i class="fa fa-file-excel-o"></i></span>
-            <h3 class="mt-4 text-base font-semibold text-gray-900">没有待处理的导入任务</h3>
-            <p class="mt-2 max-w-xl text-sm leading-6 text-gray-500">${escapeHTML(message || "刷新后会自动恢复尚未完成的导入草稿。现在可以返回系统设置，或重新选择送货单 / 对账单文件。")}</p>
-          </div>`,
-        primaryText: "选择送货单 / 对账单文件",
-        secondaryText: "返回系统设置",
-        onPrimary: () => openFilePicker(),
-        onSecondary: () => returnToImportSettings(),
-      });
     }
 
     function draftContainsImportedOrder(draft) {
@@ -2310,14 +3981,16 @@
     function restoreWorkflowDraft() {
       const draft = readWorkflowDraft();
       if (!draft) {
-        showEmptyWorkflowState();
+        returnToImportSettings({ clearState: true });
         return false;
       }
       if (draftContainsImportedOrder(draft)) {
         clearWorkflowDraft();
-        showEmptyWorkflowState(
-          "暂存任务中的送货单已经存在于系统中，可能已完成导入。为防止重复写入，本次草稿已自动清除。",
+        global.showAntdMessage?.(
+          "warning",
+          "暂存任务中的送货单已经存在于系统中，本次草稿已自动清除。",
         );
+        returnToImportSettings();
         return false;
       }
 
@@ -2482,21 +4155,351 @@
       return true;
     }
 
+    function isArchiveFile(file) {
+      return /\.(?:rar|zip)$/i.test(file?.name || "");
+    }
+
+    function createStandaloneBatchRecord(file, parsed, index) {
+      const documents = parsed.ok
+        ? Array.isArray(parsed.documents)
+          ? parsed.documents
+          : [parsed]
+        : [];
+      return {
+        id: `selected-file-${index + 1}`,
+        archiveName: "单独选择的 Excel",
+        relativePath: file.name,
+        fileName: file.name,
+        size: Number(file.size) || 0,
+        status: parsed.ok ? "pending" : "error",
+        importKind:
+          parsed.importKind || documents[0]?.importKind || "delivery-note",
+        errors: parsed.errors || [],
+        warnings: parsed.warnings || [],
+        documentCount: documents.length,
+        itemCount: documents.reduce(
+          (sum, documentData) => sum + (documentData.items?.length || 0),
+          0,
+        ),
+        totalAmount: documents.reduce(
+          (sum, documentData) =>
+            sum + Number(documentData.calculatedTotal || 0),
+          0,
+        ),
+        documents,
+      };
+    }
+
+    async function confirmArchiveImportExit() {
+      const options = {
+        title: "退出压缩包解析？",
+        content:
+          "退出后将立即停止当前解析，本批次已经解析的内容不会进入核对和导入流程。确定要退出吗？",
+        okText: "确定退出",
+        cancelText: "继续解析",
+        okType: "danger",
+      };
+      return showImportConfirm(options);
+    }
+
+    function showArchiveProgressDialog(archiveCount, onExit) {
+      const document = global.document;
+      if (!document?.body) {
+        return { update() {}, close() {} };
+      }
+      document.getElementById("archive-import-progress-dialog")?.remove();
+      const overlay = document.createElement("div");
+      overlay.id = "archive-import-progress-dialog";
+      overlay.className = "archive-import-progress-overlay";
+      overlay.innerHTML = `
+        <div class="archive-import-progress-card" role="dialog" aria-modal="true" aria-labelledby="archive-import-progress-title">
+          <div class="archive-import-progress-heading">
+            <span class="archive-import-progress-icon"><i class="fa fa-file-archive-o"></i></span>
+            <div>
+              <h3 id="archive-import-progress-title">正在处理压缩包</h3>
+              <p data-archive-progress-batch>准备处理 ${archiveCount} 个压缩包</p>
+            </div>
+          </div>
+          <div class="archive-import-progress-state">
+            <strong data-archive-progress-status>正在读取压缩包…</strong>
+            <span data-archive-progress-percent>0%</span>
+          </div>
+          <div class="archive-import-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <span data-archive-progress-bar></span>
+          </div>
+          <div class="archive-import-progress-file">
+            <span>当前文件</span>
+            <strong data-archive-progress-file>等待解压…</strong>
+          </div>
+          <div class="archive-import-progress-footer">
+            <p class="archive-import-progress-tip">文件较多时需要一些时间，请保持当前页面开启。</p>
+            <button type="button" class="archive-import-progress-exit" data-archive-progress-exit>中途退出</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      const batch = overlay.querySelector("[data-archive-progress-batch]");
+      const status = overlay.querySelector("[data-archive-progress-status]");
+      const percent = overlay.querySelector("[data-archive-progress-percent]");
+      const track = overlay.querySelector(".archive-import-progress-track");
+      const bar = overlay.querySelector("[data-archive-progress-bar]");
+      const currentFile = overlay.querySelector("[data-archive-progress-file]");
+      const exitButton = overlay.querySelector("[data-archive-progress-exit]");
+      let displayedPercent = 0;
+      let autoCeiling = 0;
+      let closed = false;
+
+      const renderPercent = (nextPercent, nextCeiling = nextPercent) => {
+        displayedPercent = Math.max(
+          displayedPercent,
+          Math.min(100, Number(nextPercent) || 0),
+        );
+        autoCeiling = Math.max(
+          autoCeiling,
+          displayedPercent,
+          Math.min(100, Number(nextCeiling) || 0),
+        );
+        const rounded = Math.round(displayedPercent);
+        track?.setAttribute("aria-valuenow", String(rounded));
+        if (bar) bar.style.width = `${displayedPercent}%`;
+        if (percent) {
+          percent.textContent = `${displayedPercent > 0 && displayedPercent < 1 ? displayedPercent.toFixed(1) : rounded}%`;
+        }
+      };
+      const progressTimer = global.setInterval?.(() => {
+        if (closed || displayedPercent >= autoCeiling) return;
+        renderPercent(Math.min(autoCeiling, displayedPercent + 0.2));
+      }, 450);
+      exitButton?.addEventListener("click", async () => {
+        if (exitButton.disabled) return;
+        exitButton.disabled = true;
+        const shouldExit = await onExit?.();
+        if (!shouldExit && !closed) exitButton.disabled = false;
+      });
+
+      return {
+        update(progress = {}) {
+          const phase = progress.phase || "extracting";
+          const archiveIndex = Number(progress.archiveIndex) || 1;
+          const archiveName =
+            progress.archiveName || progress.fileName || "压缩包";
+          const current = Number(progress.current) || 0;
+          const total = Number(progress.total) || 0;
+          const archiveSpan = 100 / Math.max(archiveCount, 1);
+          const archiveBase = (archiveIndex - 1) * archiveSpan;
+          const parseRatio = total > 0 ? Math.min(1, current / total) : 0;
+          let phasePercent = 5;
+          let phaseCeiling = 9;
+          if (phase === "uploading") {
+            phasePercent = 1;
+            phaseCeiling = 4;
+          } else if (phase === "extracted") {
+            phasePercent = 10;
+            phaseCeiling = 10;
+          } else if (phase === "parsing") {
+            phasePercent = 10 + parseRatio * 89.5;
+            phaseCeiling = phasePercent;
+          } else if (phase === "complete") {
+            phasePercent = 100;
+            phaseCeiling = 100;
+          }
+          renderPercent(
+            archiveBase + (phasePercent / 100) * archiveSpan,
+            archiveBase + (phaseCeiling / 100) * archiveSpan,
+          );
+          if (batch) {
+            batch.textContent = `${archiveName} · 第 ${archiveIndex}/${archiveCount} 个压缩包`;
+          }
+          if (phase === "uploading" || phase === "extracting") {
+            if (status) {
+              status.textContent =
+                phase === "uploading" ? "正在上传压缩包" : "正在解压压缩包";
+            }
+            if (currentFile) {
+              currentFile.textContent = archiveName;
+              currentFile.title = archiveName;
+            }
+            return;
+          }
+
+          if (status) {
+            status.textContent =
+              phase === "complete"
+                ? `解析完成 ${total}/${total}`
+                : `正在解析 ${current}/${total}`;
+          }
+          if (currentFile) {
+            const fileName = progress.fileName || archiveName;
+            currentFile.textContent = fileName;
+            currentFile.title = fileName;
+          }
+        },
+        close() {
+          closed = true;
+          if (progressTimer) global.clearInterval?.(progressTimer);
+          overlay.remove();
+        },
+      };
+    }
+
+    async function probeArchiveImportEndpoint(endpoint) {
+      try {
+        const response = await global.fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "X-Archive-Name": encodeURIComponent("probe.rar"),
+          },
+          body: new Uint8Array(0),
+        });
+        const contentType = response.headers?.get?.("content-type") || "";
+        const progressProtocol =
+          response.headers?.get?.("x-archive-progress") || "";
+        if (!contentType.includes("application/json")) return false;
+        const payload = await response.json();
+        return (
+          progressProtocol === "ndjson" &&
+          response.status === 400 &&
+          payload?.success === false &&
+          /压缩包内容为空/.test(payload?.error || "")
+        );
+      } catch {
+        return false;
+      }
+    }
+
+    async function resolveArchiveImportEndpoint() {
+      if (
+        archiveImportEndpoint &&
+        (await probeArchiveImportEndpoint(archiveImportEndpoint))
+      ) {
+        return archiveImportEndpoint;
+      }
+      const candidates = ["/api/import/archive"];
+      const protocol = global.location?.protocol;
+      if (protocol === "http:" || protocol === "https:") {
+        for (let port = 8080; port <= 8090; port += 1) {
+          candidates.push(`http://127.0.0.1:${port}/api/import/archive`);
+        }
+      }
+      for (const endpoint of [...new Set(candidates)]) {
+        if (await probeArchiveImportEndpoint(endpoint)) {
+          archiveImportEndpoint = endpoint;
+          return endpoint;
+        }
+      }
+      return "";
+    }
+
+    async function readArchiveProgressResponse(response, onProgress) {
+      if (!response.body?.getReader) {
+        throw new Error(
+          "当前浏览器不支持显示压缩包解析进度，请升级浏览器后重试。",
+        );
+      }
+      const reader = response.body.getReader();
+      const Decoder = global.TextDecoder || globalThis.TextDecoder;
+      const decoder = new Decoder();
+      let pending = "";
+      /** @type {any} */
+      let result = null;
+      const handleLine = (line) => {
+        if (!line.trim()) return;
+        const event = JSON.parse(line);
+        if (event.type === "progress") onProgress?.(event);
+        if (event.type === "complete") result = event.result;
+        if (event.type === "error") {
+          throw new Error(event.error || "压缩包解析失败。");
+        }
+      };
+      while (true) {
+        const { done, value } = await reader.read();
+        pending += decoder.decode(value || new Uint8Array(0), {
+          stream: !done,
+        });
+        const lines = pending.split("\n");
+        pending = lines.pop() || "";
+        lines.forEach(handleLine);
+        if (done) break;
+      }
+      handleLine(pending);
+      if (!result?.success) {
+        throw new Error(result?.error || "压缩包解析服务未返回完整结果。");
+      }
+      return result;
+    }
+
+    async function uploadArchiveFile(file, onProgress, signal) {
+      if (typeof global.fetch !== "function") {
+        throw new Error(
+          "当前运行环境不支持压缩包解析，请使用本地网页服务或桌面版。",
+        );
+      }
+      const endpoint = await resolveArchiveImportEndpoint();
+      if (!endpoint) {
+        throw new Error(
+          "未找到支持压缩包解析的本地服务，请打开最新版预览或桌面安装版。",
+        );
+      }
+      onProgress?.({ phase: "uploading", fileName: file.name });
+      const response = await global.fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-Archive-Name": encodeURIComponent(file.name),
+          "X-Progress-Stream": "1",
+        },
+        body: await file.arrayBuffer(),
+        signal,
+      });
+      const responseContentType = response.headers?.get?.("content-type") || "";
+      if (responseContentType.includes("application/x-ndjson")) {
+        const streamedPayload = await readArchiveProgressResponse(
+          response,
+          onProgress,
+        );
+        return streamedPayload.records || [];
+      }
+      let payload;
+      try {
+        payload = await response.json();
+      } catch {
+        throw new Error(
+          "压缩包解析服务不可用，请通过本地预览服务或桌面安装版打开系统。",
+        );
+      }
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || "压缩包解析失败。");
+      }
+      return payload.records || [];
+    }
+
     async function handleFiles(fileList) {
       const files = Array.from(fileList || []);
       if (!files.length) return false;
-      if (files.length > MAX_FILE_COUNT) {
+      const archiveFiles = files.filter(isArchiveFile);
+      const workbookFiles = files.filter((file) => !isArchiveFile(file));
+      if (archiveFiles.length > MAX_ARCHIVE_COUNT) {
+        global.alert?.(
+          `一次最多选择 ${MAX_ARCHIVE_COUNT} 个压缩包，请分批处理。`,
+        );
+        return false;
+      }
+      if (workbookFiles.length > MAX_FILE_COUNT) {
         global.alert?.(`一次最多导入 ${MAX_FILE_COUNT} 个文件，请分批处理。`);
         return false;
       }
-      const invalid = files.find(
-        (file) =>
-          !/\.xlsx?$/i.test(file.name || "") ||
-          Number(file.size) > MAX_FILE_SIZE,
-      );
+      const invalid = files.find((file) => {
+        const archive = isArchiveFile(file);
+        const validExtension = archive
+          ? /\.(?:rar|zip)$/i.test(file.name || "")
+          : /\.xlsx?$/i.test(file.name || "");
+        const sizeLimit = archive ? MAX_ARCHIVE_SIZE : MAX_FILE_SIZE;
+        return !validExtension || Number(file.size) > sizeLimit;
+      });
       if (invalid) {
         global.alert?.(
-          `文件“${invalid.name}”格式不支持或超过 15MB，请选择 .xlsx/.xls 文件。`,
+          `文件“${invalid.name}”格式不支持或超过大小限制；Excel 最大 15MB，RAR/ZIP 最大 80MB。`,
         );
         return false;
       }
@@ -2505,12 +4508,94 @@
         "historical-business-import-btn",
       );
       const originalText = button?.innerHTML;
+      const AbortControllerClass =
+        global.AbortController || globalThis.AbortController;
+      const abortController =
+        archiveFiles.length && AbortControllerClass
+          ? new AbortControllerClass()
+          : null;
+      let importCancelled = false;
+      let progressDialog = null;
+      if (archiveFiles.length) {
+        progressDialog = showArchiveProgressDialog(
+          archiveFiles.length,
+          async () => {
+            const confirmed = await confirmArchiveImportExit();
+            if (!confirmed) return false;
+            importCancelled = true;
+            abortController?.abort();
+            return true;
+          },
+        );
+      }
       if (button) {
         button.disabled = true;
         button.innerHTML =
           '<i class="fa fa-spinner fa-spin mr-2"></i>正在解析…';
       }
       try {
+        if (archiveFiles.length) {
+          const records = [];
+          const skippedProcessedRecords = [];
+          for (let index = 0; index < archiveFiles.length; index += 1) {
+            const file = archiveFiles[index];
+            if (button) {
+              button.innerHTML = `<i class="fa fa-spinner fa-spin mr-2"></i>正在解析压缩包 ${index + 1}/${archiveFiles.length}…`;
+            }
+            try {
+              const parsedRecords = await uploadArchiveFile(
+                file,
+                (progress) => {
+                  progressDialog?.update({
+                    ...progress,
+                    archiveIndex: index + 1,
+                    archiveName: file.name,
+                  });
+                },
+                abortController?.signal,
+              );
+              const filteredRecords = filterPreviouslyImportedArchiveRecords(
+                parsedRecords,
+                global.mockData,
+              );
+              skippedProcessedRecords.push(...filteredRecords.skipped);
+              records.push(...filteredRecords.pending);
+              if (importCancelled) return false;
+            } catch (error) {
+              if (importCancelled || error?.name === "AbortError") {
+                return false;
+              }
+              global.alert?.(
+                `压缩包“${file.name}”未能完整解析：${error?.message || "解析失败"}\n本批次尚未进入导入流程。`,
+              );
+              return false;
+            }
+          }
+          for (let index = 0; index < workbookFiles.length; index += 1) {
+            const file = workbookFiles[index];
+            let parsed;
+            try {
+              parsed = parseWorkbookBuffer(await file.arrayBuffer(), file.name);
+            } catch (error) {
+              parsed = {
+                ok: false,
+                errors: [error?.message || "解析失败"],
+                warnings: [],
+              };
+            }
+            records.push(createStandaloneBatchRecord(file, parsed, index));
+          }
+          if (!records.length && !skippedProcessedRecords.length) {
+            global.showAntdMessage?.(
+              "info",
+              "压缩包中没有可核对的 Excel 文件。",
+            );
+            return false;
+          }
+          showArchiveScreeningPage(records, skippedProcessedRecords);
+          return true;
+        }
+
         const documents = [];
         const failures = [];
         for (const file of files) {
@@ -2541,6 +4626,7 @@
         showReviewPage(documents);
         return true;
       } finally {
+        progressDialog?.close();
         if (button) {
           button.disabled = false;
           button.innerHTML = originalText;
@@ -2559,11 +4645,17 @@
       parseWorkbookBuffer,
       findBestMatch,
       enrichMatches,
+      createArchiveEntryKey,
+      filterPreviouslyImportedArchiveRecords,
+      classifyArchiveScreeningRecords,
+      mergeDocumentsByOrderNumber,
       syncImportedCustomerPrices,
       createImportPlan,
       collectReviewedDocuments,
       commitReviewedImports,
       showReviewPage,
+      showArchiveScreeningPage,
+      showBatchReviewPage,
       showReviewModal: showReviewPage,
       showImportPlanPage,
       showImportPlanModal: showImportPlanPage,

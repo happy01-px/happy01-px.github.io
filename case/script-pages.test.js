@@ -154,7 +154,15 @@ test("showSection switches pages, syncs hash and triggers page-specific refreshe
   };
 
   harness.window.showSection("dashboard");
+  const main = harness.window.document.createElement("main");
+  harness.window.document.body.prepend(main);
+  main.scrollTop = 96;
   harness.window.showSection("bills");
+  assert.equal(
+    main.scrollTop,
+    0,
+    "switching a main page should start at the consistent top position",
+  );
   harness.window.showSection("logs");
   harness.window.showSection("stock-movement");
   harness.window.showSection("sales-order");
@@ -325,11 +333,23 @@ test("bindMobileEvents handles mobile sidebar, desktop toggle and user menu dism
     configurable: true,
     value: 1200,
   });
-  harness.window.document.getElementById("sidebar-toggle-button").click();
-  assert.equal(
-    harness.window.document.getElementById("desktop-sidebar").style.display,
-    "none",
+  const desktopSidebar =
+    harness.window.document.getElementById("desktop-sidebar");
+  const sidebarToggleButton = harness.window.document.getElementById(
+    "sidebar-toggle-button",
   );
+  sidebarToggleButton.click();
+  assert.equal(desktopSidebar.classList.contains("is-collapsed"), true);
+  assert.equal(desktopSidebar.style.display, "");
+  assert.equal(desktopSidebar.getAttribute("aria-hidden"), "true");
+  assert.equal(sidebarToggleButton.getAttribute("aria-expanded"), "false");
+  assert.equal(sidebarToggleButton.getAttribute("aria-label"), "展开侧边栏");
+
+  sidebarToggleButton.click();
+  assert.equal(desktopSidebar.classList.contains("is-collapsed"), false);
+  assert.equal(desktopSidebar.getAttribute("aria-hidden"), "false");
+  assert.equal(sidebarToggleButton.getAttribute("aria-expanded"), "true");
+  assert.equal(sidebarToggleButton.getAttribute("aria-label"), "收起侧边栏");
 
   harness.close();
 });

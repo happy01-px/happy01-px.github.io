@@ -289,6 +289,65 @@
     });
   }
 
+  function clearFormError(target) {
+    const field =
+      typeof target === "string" ? document.querySelector(target) : target;
+    if (!field) return;
+    const wrapper =
+      field.closest(".app-field-error-host") || field.parentElement;
+    field.removeAttribute("aria-invalid");
+    field.classList.remove("app-field-error");
+    wrapper?.classList.remove("app-field-error-host");
+    wrapper?.querySelector("[data-form-error-message]")?.remove();
+  }
+
+  function reportFormError(message, target, form) {
+    const root = form || document;
+    const field =
+      typeof target === "string" ? root.querySelector(target) : target;
+    if (!field) {
+      global.alert(message);
+      return false;
+    }
+    root
+      .querySelectorAll("[data-form-error-message]")
+      .forEach((element) => element.remove());
+    root
+      .querySelectorAll(".app-field-error, .app-field-error-host")
+      .forEach((element) =>
+        element.classList.remove("app-field-error", "app-field-error-host"),
+      );
+    const wrapper = field.closest("label") || field.parentElement || field;
+    const focusTarget =
+      (field.matches("input:not([type=hidden]), select, textarea, button") &&
+        field) ||
+      field.querySelector(
+        "input:not([type=hidden]), select, textarea, button, .ant-select-selector",
+      ) ||
+      wrapper.querySelector(
+        "input:not([type=hidden]), select, textarea, button, .ant-select-selector",
+      );
+    wrapper.classList.add("app-field-error-host");
+    field.classList.add("app-field-error");
+    field.setAttribute("aria-invalid", "true");
+    const error = document.createElement("p");
+    error.dataset.formErrorMessage = "true";
+    error.className = "app-form-error-message";
+    error.textContent = String(message || "请检查此项");
+    wrapper.appendChild(error);
+    wrapper.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    focusTarget?.focus?.({ preventScroll: true });
+    const clear = () => clearFormError(field);
+    field.addEventListener("input", clear, { once: true });
+    field.addEventListener("change", clear, { once: true });
+    if (root !== field) {
+      root.addEventListener("input", clear, { once: true });
+      root.addEventListener("change", clear, { once: true });
+    }
+    global.alert(message);
+    return false;
+  }
+
   global.getLocalISOString = getLocalISOString;
   global.deepClone = deepClone;
   global.normalizeList = normalizeList;
@@ -307,6 +366,8 @@
   global.createAntdEmptyNode = createAntdEmptyNode;
   global.renderAntdEmptyState = renderAntdEmptyState;
   global.renderAntdEmptyTableRow = renderAntdEmptyTableRow;
+  global.reportFormError = reportFormError;
+  global.clearFormError = clearFormError;
 
   global.AppUtils = Object.freeze({
     getLocalISOString,
@@ -327,5 +388,7 @@
     createAntdEmptyNode,
     renderAntdEmptyState,
     renderAntdEmptyTableRow,
+    reportFormError,
+    clearFormError,
   });
 })(window);

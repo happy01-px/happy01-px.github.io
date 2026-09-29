@@ -23,6 +23,7 @@ function createPriceManagementMarkup() {
         <select id="customer-price-customer-select"></select>
         <button id="confirm-customer-price-pair"></button>
         <button id="reset-customer-price-pair"></button>
+        <button id="reuse-customer-price-pair" class="hidden"></button>
         <div id="customer-price-pair-summary"></div>
         <div id="customer-pair-price-content" hidden>
           <table><tbody id="customer-pair-price-table-body"></tbody></table>
@@ -176,6 +177,26 @@ test("price management materializes purchase and company-customer price tables",
     harness.window.document.getElementById("customer-price-customer-select")
       .disabled,
     false,
+  );
+  const reuseButton = harness.window.document.getElementById(
+    "reuse-customer-price-pair",
+  );
+  assert.equal(reuseButton.hidden, false);
+  reuseButton.click();
+  assert.equal(
+    harness.window.document.getElementById("customer-price-company-select")
+      .value,
+    "CO001",
+  );
+  assert.equal(
+    harness.window.document.getElementById("customer-price-customer-select")
+      .value,
+    "C001",
+  );
+  assert.equal(
+    harness.window.document.getElementById("customer-pair-price-content")
+      .hidden,
+    true,
   );
 
   harness.close();

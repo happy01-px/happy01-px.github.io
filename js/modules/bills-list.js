@@ -99,11 +99,22 @@
     const title = section.querySelector("h2");
     const desc = section.querySelector("p");
     const addButton = document.getElementById("add-bill-btn");
+    let bulkButton = document.getElementById("bulk-create-bills-btn");
+    if (!bulkButton && addButton?.parentElement) {
+      bulkButton = document.createElement("button");
+      bulkButton.id = "bulk-create-bills-btn";
+      bulkButton.type = "button";
+      addButton.parentElement.insertBefore(bulkButton, addButton);
+    }
 
     if (title) title.textContent = "对账单系统";
     if (desc) desc.textContent = "管理所有客户和供应商对账单";
     if (addButton) {
       addButton.innerHTML = '<i class="fa fa-plus mr-2"></i> 新增对账单';
+    }
+    if (bulkButton) {
+      bulkButton.innerHTML =
+        '<i class="fa fa-magic mr-2"></i> 批量生成未对账账期';
     }
 
     section.querySelectorAll("#bills-tabs button").forEach((button) => {
@@ -165,14 +176,19 @@
   function applyBillsListVisualParity() {
     const section = document.getElementById("bills");
     const addButton = document.getElementById("add-bill-btn");
+    const bulkButton = document.getElementById("bulk-create-bills-btn");
     if (!section) return;
 
     section.firstElementChild?.classList.add("bills-list-header");
 
     if (addButton) {
       addButton.className =
-        "bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg flex items-center transition-all-300";
+        "bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg flex items-center transition-all-300";
       addButton.parentElement?.classList.add("bills-list-toolbar");
+    }
+    if (bulkButton) {
+      bulkButton.className =
+        "border border-primary bg-white px-4 py-2 rounded-lg flex items-center text-primary transition-all-300 hover:bg-purple-50";
     }
   }
   function closeBillsModal() {
@@ -518,7 +534,7 @@
     return records
       .map(
         (record) => `
-            <tr>
+            <tr data-record-id="${global.escapeHTML(record.id)}">
                 <td class="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">${global.escapeHTML(record.id)}</td>
                 <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">${global.escapeHTML(getStatementDisplayName(record))}</td>
                 <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">${global.escapeHTML(formatStatementPeriod(record.periodStart, record.periodEnd))}</td>
@@ -639,6 +655,14 @@
       button.classList.toggle("border-primary", isActive);
       button.classList.toggle("border-transparent", !isActive);
     });
+    const bulkButton = document.getElementById("bulk-create-bills-btn");
+    if (bulkButton) {
+      bulkButton.classList.toggle("hidden", state.activeTab === "payment");
+      bulkButton.title =
+        state.activeTab === "supplier"
+          ? "按公司、供应商和月份批量生成未对账账期"
+          : "按公司、客户和月份批量生成未对账账期";
+    }
   }
   function bindBillTabEventsOverride() {
     if (state.filtersBound) return;

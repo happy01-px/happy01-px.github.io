@@ -76,6 +76,20 @@ test("updateBillsTable renders the active customer statements and empty states",
     harness.window.document.querySelector("#bills h2").textContent,
     /对账单系统/,
   );
+  assert.equal(
+    harness.window.document
+      .getElementById("add-bill-btn")
+      .classList.contains("px-4"),
+    true,
+    "the statement action should match the compact inventory action size",
+  );
+  assert.equal(
+    harness.window.document
+      .getElementById("add-bill-btn")
+      .parentElement.classList.contains("bills-list-toolbar"),
+    true,
+    "the statement action should use the shared left-aligned toolbar",
+  );
   assert.match(text, /BILL-C-001/);
   assert.doesNotMatch(text, /BILL-S-001/);
   assert.equal(
@@ -306,6 +320,111 @@ test("create bill flow blocks invalid tax rate values", async () => {
     harness.window.mockData.bills.length,
     fixture.mockData.bills.length,
   );
+
+  harness.close();
+});
+
+test("delivery note can open a prefilled bill with both save choices", async () => {
+  const harness = createWindow({
+    markup: createBillsMarkup(),
+    loadReactRuntime: true,
+  });
+  const fixture = createFixtureData();
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/bills-core.js",
+    "js/modules/bills-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  dispatchDomContentLoaded(harness.window);
+  await flushAsyncTasks();
+
+  harness.window.openCreateBillFromSource({
+    id: "SD-DIRECT",
+    type: "sales",
+    issueDate: "2026-06-18",
+    companyId: "CO001",
+    customerId: "C001",
+  });
+  await flushAsyncTasks();
+
+  assert.equal(
+    harness.window.document.getElementById("bill-create-type").value,
+    "customer",
+  );
+  assert.equal(
+    harness.window.document.getElementById("bill-create-company").value,
+    "CO001",
+  );
+  assert.equal(
+    harness.window.document.getElementById("bill-create-party").value,
+    "C001",
+  );
+  assert.equal(
+    harness.window.document.getElementById("bill-create-period-start").value,
+    "2026-06-01",
+  );
+  assert.ok(harness.window.document.getElementById("bill-create-continue-btn"));
+  assert.match(
+    harness.window.document.getElementById("bill-create-submit-btn")
+      .textContent,
+    /生成并查看/,
+  );
+
+  harness.close();
+});
+
+test("bill list can batch-create grouped unbilled periods", async () => {
+  const harness = createWindow({
+    markup: createBillsMarkup(),
+    loadReactRuntime: true,
+  });
+  const fixture = createFixtureData();
+  fixture.mockData.deliveryNotes = [
+    {
+      id: "SD-BULK-001",
+      type: "sales",
+      orderNo: "XS-BULK-001",
+      issueDate: "2026-11-08",
+      status: "confirmed",
+      companyId: "CO001",
+      customerId: "C001",
+      details: [
+        {
+          productId: "P001",
+          productName: "Widget",
+          quantity: 2,
+          unit: "个",
+          unitPrice: 150,
+          totalAmount: 300,
+          status: "confirmed",
+        },
+      ],
+    },
+  ];
+  loadScripts(harness.window, [
+    "js/modules/app-utils.js",
+    "js/modules/app-state.js",
+    "js/modules/bills-core.js",
+    "js/modules/bills-module.js",
+  ]);
+  applyFixtureState(harness.window, fixture);
+  harness.window.showAntdConfirm = async () => true;
+  harness.window.saveMockData = async () => true;
+  harness.window.addLog = () => {};
+  dispatchDomContentLoaded(harness.window);
+  await flushAsyncTasks();
+
+  const initialCount = harness.window.mockData.bills.length;
+  harness.window.document.getElementById("bulk-create-bills-btn").click();
+  await flushAsyncTasks(6);
+
+  assert.equal(harness.window.mockData.bills.length, initialCount + 1);
+  const created = harness.window.mockData.bills.at(-1);
+  assert.equal(created.periodStart, "2026-11-01");
+  assert.equal(created.periodEnd, "2026-11-30");
+  assert.deepEqual(created.sourceDocumentIds, ["SD-BULK-001"]);
 
   harness.close();
 });

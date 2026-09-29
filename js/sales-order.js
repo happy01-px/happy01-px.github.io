@@ -31,6 +31,7 @@
 
   let currentSalesOrder = createEmptySalesOrder();
   let currentPrintableDeliveryNote = null;
+  let salesOrderInitialSnapshot = "";
   let salesOrderPaperResizeObserver = null;
   let salesOrderResizeFallbackBound = false;
   let salesOrderLayoutFrame = 0;
@@ -1122,15 +1123,29 @@
     const payload = collectSalesOrderPayload();
 
     if (!payload.companyId) {
-      return { ok: false, message: "请选择发货公司。" };
+      return {
+        ok: false,
+        message: "请选择发货公司。",
+        selector: "#sales-order-company-container",
+      };
     }
 
     if (!payload.customerId) {
-      return { ok: false, message: "请选择客户。" };
+      return {
+        ok: false,
+        message: "请选择客户。",
+        selector: "#sales-order-customer-container",
+      };
     }
 
     if (!payload.items.length) {
-      return { ok: false, message: "请至少选择一条商品明细并填写出货数量。" };
+      return {
+        ok: false,
+        message: "请至少选择一条商品明细并填写出货数量。",
+        selector: currentSalesOrder.items[0]
+          ? `#sales-order-item-product-container-${currentSalesOrder.items[0].id}`
+          : "#sales-order-add-row-button",
+      };
     }
 
     for (const item of payload.items) {
@@ -1138,6 +1153,7 @@
         return {
           ok: false,
           message: `商品“${item.productName || "未命名商品"}”的出货数量必须大于 0。`,
+          selector: `#sales-order-item-qty-container-${item.id}`,
         };
       }
 
@@ -1145,6 +1161,7 @@
         return {
           ok: false,
           message: `请确认商品“${item.productName || "未命名商品"}”的本次送货单价，单价必须大于 0。`,
+          selector: `#sales-order-item-price-${item.id}`,
         };
       }
 
@@ -1155,13 +1172,18 @@
           ? global.getLedgerQuantity(item.productId, salesWarehouseId)
           : parseNumber(product?.stockQuantity);
       if (!product) {
-        return { ok: false, message: "存在无效商品，请重新选择。" };
+        return {
+          ok: false,
+          message: "存在无效商品，请重新选择。",
+          selector: `#sales-order-item-product-container-${item.id}`,
+        };
       }
 
       if (item.quantity > currentStock) {
         return {
           ok: false,
           message: `商品“${item.productName}”库存不足，当前库存 ${currentStock}。`,
+          selector: `#sales-order-item-qty-container-${item.id}`,
         };
       }
     }
@@ -1448,7 +1470,11 @@
   function showSalesOrderPreview() {
     const validation = validateSalesOrder();
     if (!validation.ok) {
-      alert(validation.message);
+      global.reportFormError?.(
+        validation.message,
+        validation.selector,
+        document.getElementById("sales-order"),
+      );
       return;
     }
 
@@ -1490,6 +1516,7 @@
     if (previewContainer) previewContainer.innerHTML = "";
     const printContainer = document.getElementById("sales-order-print-content");
     if (printContainer) printContainer.innerHTML = "";
+    salesOrderInitialSnapshot = JSON.stringify(collectSalesOrderPayload());
   }
 
   function initSalesOrder() {
@@ -1525,7 +1552,12 @@
   async function submitSalesOrder() {
     const validation = validateSalesOrder();
     if (!validation.ok) {
-      alert(validation.message);
+      showSalesOrderForm();
+      global.reportFormError?.(
+        validation.message,
+        validation.selector,
+        document.getElementById("sales-order"),
+      );
       return;
     }
 
@@ -1697,6 +1729,7 @@
       global.renderDashboardActivity();
     }
 
+    salesOrderInitialSnapshot = JSON.stringify(collectSalesOrderPayload());
     showSalesOrderPrintStep(deliveryNote);
     alert("销售出库已提交，请打印送货单。");
     return true;
@@ -1716,4 +1749,17 @@
   global.buildDeliveryNotePrintMarkup = buildDeliveryNotePrintMarkup;
   global.buildSalesOrderPreviewMarkup = buildSalesOrderPreviewMarkup;
   global.syncSalesOrderPaperLayout = syncSalesOrderPaperLayout;
+  global.hasUnsavedSalesOrder = function hasUnsavedSalesOrder() {
+    const section = document.getElementById("sales-order");
+    const printPanel = document.getElementById("sales-order-print-panel");
+    if (!section || section.classList.contains("hidden")) return false;
+    if (printPanel && !printPanel.classList.contains("hidden")) return false;
+    if (!salesOrderInitialSnapshot) return false;
+    return (
+      JSON.stringify(collectSalesOrderPayload()) !== salesOrderInitialSnapshot
+    );
+  };
+  global.discardSalesOrderChanges = function discardSalesOrderChanges() {
+    salesOrderInitialSnapshot = "";
+  };
 })(window);

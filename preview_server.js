@@ -6,6 +6,7 @@ const { execFile } = require("child_process");
 const { pathToFileURL } = require("url");
 const AppDataSchema = require("./js/modules/data-schema.js");
 const { SQLiteInventoryStore } = require("./server/sqlite-store.js");
+const ArchiveImport = require("./server/archive-import.js");
 
 const PORT = 8080;
 const HOST = "127.0.0.1";
@@ -205,7 +206,11 @@ function applyCorsHeaders(request, response) {
   }
 
   response.setHeader("Access-Control-Allow-Methods", "OPTIONS, GET, POST");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  response.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, X-Archive-Name, X-Progress-Stream",
+  );
+  response.setHeader("Access-Control-Expose-Headers", "X-Archive-Progress");
 }
 
 function getResponseContentType(contentType) {
@@ -586,6 +591,109 @@ const server = http.createServer(function (request, response) {
           "Content-Type": "application/json; charset=utf-8",
         });
         response.end(JSON.stringify({ success: false, error: "Invalid JSON" }));
+      }
+    });
+    return;
+  }
+
+  if (request.url === "/api/import/archive" && request.method === "POST") {
+    response.setHeader("X-Archive-Progress", "ndjson");
+    const chunks = [];
+    let bodySize = 0;
+    let bodyTooLarge = false;
+    let clientDisconnected = false;
+    response.on("close", () => {
+      if (!response.writableEnded) clientDisconnected = true;
+    });
+    request.on("data", (chunk) => {
+      if (bodyTooLarge) return;
+      bodySize += chunk.length;
+      if (bodySize > ArchiveImport.MAX_ARCHIVE_SIZE) {
+        bodyTooLarge = true;
+        response.writeHead(413, {
+          "Content-Type": "application/json; charset=utf-8",
+        });
+        response.end(
+          JSON.stringify({
+            success: false,
+            error: "压缩包超过 80MB，请拆分后导入。",
+          }),
+        );
+        request.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on("end", async () => {
+      if (bodyTooLarge) return;
+      const streamProgress = request.headers["x-progress-stream"] === "1";
+      let archiveName = "archive.rar";
+      try {
+        archiveName = decodeURIComponent(
+          String(request.headers["x-archive-name"] || archiveName),
+        );
+      } catch {
+        archiveName = "archive.rar";
+      }
+      try {
+        if (streamProgress) {
+          response.writeHead(200, {
+            "Content-Type": "application/x-ndjson; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+          });
+          const writeEvent = async (event) => {
+            if (response.destroyed || response.writableEnded) return;
+            const canContinue = response.write(`${JSON.stringify(event)}\n`);
+            if (!canContinue) {
+              await new Promise((resolve) => response.once("drain", resolve));
+            }
+            await new Promise((resolve) => setImmediate(resolve));
+          };
+          const result = await ArchiveImport.parseArchiveBuffer(
+            Buffer.concat(chunks),
+            archiveName,
+            {
+              onProgress: (progress) =>
+                writeEvent({ type: "progress", ...progress }),
+              shouldAbort: () => clientDisconnected,
+            },
+          );
+          await writeEvent({ type: "complete", result });
+          response.end();
+          return;
+        }
+        const result = await ArchiveImport.parseArchiveBuffer(
+          Buffer.concat(chunks),
+          archiveName,
+        );
+        response.writeHead(200, {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+        });
+        response.end(JSON.stringify(result));
+      } catch (error) {
+        console.error("Archive import failed:", error);
+        if (streamProgress && response.headersSent) {
+          if (!response.destroyed && !response.writableEnded) {
+            response.end(
+              `${JSON.stringify({
+                type: "error",
+                error: error.message || "Archive parsing failed.",
+              })}\n`,
+            );
+          }
+          return;
+        }
+        response.writeHead(400, {
+          "Content-Type": "application/json; charset=utf-8",
+        });
+        response.end(
+          JSON.stringify({
+            success: false,
+            error: error.message || "压缩包解析失败。",
+          }),
+        );
       }
     });
     return;

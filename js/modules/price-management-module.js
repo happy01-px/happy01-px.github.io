@@ -4,6 +4,51 @@
   let confirmedCustomerPair = null;
   let customerPriceDisplayMode = "exclusive";
   let customerPriceDrafts = new Map();
+  const RECENT_PAIR_KEY = "inventory.priceManagement.recentPair.v1";
+
+  function getRecentCustomerPair() {
+    try {
+      const pair = JSON.parse(
+        global.localStorage?.getItem(RECENT_PAIR_KEY) || "null",
+      );
+      if (!pair?.companyId || !pair?.customerId) return null;
+      const validCompany = getActiveCompanies().some(
+        (record) => record.id === pair.companyId,
+      );
+      const validCustomer = getActiveCustomers().some(
+        (record) => record.id === pair.customerId,
+      );
+      return validCompany && validCustomer ? pair : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function saveRecentCustomerPair(pair) {
+    try {
+      global.localStorage?.setItem(RECENT_PAIR_KEY, JSON.stringify(pair));
+    } catch (_error) {
+      // Storage can be unavailable in privacy mode; price management still works.
+    }
+  }
+
+  function reuseRecentCustomerPair() {
+    const pair = getRecentCustomerPair();
+    if (!pair) return false;
+    const companySelect = document.getElementById(
+      "customer-price-company-select",
+    );
+    const customerSelect = document.getElementById(
+      "customer-price-customer-select",
+    );
+    if (companySelect) companySelect.value = pair.companyId;
+    if (customerSelect) customerSelect.value = pair.customerId;
+    global.showAntdMessage?.(
+      "info",
+      "已带入上次使用的公司与客户，请确认后查看价格",
+    );
+    return true;
+  }
 
   function list(value) {
     return Array.isArray(value) ? value : [];
@@ -225,6 +270,7 @@
       "confirm-customer-price-pair",
     );
     const resetButton = document.getElementById("reset-customer-price-pair");
+    const reuseButton = document.getElementById("reuse-customer-price-pair");
 
     if (companySelect) companySelect.disabled = isConfirmed;
     if (customerSelect) customerSelect.disabled = isConfirmed;
@@ -233,6 +279,11 @@
       confirmButton.textContent = isConfirmed ? "已确认" : "确认";
     }
     if (resetButton) resetButton.disabled = !isConfirmed;
+    if (reuseButton) {
+      const canReuse = !isConfirmed && Boolean(getRecentCustomerPair());
+      reuseButton.hidden = !canReuse;
+      reuseButton.classList.toggle("hidden", !canReuse);
+    }
   }
 
   function renderCustomerPriceModeSwitch(customer) {
@@ -311,6 +362,7 @@
     }
 
     confirmedCustomerPair = { companyId, customerId };
+    saveRecentCustomerPair(confirmedCustomerPair);
     customerPriceDisplayMode = "exclusive";
     customerPriceDrafts = new Map();
     syncCustomerPairControls();
@@ -443,7 +495,7 @@
       (record) => record.id === customerId,
     );
     if (!company || !customer) {
-      alert("请先选择公司和客户");
+      showPriceWarning("请先选择公司和客户");
       return false;
     }
     const rows = Array.from(
@@ -465,8 +517,11 @@
       if (!priceText) continue;
       const referencePrice = Number(priceText);
       if (!Number.isFinite(referencePrice) || referencePrice < 0) {
-        alert("客户参考价必须是大于或等于 0 的有效数字");
-        return false;
+        return global.reportFormError?.(
+          "客户参考价必须是大于或等于 0 的有效数字",
+          row.querySelector('[data-field="referencePrice"]'),
+          document.getElementById("price-management"),
+        );
       }
       const priceTaxMode =
         row.querySelector('[data-field="priceTaxMode"]')?.value === "inclusive"
@@ -503,7 +558,7 @@
       changed += 1;
     }
     if (!changed) {
-      alert("价格表没有变化");
+      global.showAntdMessage?.("info", "价格表没有变化");
       return false;
     }
     const auditLogs = stageAuditLogs({
@@ -518,13 +573,16 @@
       mockData.customerProductPrices = beforePrices;
       logsData = beforeLogs;
       rollbackStagedAuditLogs(auditLogs);
-      alert("商品价格表保存失败，变更已回滚");
+      global.showAntdMessage?.("error", "商品价格表保存失败，变更已回滚");
       return false;
     }
     finalizeStagedAuditLogs(auditLogs);
     customerPriceDrafts = new Map();
     renderCustomerPairPriceTable();
-    alert(`商品价格表已保存，共更新 ${changed} 项`);
+    global.showAntdMessage?.(
+      "success",
+      `商品价格表已保存，共更新 ${changed} 项`,
+    );
     return true;
   }
 
@@ -641,6 +699,11 @@
         id: "reset-customer-price-pair",
         eventName: "click",
         handler: resetCustomerPricePair,
+      },
+      {
+        id: "reuse-customer-price-pair",
+        eventName: "click",
+        handler: reuseRecentCustomerPair,
       },
       {
         id: "save-customer-pair-prices",

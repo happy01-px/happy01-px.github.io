@@ -129,3 +129,24 @@ test("AppUtils renders Ant Design Empty for shared empty states when runtime is 
 
   harness.close();
 });
+
+test("AppUtils reports a field error inline and focuses the invalid control", () => {
+  const harness = createWindow({
+    markup: '<form id="form"><label>名称<input name="name"></label></form>',
+  });
+  loadScripts(harness.window, ["js/modules/app-utils.js"]);
+  const form = harness.window.document.getElementById("form");
+  const input = form.querySelector("input");
+
+  assert.equal(
+    harness.window.reportFormError("请输入名称", '[name="name"]', form),
+    false,
+  );
+  assert.equal(harness.window.document.activeElement, input);
+  assert.equal(input.getAttribute("aria-invalid"), "true");
+  assert.match(form.textContent, /请输入名称/);
+
+  input.dispatchEvent(new harness.window.Event("input", { bubbles: true }));
+  assert.equal(form.querySelector("[data-form-error-message]"), null);
+  harness.close();
+});
